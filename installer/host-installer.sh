@@ -247,9 +247,18 @@ apply_runtime_falco_guard() {
   fi
 }
 
+disable_traefik_if_present() {
+  # k3s may keep Traefik enabled from previous runs; remove it to free 80/443 for Envoy.
+  kubectl -n kube-system delete helmchart traefik --ignore-not-found >/dev/null 2>&1 || true
+  kubectl -n kube-system delete deployment traefik --ignore-not-found >/dev/null 2>&1 || true
+  kubectl -n kube-system delete service traefik --ignore-not-found >/dev/null 2>&1 || true
+  kubectl -n kube-system delete daemonset svclb-traefik --ignore-not-found >/dev/null 2>&1 || true
+  kubectl -n kube-system delete pods -l app=traefik --ignore-not-found >/dev/null 2>&1 || true
+}
+
 if ! command -v k3s >/dev/null 2>&1; then
   if ! is_skipped "k3s"; then
-    curl -sfL https://get.k3s.io | sh -
+    curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="--disable traefik" sh -
   fi
 fi
 
@@ -261,6 +270,8 @@ if ! kubectl cluster-info >/dev/null 2>&1; then
   echo "Kubernetes cluster is unreachable. Check k3s status and KUBECONFIG=${KUBECONFIG}"
   exit 1
 fi
+
+disable_traefik_if_present
 
 if ! command -v helm >/dev/null 2>&1; then
   if ! is_skipped "helm"; then
