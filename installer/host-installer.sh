@@ -13,6 +13,7 @@ STRIMZI_NAMESPACE="${STRIMZI_NAMESPACE:-strimzi-system}"
 SPARK_ENABLED="${SPARK_ENABLED:-0}"
 SPARK_IMAGE="${SPARK_IMAGE:-apache/spark}"
 SPARK_TAG="${SPARK_TAG:-3.5.8-scala2.12-java17-python3-ubuntu}"
+FALCO_ENABLED="${FALCO_ENABLED:-0}"
 REFRESH_RELEASE_ASSETS="${REFRESH_RELEASE_ASSETS:-1}"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -171,6 +172,14 @@ apply_runtime_spark_guard() {
   fi
 }
 
+apply_runtime_falco_guard() {
+  if [[ "${FALCO_ENABLED}" != "1" ]]; then
+    kubectl delete daemonset falco -n "${NAMESPACE}" --ignore-not-found >/dev/null 2>&1 || true
+    kubectl delete vpa falco-vpa -n "${NAMESPACE}" --ignore-not-found >/dev/null 2>&1 || true
+    kubectl delete pod -n "${NAMESPACE}" -l app=falco --ignore-not-found >/dev/null 2>&1 || true
+  fi
+}
+
 if ! command -v k3s >/dev/null 2>&1; then
   if ! is_skipped "k3s"; then
     curl -sfL https://get.k3s.io | sh -
@@ -252,6 +261,7 @@ fi
 if ! is_skipped "infra"; then
   helm upgrade host-infra "${INFRA_CHART_PATH}" "${HELM_UPGRADE_FLAGS[@]}" \
     --set global.namespace="${NAMESPACE}" \
+    --set falco.enabled="${FALCO_ENABLED}" \
     --set spark.enabled="${SPARK_ENABLED}" \
     --set spark.image="${SPARK_IMAGE}" \
     --set spark.tag="${SPARK_TAG}"
@@ -269,8 +279,10 @@ kubectl delete service kafka -n "${NAMESPACE}" --ignore-not-found >/dev/null 2>&
 kubectl delete configmap kafka-topics -n "${NAMESPACE}" --ignore-not-found >/dev/null 2>&1 || true
 kubectl delete vpa kafka-vpa -n "${NAMESPACE}" --ignore-not-found >/dev/null 2>&1 || true
 kubectl delete pod -n "${NAMESPACE}" -l app=kafka --ignore-not-found >/dev/null 2>&1 || true
+kubectl delete pod kafka-0 -n "${NAMESPACE}" --ignore-not-found >/dev/null 2>&1 || true
 
 apply_runtime_spark_guard
+apply_runtime_falco_guard
 
 LB_IP="$(kubectl get svc -n ${NAMESPACE} -o jsonpath='{.items[0].status.loadBalancer.ingress[0].ip}' 2>/dev/null || true)"
 if [[ -z "${LB_IP}" ]]; then

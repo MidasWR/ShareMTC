@@ -90,7 +90,7 @@ sudo ./installer/host-installer.sh
 Release download example:
 
 ```bash
-gh release download --repo MidasWR/ShareMTC --pattern "host-installer" --clobber && chmod +x host-installer && sudo TAG=v1.0.15 ./host-installer
+gh release download --repo MidasWR/ShareMTC --pattern "host-installer" --clobber && chmod +x host-installer && sudo ./host-installer
 ```
 
 ## Helm Layout

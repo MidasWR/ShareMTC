@@ -24,6 +24,7 @@ postgres:
   dns: host-db
 
 falco:
+  enabled: false
   dns: falco
   image: public.ecr.aws/falcosecurity/falco
   tag: 0.38.2
