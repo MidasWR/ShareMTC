@@ -1,12 +1,14 @@
+{{- if .Values.kafka.vpa.enabled }}
 apiVersion: autoscaling.k8s.io/v1
 kind: VerticalPodAutoscaler
 metadata:
   name: kafka-vpa
-  namespace: {{ .Values.global.namespace }}
+  namespace: {{ .Values.kafka.vpa.namespace }}
 spec:
   targetRef:
     apiVersion: apps/v1
-    kind: StatefulSet
-    name: {{ .Values.kafka.dns }}
+    kind: Deployment
+    name: strimzi-cluster-operator
   updatePolicy:
     updateMode: Auto
+{{- end }}

@@ -47,16 +47,22 @@ wait_for_atlas_crd() {
 }
 
 install_prerequisites() {
+  kubectl create namespace "${NAMESPACE}" --dry-run=client -o yaml | kubectl apply -f -
+
   helm repo add kyverno https://kyverno.github.io/kyverno
   helm repo add postgres-operator-charts https://opensource.zalando.com/postgres-operator/charts/postgres-operator
   helm repo add fairwinds-stable https://charts.fairwinds.com/stable
+  helm repo add strimzi https://strimzi.io/charts/
   helm repo update
 
+  helm upgrade --install strimzi-kafka-operator strimzi/strimzi-kafka-operator -n "${NAMESPACE}" --create-namespace
   helm upgrade --install kyverno kyverno/kyverno -n kyverno --create-namespace
   helm upgrade --install postgres-operator postgres-operator-charts/postgres-operator -n postgres-operator --create-namespace
   helm upgrade --install atlas-operator oci://ghcr.io/ariga/charts/atlas-operator -n atlas-system --create-namespace
   helm upgrade --install vpa fairwinds-stable/vpa -n vpa --create-namespace
 
+  wait_for_crd "kafkas.kafka.strimzi.io"
+  wait_for_crd "kafkatopics.kafka.strimzi.io"
   wait_for_crd "clusterpolicies.kyverno.io"
   wait_for_crd "postgresqls.acid.zalan.do"
   wait_for_atlas_crd

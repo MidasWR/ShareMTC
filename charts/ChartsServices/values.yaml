@@ -30,3 +30,6 @@ frontend:
 hostagent:
   dns: hostagent
   image: midaswr/host-hostagent
+
+kafka:
+  bootstrapService: host-kafka-kafka-bootstrap

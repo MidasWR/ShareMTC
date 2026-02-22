@@ -1,9 +1,23 @@
-apiVersion: v1
-kind: ConfigMap
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
 metadata:
-  name: kafka-topics
+  name: host-metrics
   namespace: {{ .Values.global.namespace }}
-data:
-  topics: |
-    host.metrics
-    host.health
+  labels:
+    strimzi.io/cluster: {{ .Values.kafka.clusterName }}
+spec:
+  topicName: {{ .Values.kafka.topicMetrics | quote }}
+  partitions: 1
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: host-health
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    strimzi.io/cluster: {{ .Values.kafka.clusterName }}
+spec:
+  topicName: {{ .Values.kafka.topicHealth | quote }}
+  partitions: 1
+  replicas: 1
