@@ -67,12 +67,13 @@ normalize_infra_chart_for_atlas_api() {
   if [[ -f "${chart_path}" ]]; then
     local inspect_file
     inspect_file="$(tar -xOf "${chart_path}" host-infra/templates/atlas/crd.yaml 2>/dev/null || true)"
-    if [[ "${inspect_file}" == *"apiVersion: atlasgo.io/v1alpha1"* ]]; then
+    if [[ -n "${inspect_file}" ]] && [[ "${inspect_file}" == *"apiVersion: atlasgo.io/v1alpha1"* || "${inspect_file}" == *"spec.target"* || "${inspect_file}" == *"spec.projectConfig"* ]]; then
       local unpack_dir="${TMP_DIR}/host-infra"
       mkdir -p "${unpack_dir}"
       tar -xzf "${chart_path}" -C "${TMP_DIR}"
-      sed -i 's|apiVersion: atlasgo.io/v1alpha1|apiVersion: db.atlasgo.io/v1alpha1|g' \
-        "${unpack_dir}/templates/atlas/crd.yaml"
+      # Legacy AtlasMigration template is incompatible with current Atlas Operator CRD.
+      # Atlas migration is optional, so we disable only this template for backward compatibility.
+      rm -f "${unpack_dir}/templates/atlas/crd.yaml"
       echo "${unpack_dir}"
       return 0
     fi
