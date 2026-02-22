@@ -6,6 +6,10 @@ REGISTRY ?= docker.io/midaswr
 REPO ?= MidasWR/ShareMTC
 AUTO_COMMIT_PUSH ?= 1
 COMMIT_MSG ?= chore: release $(TAG)
+DIST_DIR ?= dist
+INFRA_CHART_ASSET := $(DIST_DIR)/host-infra-$(TAG).tgz
+SERVICES_CHART_ASSET := $(DIST_DIR)/host-services-$(TAG).tgz
+INSTALLER_ASSET := $(DIST_DIR)/host-installer
 
 SERVICES := authservice adminservice resourceservice billingservice hostagent frontend
 
@@ -21,9 +25,9 @@ comma := ,
 SKIP_ITEMS := $(strip $(subst $(comma),$(space),$(SKIP)))
 has_skip = $(filter $(1),$(SKIP_ITEMS))
 
-.PHONY: release auto-commit-push guard-tag test build-images chart-package package-installer github-release
+.PHONY: release auto-commit-push guard-tag clean-dist test build-images chart-package package-installer verify-assets github-release
 
-release: auto-commit-push guard-tag test build-images chart-package package-installer github-release
+release: auto-commit-push guard-tag clean-dist test build-images chart-package package-installer verify-assets github-release
 
 auto-commit-push:
 	@if [ "$(AUTO_COMMIT_PUSH)" != "1" ]; then \
@@ -52,6 +56,9 @@ guard-tag:
 		exit 1; \
 	fi
 
+clean-dist:
+	@rm -rf "$(DIST_DIR)" && mkdir -p "$(DIST_DIR)"
+
 test:
 	@if [ "$(call has_skip,1)" = "1" ]; then \
 		echo "Skipping tests"; \
@@ -76,19 +83,23 @@ chart-package:
 	@if [ "$(call has_skip,3)" = "3" ]; then \
 		echo "Skipping chart package"; \
 	else \
-		helm package charts/ChartsInfra --version $(TAG) --app-version $(TAG) -d dist && \
-		helm package charts/ChartsServices --version $(TAG) --app-version $(TAG) -d dist; \
+		helm package charts/ChartsInfra --version $(TAG) --app-version $(TAG) -d "$(DIST_DIR)" && \
+		helm package charts/ChartsServices --version $(TAG) --app-version $(TAG) -d "$(DIST_DIR)"; \
 	fi
 
 package-installer:
 	@if [ "$(call has_skip,4)" = "4" ]; then \
 		echo "Skipping installer package"; \
 	else \
-		mkdir -p dist && \
-		cp installer/host-installer.sh dist/host-installer && \
-		chmod +x dist/host-installer && \
-		cp -r charts dist/charts; \
+		mkdir -p "$(DIST_DIR)" && \
+		cp installer/host-installer.sh "$(INSTALLER_ASSET)" && \
+		chmod +x "$(INSTALLER_ASSET)"; \
 	fi
+
+verify-assets:
+	@test -f "$(INSTALLER_ASSET)" || (echo "Missing installer asset: $(INSTALLER_ASSET)"; exit 1)
+	@test -f "$(INFRA_CHART_ASSET)" || (echo "Missing infra chart asset: $(INFRA_CHART_ASSET)"; exit 1)
+	@test -f "$(SERVICES_CHART_ASSET)" || (echo "Missing services chart asset: $(SERVICES_CHART_ASSET)"; exit 1)
 
 github-release:
 	@if [ "$(call has_skip,5)" = "5" ]; then \
@@ -96,9 +107,9 @@ github-release:
 	else \
 		if gh release view "$(TAG)" --repo "$(REPO)" >/dev/null 2>&1; then \
 			echo "Release $(TAG) exists: overwrite assets"; \
-			gh release upload "$(TAG)" dist/host-installer dist/*.tgz --repo "$(REPO)" --clobber && \
+			gh release upload "$(TAG)" "$(INSTALLER_ASSET)" "$(INFRA_CHART_ASSET)" "$(SERVICES_CHART_ASSET)" --repo "$(REPO)" --clobber && \
 			gh release edit "$(TAG)" --repo "$(REPO)" --title "$(TAG)" --notes "Release $(TAG)"; \
 		else \
-			gh release create "$(TAG)" dist/host-installer dist/*.tgz --repo "$(REPO)" --title "$(TAG)" --notes "Release $(TAG)"; \
+			gh release create "$(TAG)" "$(INSTALLER_ASSET)" "$(INFRA_CHART_ASSET)" "$(SERVICES_CHART_ASSET)" --repo "$(REPO)" --title "$(TAG)" --notes "Release $(TAG)"; \
 		fi; \
 	fi
