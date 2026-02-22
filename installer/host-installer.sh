@@ -9,6 +9,8 @@ SKIP="${SKIP:-}"
 RELEASE_REPO="${RELEASE_REPO:-MidasWR/ShareMTC}"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+TMP_DIR="$(mktemp -d)"
+trap 'rm -rf "${TMP_DIR}"' EXIT
 
 is_skipped() {
   local key="$1"
@@ -57,6 +59,26 @@ install_prerequisites() {
   wait_for_crd "postgresqls.acid.zalan.do"
   wait_for_atlas_crd
   wait_for_crd "verticalpodautoscalers.autoscaling.k8s.io"
+}
+
+normalize_infra_chart_for_atlas_api() {
+  local chart_path="$1"
+
+  if [[ -f "${chart_path}" ]]; then
+    local inspect_file
+    inspect_file="$(tar -xOf "${chart_path}" host-infra/templates/atlas/crd.yaml 2>/dev/null || true)"
+    if [[ "${inspect_file}" == *"apiVersion: atlasgo.io/v1alpha1"* ]]; then
+      local unpack_dir="${TMP_DIR}/host-infra"
+      mkdir -p "${unpack_dir}"
+      tar -xzf "${chart_path}" -C "${TMP_DIR}"
+      sed -i 's|apiVersion: atlasgo.io/v1alpha1|apiVersion: db.atlasgo.io/v1alpha1|g' \
+        "${unpack_dir}/templates/atlas/crd.yaml"
+      echo "${unpack_dir}"
+      return 0
+    fi
+  fi
+
+  echo "${chart_path}"
 }
 
 if ! command -v k3s >/dev/null 2>&1; then
@@ -115,6 +137,8 @@ if [[ ! -d "${INFRA_CHART_PATH}" || ! -d "${SERVICES_CHART_PATH}" ]]; then
     exit 1
   fi
 fi
+
+INFRA_CHART_PATH="$(normalize_infra_chart_for_atlas_api "${INFRA_CHART_PATH}")"
 
 if ! is_skipped "infra"; then
   helm upgrade --install host-infra "${INFRA_CHART_PATH}" \
