@@ -64,21 +64,19 @@ ensure_namespace_active() {
 adopt_strimzi_cluster_resources() {
   local target_ns="$1"
   local release_name="strimzi-kafka-operator"
-  local resources=(
-    "clusterrole/strimzi-cluster-operator-global"
-    "clusterrole/strimzi-cluster-operator-namespaced"
-    "clusterrole/strimzi-cluster-operator-watched"
-    "clusterrolebinding/strimzi-cluster-operator"
-    "clusterrolebinding/strimzi-cluster-operator-kafka-broker-delegation"
-  )
+  local resource
 
-  for resource in "${resources[@]}"; do
-    if kubectl get "${resource}" >/dev/null 2>&1; then
-      kubectl label "${resource}" app.kubernetes.io/managed-by=Helm --overwrite >/dev/null 2>&1 || true
-      kubectl annotate "${resource}" meta.helm.sh/release-name="${release_name}" --overwrite >/dev/null 2>&1 || true
-      kubectl annotate "${resource}" meta.helm.sh/release-namespace="${target_ns}" --overwrite >/dev/null 2>&1 || true
-    fi
-  done
+  while IFS= read -r resource; do
+    kubectl label "${resource}" app.kubernetes.io/managed-by=Helm --overwrite >/dev/null 2>&1 || true
+    kubectl annotate "${resource}" meta.helm.sh/release-name="${release_name}" --overwrite >/dev/null 2>&1 || true
+    kubectl annotate "${resource}" meta.helm.sh/release-namespace="${target_ns}" --overwrite >/dev/null 2>&1 || true
+  done < <(kubectl get clusterrole -o name 2>/dev/null | grep '^clusterrole/strimzi-' || true)
+
+  while IFS= read -r resource; do
+    kubectl label "${resource}" app.kubernetes.io/managed-by=Helm --overwrite >/dev/null 2>&1 || true
+    kubectl annotate "${resource}" meta.helm.sh/release-name="${release_name}" --overwrite >/dev/null 2>&1 || true
+    kubectl annotate "${resource}" meta.helm.sh/release-namespace="${target_ns}" --overwrite >/dev/null 2>&1 || true
+  done < <(kubectl get clusterrolebinding -o name 2>/dev/null | grep '^clusterrolebinding/strimzi-' || true)
 }
 
 install_prerequisites() {
