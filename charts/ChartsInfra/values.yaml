@@ -16,6 +16,7 @@ redis:
 
 envoy:
   dns: envoy-gateway
+  gatewayClassName: envoy
 
 prometheus:
   dns: prometheus

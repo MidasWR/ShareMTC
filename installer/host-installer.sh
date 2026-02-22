@@ -12,6 +12,7 @@ FORCE_HELM_UPGRADE="${FORCE_HELM_UPGRADE:-1}"
 HELM_TIMEOUT="${HELM_TIMEOUT:-15m}"
 STRIMZI_NAMESPACE="${STRIMZI_NAMESPACE:-strimzi-system}"
 ENVOY_NAMESPACE="${ENVOY_NAMESPACE:-envoy-gateway-system}"
+ENVOY_GATEWAY_CLASS="${ENVOY_GATEWAY_CLASS:-}"
 SPARK_ENABLED="${SPARK_ENABLED:-0}"
 SPARK_IMAGE="${SPARK_IMAGE:-apache/spark}"
 SPARK_TAG="${SPARK_TAG:-3.5.8-scala2.12-java17-python3-ubuntu}"
@@ -73,6 +74,23 @@ wait_for_gatewayclass() {
   done
 }
 
+resolve_envoy_gateway_class() {
+  if [[ -n "${ENVOY_GATEWAY_CLASS}" ]]; then
+    echo "${ENVOY_GATEWAY_CLASS}"
+    return 0
+  fi
+
+  local detected
+  detected="$(kubectl get gatewayclass -o jsonpath='{range .items[*]}{.metadata.name}{"|"}{.spec.controllerName}{"\n"}{end}' \
+    | awk -F'|' '/gateway.envoyproxy.io\/gatewayclass-controller/ {print $1; exit}')"
+
+  if [[ -z "${detected}" ]]; then
+    echo "envoy"
+  else
+    echo "${detected}"
+  fi
+}
+
 ensure_namespace_active() {
   local ns="$1"
   local phase
@@ -130,7 +148,7 @@ install_prerequisites() {
   wait_for_crd "postgresqls.acid.zalan.do"
   wait_for_atlas_crd
   wait_for_crd "verticalpodautoscalers.autoscaling.k8s.io"
-  wait_for_gatewayclass "envoy"
+  wait_for_gatewayclass "$(resolve_envoy_gateway_class)"
 }
 
 normalize_infra_chart_for_compat() {
@@ -242,6 +260,9 @@ if ! is_skipped "prereqs"; then
   install_prerequisites
 fi
 
+ENVOY_GATEWAY_CLASS="$(resolve_envoy_gateway_class)"
+echo "Using GatewayClass: ${ENVOY_GATEWAY_CLASS}"
+
 ensure_namespace_active "${NAMESPACE}"
 kubectl create namespace "${NAMESPACE}" --dry-run=client -o yaml | kubectl apply -f -
 
@@ -293,6 +314,7 @@ fi
 if ! is_skipped "infra"; then
   helm upgrade host-infra "${INFRA_CHART_PATH}" "${HELM_UPGRADE_FLAGS[@]}" \
     --set global.namespace="${NAMESPACE}" \
+    --set envoy.gatewayClassName="${ENVOY_GATEWAY_CLASS}" \
     --set falco.enabled="${FALCO_ENABLED}" \
     --set spark.enabled="${SPARK_ENABLED}" \
     --set spark.image="${SPARK_IMAGE}" \

@@ -1,3 +1,4 @@
+{{- if .Values.hostagent.enabled }}
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
@@ -22,3 +23,4 @@ spec:
           envFrom:
             - configMapRef:
                 name: host-services-config
+{{- end }}

@@ -37,6 +37,7 @@ frontend:
   port: 80
 
 hostagent:
+  enabled: false
   dns: hostagent
   image: midaswr/host-hostagent
 

@@ -4,7 +4,7 @@ metadata:
   name: {{ .Values.envoy.dns }}
   namespace: {{ .Values.global.namespace }}
 spec:
-  gatewayClassName: envoy
+  gatewayClassName: {{ .Values.envoy.gatewayClassName | quote }}
   listeners:
     - name: http
       protocol: HTTP

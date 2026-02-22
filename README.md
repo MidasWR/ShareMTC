@@ -15,7 +15,7 @@ ShareMTC is a provider marketplace for VM and Pod capacity where users can both 
 - `services/adminservice` - provider management for internal and donor machines.
 - `services/resourceservice` - host heartbeats, free resource state, allocation and release with cgroups v2 limits.
 - `services/billingservice` - plans, usage ingestion, accrual history, VIP network bonus logic.
-- `services/hostagent` - host-side metrics collector and Kafka publisher.
+- `services/hostagent` - host-side metrics collector for user PCs; can publish to Kafka and/or directly to `resourceservice` heartbeat API.
 - `services/frontend` - TypeScript + Tailwind control panel (auth/admin/host/vip).
 - `services/sdk` - shared logger, DB, JWT, HTTP utilities.
 
@@ -23,7 +23,7 @@ ShareMTC is a provider marketplace for VM and Pod capacity where users can both 
 
 - Go microservices use `net/http`, clear separation (`cmd`, `config`, `internal/adapter`, `internal/models`, `internal/service`).
 - Logging is unified through `zerolog` and `github.com/MidasWR/mc-go-writer`.
-- Kafka receives host metrics from `hostagent`; Spark integration is expected to consume these topics for aggregate processing.
+- User PC `hostagent` instances send resource heartbeat to `resourceservice` (`/v1/resources/heartbeat`) and can additionally publish to Kafka for stream processing.
 - Envoy Gateway is used as the external entrypoint.
 - Postgres stores auth, provider, resource, and billing data.
 
@@ -87,6 +87,14 @@ Installer is idempotent and supports repeated runs through `helm upgrade --insta
 sudo ./installer/host-installer.sh
 ```
 
+Install node agent on user PC (shared-hosting donor model):
+
+```bash
+sudo RESOURCE_API_URL=http://<platform-host-ip> ./installer/hostagent-node-installer.sh
+```
+
+`hostagent-node-installer.sh` installs a `systemd` service (`sharemct-hostagent`) that runs hostagent in Docker on the user's machine and reports available resources to the platform.
+
 Release download example:
 
 ```bash
@@ -103,6 +111,7 @@ gh release download --repo MidasWR/ShareMTC --pattern "host-installer" --clobber
   - `template/config.yaml`
 
 All service names are controlled through `values.yaml` `dns` fields.
+`hostagent` chart deployment is disabled by default because primary deployment target is user PCs.
 
 ## Security and Observability
 

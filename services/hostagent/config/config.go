@@ -10,6 +10,8 @@ type Config struct {
 	ProviderID      string
 	KafkaBrokers    []string
 	KafkaTopic      string
+	ResourceAPIURL  string
+	AgentToken      string
 	Interval        time.Duration
 	MidasWriterAddr string
 }
@@ -17,8 +19,10 @@ type Config struct {
 func Load() Config {
 	return Config{
 		ProviderID:      env("PROVIDER_ID", "local-host"),
-		KafkaBrokers:    splitCSV(env("KAFKA_BROKERS", "localhost:9092")),
+		KafkaBrokers:    splitCSV(env("KAFKA_BROKERS", "")),
 		KafkaTopic:      env("KAFKA_TOPIC", "host.metrics"),
+		ResourceAPIURL:  env("RESOURCE_API_URL", ""),
+		AgentToken:      env("AGENT_TOKEN", ""),
 		Interval:        time.Duration(envInt("METRICS_INTERVAL_SECONDS", 5)) * time.Second,
 		MidasWriterAddr: os.Getenv("MIDAS_WRITER_ADDR"),
 	}
