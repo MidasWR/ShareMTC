@@ -9,6 +9,7 @@ SKIP="${SKIP:-}"
 RELEASE_REPO="${RELEASE_REPO:-MidasWR/ShareMTC}"
 FORCE_HELM_UPGRADE="${FORCE_HELM_UPGRADE:-1}"
 HELM_TIMEOUT="${HELM_TIMEOUT:-15m}"
+STRIMZI_NAMESPACE="${STRIMZI_NAMESPACE:-strimzi-system}"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TMP_DIR="$(mktemp -d)"
@@ -46,8 +47,23 @@ wait_for_atlas_crd() {
   done
 }
 
+ensure_namespace_active() {
+  local ns="$1"
+  local phase
+  phase="$(kubectl get namespace "${ns}" -o jsonpath='{.status.phase}' 2>/dev/null || true)"
+  if [[ "${phase}" == "Terminating" ]]; then
+    echo "Namespace ${ns} is Terminating; clearing finalizers to recover."
+    kubectl patch namespace "${ns}" --type=merge -p '{"spec":{"finalizers":[]}}' >/dev/null 2>&1 || true
+    kubectl wait --for=delete "namespace/${ns}" --timeout=120s >/dev/null 2>&1 || true
+  fi
+  if ! kubectl get namespace "${ns}" >/dev/null 2>&1; then
+    kubectl create namespace "${ns}" >/dev/null
+  fi
+}
+
 install_prerequisites() {
-  kubectl create namespace "${NAMESPACE}" --dry-run=client -o yaml | kubectl apply -f -
+  ensure_namespace_active "${NAMESPACE}"
+  ensure_namespace_active "${STRIMZI_NAMESPACE}"
 
   helm repo add kyverno https://kyverno.github.io/kyverno
   helm repo add postgres-operator-charts https://opensource.zalando.com/postgres-operator/charts/postgres-operator
@@ -55,7 +71,7 @@ install_prerequisites() {
   helm repo add strimzi https://strimzi.io/charts/
   helm repo update
 
-  helm upgrade --install strimzi-kafka-operator strimzi/strimzi-kafka-operator -n "${NAMESPACE}" --create-namespace
+  helm upgrade --install strimzi-kafka-operator strimzi/strimzi-kafka-operator -n "${STRIMZI_NAMESPACE}" --create-namespace
   helm upgrade --install kyverno kyverno/kyverno -n kyverno --create-namespace
   helm upgrade --install postgres-operator postgres-operator-charts/postgres-operator -n postgres-operator --create-namespace
   helm upgrade --install atlas-operator oci://ghcr.io/ariga/charts/atlas-operator -n atlas-system --create-namespace
@@ -120,6 +136,7 @@ if ! is_skipped "prereqs"; then
   install_prerequisites
 fi
 
+ensure_namespace_active "${NAMESPACE}"
 kubectl create namespace "${NAMESPACE}" --dry-run=client -o yaml | kubectl apply -f -
 
 # Align namespace ownership metadata so Helm can manage Namespace resource from host-infra chart.
