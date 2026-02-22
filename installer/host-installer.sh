@@ -212,6 +212,13 @@ if ! is_skipped "services"; then
     --set global.tag="${TAG}"
 fi
 
+# Cleanup of legacy Kafka resources from pre-Strimzi chart revisions.
+kubectl delete statefulset kafka -n "${NAMESPACE}" --ignore-not-found >/dev/null 2>&1 || true
+kubectl delete service kafka -n "${NAMESPACE}" --ignore-not-found >/dev/null 2>&1 || true
+kubectl delete configmap kafka-topics -n "${NAMESPACE}" --ignore-not-found >/dev/null 2>&1 || true
+kubectl delete vpa kafka-vpa -n "${NAMESPACE}" --ignore-not-found >/dev/null 2>&1 || true
+kubectl delete pod -n "${NAMESPACE}" -l app=kafka --ignore-not-found >/dev/null 2>&1 || true
+
 # Backward compatibility cleanup for old infra charts where spark template was always on.
 if [[ "${SPARK_ENABLED}" != "1" ]]; then
   kubectl delete deployment spark -n "${NAMESPACE}" --ignore-not-found >/dev/null 2>&1 || true

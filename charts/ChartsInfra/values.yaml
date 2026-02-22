@@ -25,6 +25,8 @@ postgres:
 
 falco:
   dns: falco
+  image: public.ecr.aws/falcosecurity/falco
+  tag: 0.38.2
 
 kyverno:
   dns: kyverno
