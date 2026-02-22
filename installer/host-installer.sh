@@ -10,6 +10,9 @@ RELEASE_REPO="${RELEASE_REPO:-MidasWR/ShareMTC}"
 FORCE_HELM_UPGRADE="${FORCE_HELM_UPGRADE:-1}"
 HELM_TIMEOUT="${HELM_TIMEOUT:-15m}"
 STRIMZI_NAMESPACE="${STRIMZI_NAMESPACE:-strimzi-system}"
+SPARK_ENABLED="${SPARK_ENABLED:-0}"
+SPARK_IMAGE="${SPARK_IMAGE:-apache/spark}"
+SPARK_TAG="${SPARK_TAG:-3.5.8-scala2.12-java17-python3-ubuntu}"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TMP_DIR="$(mktemp -d)"
@@ -197,13 +200,23 @@ fi
 
 if ! is_skipped "infra"; then
   helm upgrade host-infra "${INFRA_CHART_PATH}" "${HELM_UPGRADE_FLAGS[@]}" \
-    --set global.namespace="${NAMESPACE}"
+    --set global.namespace="${NAMESPACE}" \
+    --set spark.enabled="${SPARK_ENABLED}" \
+    --set spark.image="${SPARK_IMAGE}" \
+    --set spark.tag="${SPARK_TAG}"
 fi
 
 if ! is_skipped "services"; then
   helm upgrade host-services "${SERVICES_CHART_PATH}" "${HELM_UPGRADE_FLAGS[@]}" \
     --set global.namespace="${NAMESPACE}" \
     --set global.tag="${TAG}"
+fi
+
+# Backward compatibility cleanup for old infra charts where spark template was always on.
+if [[ "${SPARK_ENABLED}" != "1" ]]; then
+  kubectl delete deployment spark -n "${NAMESPACE}" --ignore-not-found >/dev/null 2>&1 || true
+  kubectl delete vpa spark-vpa -n "${NAMESPACE}" --ignore-not-found >/dev/null 2>&1 || true
+  kubectl delete pod -n "${NAMESPACE}" -l app=spark --ignore-not-found >/dev/null 2>&1 || true
 fi
 
 LB_IP="$(kubectl get svc -n ${NAMESPACE} -o jsonpath='{.items[0].status.loadBalancer.ingress[0].ip}' 2>/dev/null || true)"
