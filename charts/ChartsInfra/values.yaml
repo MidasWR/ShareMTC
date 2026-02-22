@@ -27,3 +27,9 @@ spark:
 
 atlas:
   dns: atlas
+  migration:
+    enabled: false
+    urlSecretName: atlas-db-url
+    urlSecretKey: url
+    remoteDirName: ""
+    remoteDirTag: latest

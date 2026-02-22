@@ -1,17 +1,16 @@
+{{- if .Values.atlas.migration.enabled }}
 apiVersion: db.atlasgo.io/v1alpha1
 kind: AtlasMigration
 metadata:
   name: host-atlas
   namespace: {{ .Values.global.namespace }}
 spec:
-  target:
-    urlFrom:
-      secretKeyRef:
-        name: atlas-db-url
-        key: url
-  projectConfig:
-    config: |
-      env "k8s" {
-        src = "file://migrations"
-        dev = "docker://postgres/16/dev"
-      }
+  urlFrom:
+    secretKeyRef:
+      name: {{ .Values.atlas.migration.urlSecretName }}
+      key: {{ .Values.atlas.migration.urlSecretKey }}
+  dir:
+    remote:
+      name: {{ required "atlas.migration.remoteDirName is required when atlas.migration.enabled=true" .Values.atlas.migration.remoteDirName | quote }}
+      tag: {{ .Values.atlas.migration.remoteDirTag | quote }}
+{{- end }}
