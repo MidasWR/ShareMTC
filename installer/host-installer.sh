@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+export KUBECONFIG="${KUBECONFIG:-/etc/rancher/k3s/k3s.yaml}"
+
 TAG="${TAG:-v1.0.0}"
 NAMESPACE="${NAMESPACE:-host}"
 SKIP="${SKIP:-}"
