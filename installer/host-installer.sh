@@ -149,6 +149,14 @@ normalize_infra_chart_for_compat() {
     fi
   fi
 
+  local falco_tpl="${work_dir}/templates/falco/deployment.yaml"
+  local falco_vpa_tpl="${work_dir}/templates/falco/vpa.yaml"
+  if [[ -f "${falco_tpl}" ]] && [[ "${FALCO_ENABLED}" != "1" ]]; then
+    # Old chart variants could always render falco; enforce disable at installer level.
+    rm -f "${falco_tpl}" "${falco_vpa_tpl}"
+    changed=1
+  fi
+
   if [[ "${changed}" -eq 1 ]]; then
     echo "${work_dir}"
   else
@@ -272,14 +280,6 @@ if ! is_skipped "services"; then
     --set global.namespace="${NAMESPACE}" \
     --set global.tag="${TAG}"
 fi
-
-# Cleanup of legacy Kafka resources from pre-Strimzi chart revisions.
-kubectl delete statefulset kafka -n "${NAMESPACE}" --ignore-not-found >/dev/null 2>&1 || true
-kubectl delete service kafka -n "${NAMESPACE}" --ignore-not-found >/dev/null 2>&1 || true
-kubectl delete configmap kafka-topics -n "${NAMESPACE}" --ignore-not-found >/dev/null 2>&1 || true
-kubectl delete vpa kafka-vpa -n "${NAMESPACE}" --ignore-not-found >/dev/null 2>&1 || true
-kubectl delete pod -n "${NAMESPACE}" -l app=kafka --ignore-not-found >/dev/null 2>&1 || true
-kubectl delete pod kafka-0 -n "${NAMESPACE}" --ignore-not-found >/dev/null 2>&1 || true
 
 apply_runtime_spark_guard
 apply_runtime_falco_guard
