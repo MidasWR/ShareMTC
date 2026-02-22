@@ -29,14 +29,13 @@ wait_for_crd() {
   done
 }
 
-wait_for_apigroup() {
-  local group="$1"
-  local max_attempts="${2:-60}"
+wait_for_atlas_crd() {
+  local max_attempts="${1:-60}"
   local i=0
-  until kubectl api-resources --api-group "${group}" | awk 'NR>1 {print $1}' | grep -q .; do
+  until kubectl get crd atlasmigrations.db.atlasgo.io >/dev/null 2>&1 || kubectl get crd atlasschemas.db.atlasgo.io >/dev/null 2>&1; do
     i=$((i + 1))
     if [[ "${i}" -ge "${max_attempts}" ]]; then
-      echo "Timed out waiting for API group ${group}"
+      echo "Timed out waiting for Atlas Operator CRDs (atlasmigrations/atlasschemas)"
       exit 1
     fi
     sleep 2
@@ -56,7 +55,7 @@ install_prerequisites() {
 
   wait_for_crd "clusterpolicies.kyverno.io"
   wait_for_crd "postgresqls.acid.zalan.do"
-  wait_for_apigroup "atlasgo.io"
+  wait_for_atlas_crd
   wait_for_crd "verticalpodautoscalers.autoscaling.k8s.io"
 }
 
