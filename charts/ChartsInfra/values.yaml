@@ -14,7 +14,7 @@ prometheus:
   dns: prometheus
 
 postgres:
-  dns: postgresql
+  dns: host-db
 
 falco:
   dns: falco

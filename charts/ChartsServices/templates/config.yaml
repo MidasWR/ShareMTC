@@ -4,6 +4,6 @@ metadata:
   name: host-services-config
   namespace: {{ .Values.global.namespace }}
 data:
-  POSTGRES_DSN: "postgres://postgres:postgres@postgresql.{{ .Values.global.namespace }}.svc.cluster.local:5432/host?sslmode=disable"
-  REDIS_ADDR: "redis-master.{{ .Values.global.namespace }}.svc.cluster.local:6379"
-  KAFKA_BROKERS: "kafka-controller-headless.{{ .Values.global.namespace }}.svc.cluster.local:9092"
+  POSTGRES_DSN: "postgres://postgres:postgres@host-db.{{ .Values.global.namespace }}.svc.cluster.local:5432/host?sslmode=disable"
+  REDIS_ADDR: "redis.{{ .Values.global.namespace }}.svc.cluster.local:6379"
+  KAFKA_BROKERS: "kafka.{{ .Values.global.namespace }}.svc.cluster.local:9092"
