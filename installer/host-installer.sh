@@ -15,10 +15,51 @@ is_skipped() {
   [[ ",${SKIP}," == *",${key},"* ]]
 }
 
+wait_for_crd() {
+  local crd="$1"
+  local max_attempts="${2:-60}"
+  local i=0
+  until kubectl get crd "${crd}" >/dev/null 2>&1; do
+    i=$((i + 1))
+    if [[ "${i}" -ge "${max_attempts}" ]]; then
+      echo "Timed out waiting for CRD ${crd}"
+      exit 1
+    fi
+    sleep 2
+  done
+}
+
+install_prerequisites() {
+  helm repo add kyverno https://kyverno.github.io/kyverno >/dev/null 2>&1 || true
+  helm repo add postgres-operator-charts https://opensource.zalando.com/postgres-operator/charts/postgres-operator >/dev/null 2>&1 || true
+  helm repo add ariga https://ariga.github.io/charts >/dev/null 2>&1 || true
+  helm repo add fairwinds-stable https://charts.fairwinds.com/stable >/dev/null 2>&1 || true
+  helm repo update >/dev/null
+
+  helm upgrade --install kyverno kyverno/kyverno -n kyverno --create-namespace
+  helm upgrade --install postgres-operator postgres-operator-charts/postgres-operator -n postgres-operator --create-namespace
+  helm upgrade --install atlas-operator ariga/atlas-operator -n atlas-system --create-namespace
+  helm upgrade --install vpa fairwinds-stable/vpa -n vpa --create-namespace
+
+  wait_for_crd "clusterpolicies.kyverno.io"
+  wait_for_crd "postgresqls.acid.zalan.do"
+  wait_for_crd "atlasmigrations.atlasgo.io"
+  wait_for_crd "verticalpodautoscalers.autoscaling.k8s.io"
+}
+
 if ! command -v k3s >/dev/null 2>&1; then
   if ! is_skipped "k3s"; then
     curl -sfL https://get.k3s.io | sh -
   fi
+fi
+
+if ! kubectl cluster-info >/dev/null 2>&1; then
+  systemctl restart k3s >/dev/null 2>&1 || true
+fi
+
+if ! kubectl cluster-info >/dev/null 2>&1; then
+  echo "Kubernetes cluster is unreachable. Check k3s status and KUBECONFIG=${KUBECONFIG}"
+  exit 1
 fi
 
 if ! command -v helm >/dev/null 2>&1; then
@@ -30,6 +71,10 @@ fi
 if ! is_skipped "sysctl"; then
   sudo sysctl -w net.core.somaxconn=4096
   sudo sysctl -w fs.file-max=1048576
+fi
+
+if ! is_skipped "prereqs"; then
+  install_prerequisites
 fi
 
 kubectl create namespace "${NAMESPACE}" --dry-run=client -o yaml | kubectl apply -f -
