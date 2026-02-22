@@ -1,4 +1,4 @@
-apiVersion: atlasgo.io/v1alpha1
+apiVersion: db.atlasgo.io/v1alpha1
 kind: AtlasMigration
 metadata:
   name: host-atlas
