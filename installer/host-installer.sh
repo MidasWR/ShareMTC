@@ -113,6 +113,11 @@ fi
 
 kubectl create namespace "${NAMESPACE}" --dry-run=client -o yaml | kubectl apply -f -
 
+# Align namespace ownership metadata so Helm can manage Namespace resource from host-infra chart.
+kubectl label namespace "${NAMESPACE}" app.kubernetes.io/managed-by=Helm --overwrite
+kubectl annotate namespace "${NAMESPACE}" meta.helm.sh/release-name=host-infra --overwrite
+kubectl annotate namespace "${NAMESPACE}" meta.helm.sh/release-namespace="${NAMESPACE}" --overwrite
+
 INFRA_CHART_PATH="${ROOT_DIR}/charts/ChartsInfra"
 SERVICES_CHART_PATH="${ROOT_DIR}/charts/ChartsServices"
 
