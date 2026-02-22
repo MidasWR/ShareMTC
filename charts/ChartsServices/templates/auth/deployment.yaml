@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: {{ .Values.auth.dns }}
-          image: {{ .Values.auth.image }}:{{ .Values.global.tag }}
+          image: {{ .Values.auth.image }}:{{ default .Chart.AppVersion .Values.global.tag }}
           ports:
             - containerPort: {{ .Values.auth.port }}
           envFrom:

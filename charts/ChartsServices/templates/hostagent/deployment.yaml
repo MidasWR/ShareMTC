@@ -15,7 +15,7 @@ spec:
       hostNetwork: true
       containers:
         - name: {{ .Values.hostagent.dns }}
-          image: {{ .Values.hostagent.image }}:{{ .Values.global.tag }}
+          image: {{ .Values.hostagent.image }}:{{ default .Chart.AppVersion .Values.global.tag }}
           securityContext:
             privileged: true
           envFrom:

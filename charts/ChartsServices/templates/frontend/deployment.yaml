@@ -15,6 +15,6 @@ spec:
     spec:
       containers:
         - name: {{ .Values.frontend.dns }}
-          image: {{ .Values.frontend.image }}:{{ .Values.global.tag }}
+          image: {{ .Values.frontend.image }}:{{ default .Chart.AppVersion .Values.global.tag }}
           ports:
             - containerPort: {{ .Values.frontend.port }}

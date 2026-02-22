@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: {{ .Values.billing.dns }}
-          image: {{ .Values.billing.image }}:{{ .Values.global.tag }}
+          image: {{ .Values.billing.image }}:{{ default .Chart.AppVersion .Values.global.tag }}
           ports:
             - containerPort: {{ .Values.billing.port }}
           envFrom:

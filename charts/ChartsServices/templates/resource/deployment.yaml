@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: {{ .Values.resource.dns }}
-          image: {{ .Values.resource.image }}:{{ .Values.global.tag }}
+          image: {{ .Values.resource.image }}:{{ default .Chart.AppVersion .Values.global.tag }}
           securityContext:
             privileged: true
           ports:

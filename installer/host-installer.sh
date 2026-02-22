@@ -7,6 +7,8 @@ TAG="${TAG:-v1.0.0}"
 NAMESPACE="${NAMESPACE:-host}"
 SKIP="${SKIP:-}"
 RELEASE_REPO="${RELEASE_REPO:-MidasWR/ShareMTC}"
+FORCE_HELM_UPGRADE="${FORCE_HELM_UPGRADE:-1}"
+HELM_TIMEOUT="${HELM_TIMEOUT:-15m}"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TMP_DIR="$(mktemp -d)"
@@ -146,15 +148,18 @@ fi
 
 INFRA_CHART_PATH="$(normalize_infra_chart_for_atlas_api "${INFRA_CHART_PATH}")"
 
+HELM_UPGRADE_FLAGS=(--install --namespace "${NAMESPACE}" --atomic --cleanup-on-fail --wait --timeout "${HELM_TIMEOUT}" --reset-values)
+if [[ "${FORCE_HELM_UPGRADE}" == "1" ]]; then
+  HELM_UPGRADE_FLAGS+=(--force)
+fi
+
 if ! is_skipped "infra"; then
-  helm upgrade --install host-infra "${INFRA_CHART_PATH}" \
-    --namespace "${NAMESPACE}" \
+  helm upgrade host-infra "${INFRA_CHART_PATH}" "${HELM_UPGRADE_FLAGS[@]}" \
     --set global.namespace="${NAMESPACE}"
 fi
 
 if ! is_skipped "services"; then
-  helm upgrade --install host-services "${SERVICES_CHART_PATH}" \
-    --namespace "${NAMESPACE}" \
+  helm upgrade host-services "${SERVICES_CHART_PATH}" "${HELM_UPGRADE_FLAGS[@]}" \
     --set global.namespace="${NAMESPACE}" \
     --set global.tag="${TAG}"
 fi
