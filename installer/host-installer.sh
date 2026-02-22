@@ -13,6 +13,7 @@ STRIMZI_NAMESPACE="${STRIMZI_NAMESPACE:-strimzi-system}"
 SPARK_ENABLED="${SPARK_ENABLED:-0}"
 SPARK_IMAGE="${SPARK_IMAGE:-apache/spark}"
 SPARK_TAG="${SPARK_TAG:-3.5.8-scala2.12-java17-python3-ubuntu}"
+REFRESH_RELEASE_ASSETS="${REFRESH_RELEASE_ASSETS:-1}"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TMP_DIR="$(mktemp -d)"
@@ -107,25 +108,67 @@ install_prerequisites() {
   wait_for_crd "verticalpodautoscalers.autoscaling.k8s.io"
 }
 
-normalize_infra_chart_for_atlas_api() {
+normalize_infra_chart_for_compat() {
   local chart_path="$1"
+  local work_dir=""
+  local changed=0
 
-  if [[ -f "${chart_path}" ]]; then
+  if [[ -d "${chart_path}" ]]; then
+    work_dir="${TMP_DIR}/host-infra-dir"
+    cp -R "${chart_path}" "${work_dir}"
+  elif [[ -f "${chart_path}" ]]; then
+    tar -xzf "${chart_path}" -C "${TMP_DIR}"
+    work_dir="${TMP_DIR}/host-infra"
+  else
+    echo "${chart_path}"
+    return 0
+  fi
+
+  local atlas_tpl="${work_dir}/templates/atlas/crd.yaml"
+  if [[ -f "${atlas_tpl}" ]]; then
     local inspect_file
-    inspect_file="$(tar -xOf "${chart_path}" host-infra/templates/atlas/crd.yaml 2>/dev/null || true)"
-    if [[ -n "${inspect_file}" ]] && [[ "${inspect_file}" == *"apiVersion: atlasgo.io/v1alpha1"* || "${inspect_file}" == *"spec.target"* || "${inspect_file}" == *"spec.projectConfig"* ]]; then
-      local unpack_dir="${TMP_DIR}/host-infra"
-      mkdir -p "${unpack_dir}"
-      tar -xzf "${chart_path}" -C "${TMP_DIR}"
-      # Legacy AtlasMigration template is incompatible with current Atlas Operator CRD.
-      # Atlas migration is optional, so we disable only this template for backward compatibility.
-      rm -f "${unpack_dir}/templates/atlas/crd.yaml"
-      echo "${unpack_dir}"
-      return 0
+    inspect_file="$(cat "${atlas_tpl}")"
+    if [[ "${inspect_file}" == *"apiVersion: atlasgo.io/v1alpha1"* || "${inspect_file}" == *"spec.target"* || "${inspect_file}" == *"spec.projectConfig"* ]]; then
+      rm -f "${atlas_tpl}"
+      changed=1
     fi
   fi
 
-  echo "${chart_path}"
+  local spark_tpl="${work_dir}/templates/spark/deployment.yaml"
+  local spark_vpa_tpl="${work_dir}/templates/spark/vpa.yaml"
+  if [[ -f "${spark_tpl}" ]]; then
+    if [[ "${SPARK_ENABLED}" != "1" ]]; then
+      rm -f "${spark_tpl}" "${spark_vpa_tpl}"
+      changed=1
+    else
+      if grep -q 'bitnami/spark:3.5.2' "${spark_tpl}" 2>/dev/null; then
+        sed -i "s|bitnami/spark:3.5.2|${SPARK_IMAGE}:${SPARK_TAG}|g" "${spark_tpl}"
+        changed=1
+      fi
+    fi
+  fi
+
+  if [[ "${changed}" -eq 1 ]]; then
+    echo "${work_dir}"
+  else
+    echo "${chart_path}"
+  fi
+}
+
+apply_runtime_spark_guard() {
+  if [[ "${SPARK_ENABLED}" != "1" ]]; then
+    kubectl delete deployment spark -n "${NAMESPACE}" --ignore-not-found >/dev/null 2>&1 || true
+    kubectl delete vpa spark-vpa -n "${NAMESPACE}" --ignore-not-found >/dev/null 2>&1 || true
+    kubectl delete pod -n "${NAMESPACE}" -l app=spark --ignore-not-found >/dev/null 2>&1 || true
+    return 0
+  fi
+
+  local spark_image
+  spark_image="$(kubectl get deployment spark -n "${NAMESPACE}" -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null || true)"
+  if [[ "${spark_image}" == "bitnami/spark:3.5.2" ]]; then
+    kubectl set image deployment/spark spark="${SPARK_IMAGE}:${SPARK_TAG}" -n "${NAMESPACE}" >/dev/null 2>&1 || true
+    kubectl rollout restart deployment/spark -n "${NAMESPACE}" >/dev/null 2>&1 || true
+  fi
 }
 
 if ! command -v k3s >/dev/null 2>&1; then
@@ -173,7 +216,15 @@ if [[ ! -d "${INFRA_CHART_PATH}" || ! -d "${SERVICES_CHART_PATH}" ]]; then
   INFRA_CHART_PATH="${SCRIPT_DIR}/host-infra-${TAG}.tgz"
   SERVICES_CHART_PATH="${SCRIPT_DIR}/host-services-${TAG}.tgz"
 
-  if [[ ! -f "${INFRA_CHART_PATH}" || ! -f "${SERVICES_CHART_PATH}" ]]; then
+  if [[ "${REFRESH_RELEASE_ASSETS}" == "1" ]]; then
+    if command -v gh >/dev/null 2>&1; then
+      gh release download --repo "${RELEASE_REPO}" \
+        --pattern "host-infra-${TAG}.tgz" \
+        --pattern "host-services-${TAG}.tgz" \
+        --dir "${SCRIPT_DIR}" \
+        --clobber
+    fi
+  elif [[ ! -f "${INFRA_CHART_PATH}" || ! -f "${SERVICES_CHART_PATH}" ]]; then
     if command -v gh >/dev/null 2>&1; then
       gh release download --repo "${RELEASE_REPO}" \
         --pattern "host-infra-${TAG}.tgz" \
@@ -191,7 +242,7 @@ if [[ ! -d "${INFRA_CHART_PATH}" || ! -d "${SERVICES_CHART_PATH}" ]]; then
   fi
 fi
 
-INFRA_CHART_PATH="$(normalize_infra_chart_for_atlas_api "${INFRA_CHART_PATH}")"
+INFRA_CHART_PATH="$(normalize_infra_chart_for_compat "${INFRA_CHART_PATH}")"
 
 HELM_UPGRADE_FLAGS=(--install --namespace "${NAMESPACE}" --atomic --cleanup-on-fail --wait --timeout "${HELM_TIMEOUT}" --reset-values)
 if [[ "${FORCE_HELM_UPGRADE}" == "1" ]]; then
@@ -219,12 +270,7 @@ kubectl delete configmap kafka-topics -n "${NAMESPACE}" --ignore-not-found >/dev
 kubectl delete vpa kafka-vpa -n "${NAMESPACE}" --ignore-not-found >/dev/null 2>&1 || true
 kubectl delete pod -n "${NAMESPACE}" -l app=kafka --ignore-not-found >/dev/null 2>&1 || true
 
-# Backward compatibility cleanup for old infra charts where spark template was always on.
-if [[ "${SPARK_ENABLED}" != "1" ]]; then
-  kubectl delete deployment spark -n "${NAMESPACE}" --ignore-not-found >/dev/null 2>&1 || true
-  kubectl delete vpa spark-vpa -n "${NAMESPACE}" --ignore-not-found >/dev/null 2>&1 || true
-  kubectl delete pod -n "${NAMESPACE}" -l app=spark --ignore-not-found >/dev/null 2>&1 || true
-fi
+apply_runtime_spark_guard
 
 LB_IP="$(kubectl get svc -n ${NAMESPACE} -o jsonpath='{.items[0].status.loadBalancer.ingress[0].ip}' 2>/dev/null || true)"
 if [[ -z "${LB_IP}" ]]; then
