@@ -92,7 +92,7 @@ package-installer:
 		echo "Skipping installer package"; \
 	else \
 		mkdir -p "$(DIST_DIR)" && \
-		cp installer/host-installer.sh "$(INSTALLER_ASSET)" && \
+		sed 's|^RELEASE_TAG="__RELEASE_TAG__"|RELEASE_TAG="$(TAG)"|' installer/host-installer.sh > "$(INSTALLER_ASSET)" && \
 		chmod +x "$(INSTALLER_ASSET)"; \
 	fi
 

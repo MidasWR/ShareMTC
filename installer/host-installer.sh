@@ -3,7 +3,8 @@ set -euo pipefail
 
 export KUBECONFIG="${KUBECONFIG:-/etc/rancher/k3s/k3s.yaml}"
 
-TAG="${TAG:-v1.0.0}"
+RELEASE_TAG="__RELEASE_TAG__"
+TAG="${TAG:-${RELEASE_TAG}}"
 NAMESPACE="${NAMESPACE:-host}"
 SKIP="${SKIP:-}"
 RELEASE_REPO="${RELEASE_REPO:-MidasWR/ShareMTC}"
@@ -18,6 +19,10 @@ REFRESH_RELEASE_ASSETS="${REFRESH_RELEASE_ASSETS:-1}"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TMP_DIR="$(mktemp -d)"
+if [[ -z "${TAG}" || "${TAG}" == "__RELEASE_TAG__" ]]; then
+  echo "Installer release tag is not embedded. Rebuild installer from release pipeline."
+  exit 1
+fi
 echo "Version ${TAG}"
 trap 'rm -rf "${TMP_DIR}"' EXIT
 
