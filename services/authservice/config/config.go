@@ -3,6 +3,8 @@ package config
 import (
 	"os"
 	"strconv"
+
+	sdkconfig "github.com/MidasWR/ShareMTC/services/sdk/config"
 )
 
 type Config struct {
@@ -20,7 +22,7 @@ type Config struct {
 func Load() Config {
 	return Config{
 		Port:            env("PORT", "8081"),
-		PostgresDSN:     env("POSTGRES_DSN", "postgres://postgres:postgres@localhost:5432/host?sslmode=disable"),
+		PostgresDSN:     postgresDSN(),
 		JWTSecret:       env("JWT_SECRET", "change-me-in-production"),
 		GoogleClientID:  os.Getenv("GOOGLE_CLIENT_ID"),
 		GoogleSecret:    os.Getenv("GOOGLE_CLIENT_SECRET"),
@@ -29,6 +31,17 @@ func Load() Config {
 		MidasWriterTLS:  envBool("MIDAS_WRITER_TLS", false),
 		TokenTTLMinutes: envInt("TOKEN_TTL_MINUTES", 1440),
 	}
+}
+
+func postgresDSN() string {
+	return sdkconfig.BuildPostgresDSN(os.Getenv("POSTGRES_DSN"), sdkconfig.PostgresEnv{
+		Host:     env("PGHOST", "localhost"),
+		Port:     env("PGPORT", "5432"),
+		Database: env("PGDATABASE", "host"),
+		User:     env("PGUSER", "postgres"),
+		Password: env("PGPASSWORD", "postgres"),
+		SSLMode:  env("PGSSLMODE", "require"),
+	})
 }
 
 func env(name string, fallback string) string {

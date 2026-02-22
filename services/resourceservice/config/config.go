@@ -1,6 +1,10 @@
 package config
 
-import "os"
+import (
+	"os"
+
+	sdkconfig "github.com/MidasWR/ShareMTC/services/sdk/config"
+)
 
 type Config struct {
 	Port            string
@@ -11,7 +15,7 @@ type Config struct {
 func Load() Config {
 	return Config{
 		Port:            env("PORT", "8083"),
-		PostgresDSN:     env("POSTGRES_DSN", "postgres://postgres:postgres@localhost:5432/host?sslmode=disable"),
+		PostgresDSN:     postgresDSN(),
 		MidasWriterAddr: os.Getenv("MIDAS_WRITER_ADDR"),
 	}
 }
@@ -22,4 +26,15 @@ func env(name, fallback string) string {
 		return fallback
 	}
 	return v
+}
+
+func postgresDSN() string {
+	return sdkconfig.BuildPostgresDSN(os.Getenv("POSTGRES_DSN"), sdkconfig.PostgresEnv{
+		Host:     env("PGHOST", "localhost"),
+		Port:     env("PGPORT", "5432"),
+		Database: env("PGDATABASE", "host"),
+		User:     env("PGUSER", "postgres"),
+		Password: env("PGPASSWORD", "postgres"),
+		SSLMode:  env("PGSSLMODE", "require"),
+	})
 }

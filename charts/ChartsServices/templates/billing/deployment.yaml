@@ -18,6 +18,25 @@ spec:
           image: {{ .Values.billing.image }}:{{ default .Chart.AppVersion .Values.global.tag }}
           ports:
             - containerPort: {{ .Values.billing.port }}
+          env:
+            - name: PGHOST
+              value: "{{ .Values.postgres.host }}.{{ .Values.global.namespace }}.svc.cluster.local"
+            - name: PGPORT
+              value: {{ .Values.postgres.port | quote }}
+            - name: PGDATABASE
+              value: {{ .Values.postgres.database | quote }}
+            - name: PGSSLMODE
+              value: {{ .Values.postgres.sslmode | quote }}
+            - name: PGUSER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.postgres.userSecretName }}
+                  key: {{ .Values.postgres.usernameKey }}
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.postgres.userSecretName }}
+                  key: {{ .Values.postgres.passwordKey }}
           envFrom:
             - configMapRef:
                 name: host-services-config

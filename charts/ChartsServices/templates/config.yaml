@@ -4,6 +4,5 @@ metadata:
   name: host-services-config
   namespace: {{ .Values.global.namespace }}
 data:
-  POSTGRES_DSN: "postgres://postgres:postgres@host-db.{{ .Values.global.namespace }}.svc.cluster.local:5432/host?sslmode=require"
   REDIS_ADDR: "redis.{{ .Values.global.namespace }}.svc.cluster.local:6379"
   KAFKA_BROKERS: "{{ .Values.kafka.bootstrapService }}.{{ .Values.global.namespace }}.svc.cluster.local:9092"
