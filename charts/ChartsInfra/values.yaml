@@ -30,7 +30,10 @@ kyverno:
   dns: kyverno
 
 spark:
+  enabled: false
   dns: spark
+  image: apache/spark
+  tag: 3.5.8-scala2.12-java17-python3-ubuntu
 
 atlas:
   dns: atlas

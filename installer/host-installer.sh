@@ -61,6 +61,26 @@ ensure_namespace_active() {
   fi
 }
 
+adopt_strimzi_cluster_resources() {
+  local target_ns="$1"
+  local release_name="strimzi-kafka-operator"
+  local resources=(
+    "clusterrole/strimzi-cluster-operator-global"
+    "clusterrole/strimzi-cluster-operator-namespaced"
+    "clusterrole/strimzi-cluster-operator-watched"
+    "clusterrolebinding/strimzi-cluster-operator"
+    "clusterrolebinding/strimzi-cluster-operator-kafka-broker-delegation"
+  )
+
+  for resource in "${resources[@]}"; do
+    if kubectl get "${resource}" >/dev/null 2>&1; then
+      kubectl label "${resource}" app.kubernetes.io/managed-by=Helm --overwrite >/dev/null 2>&1 || true
+      kubectl annotate "${resource}" meta.helm.sh/release-name="${release_name}" --overwrite >/dev/null 2>&1 || true
+      kubectl annotate "${resource}" meta.helm.sh/release-namespace="${target_ns}" --overwrite >/dev/null 2>&1 || true
+    fi
+  done
+}
+
 install_prerequisites() {
   ensure_namespace_active "${NAMESPACE}"
   ensure_namespace_active "${STRIMZI_NAMESPACE}"
@@ -71,6 +91,7 @@ install_prerequisites() {
   helm repo add strimzi https://strimzi.io/charts/
   helm repo update
 
+  adopt_strimzi_cluster_resources "${STRIMZI_NAMESPACE}"
   helm upgrade --install strimzi-kafka-operator strimzi/strimzi-kafka-operator -n "${STRIMZI_NAMESPACE}" --create-namespace
   helm upgrade --install kyverno kyverno/kyverno -n kyverno --create-namespace
   helm upgrade --install postgres-operator postgres-operator-charts/postgres-operator -n postgres-operator --create-namespace

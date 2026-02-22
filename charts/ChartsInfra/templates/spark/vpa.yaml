@@ -1,3 +1,4 @@
+{{- if .Values.spark.enabled }}
 apiVersion: autoscaling.k8s.io/v1
 kind: VerticalPodAutoscaler
 metadata:
@@ -10,3 +11,4 @@ spec:
     name: {{ .Values.spark.dns }}
   updatePolicy:
     updateMode: Auto
+{{- end }}

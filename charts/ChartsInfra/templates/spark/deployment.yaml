@@ -1,3 +1,4 @@
+{{- if .Values.spark.enabled }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -15,4 +16,5 @@ spec:
     spec:
       containers:
         - name: spark
-          image: bitnami/spark:3.5.2
+          image: {{ .Values.spark.image }}:{{ .Values.spark.tag }}
+{{- end }}
