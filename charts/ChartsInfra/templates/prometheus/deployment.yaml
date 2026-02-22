@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.prometheus.dns }}
+  namespace: {{ .Values.global.namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Values.prometheus.dns }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.prometheus.dns }}
+    spec:
+      containers:
+        - name: prometheus
+          image: prom/prometheus:v2.55.0
+          ports:
+            - containerPort: 9090
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.prometheus.dns }}
+  namespace: {{ .Values.global.namespace }}
+spec:
+  selector:
+    app: {{ .Values.prometheus.dns }}
+  ports:
+    - port: 9090
+      targetPort: 9090

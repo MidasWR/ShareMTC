@@ -1,0 +1,25 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.resource.dns }}
+  namespace: {{ .Values.global.namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Values.resource.dns }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.resource.dns }}
+    spec:
+      containers:
+        - name: {{ .Values.resource.dns }}
+          image: {{ .Values.resource.image }}:{{ .Values.global.tag }}
+          securityContext:
+            privileged: true
+          ports:
+            - containerPort: {{ .Values.resource.port }}
+          envFrom:
+            - configMapRef:
+                name: host-services-config

@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.admin.dns }}
+  namespace: {{ .Values.global.namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Values.admin.dns }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.admin.dns }}
+    spec:
+      containers:
+        - name: {{ .Values.admin.dns }}
+          image: {{ .Values.admin.image }}:{{ .Values.global.tag }}
+          ports:
+            - containerPort: {{ .Values.admin.port }}
+          envFrom:
+            - configMapRef:
+                name: host-services-config

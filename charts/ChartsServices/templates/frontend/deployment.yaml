@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.frontend.dns }}
+  namespace: {{ .Values.global.namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Values.frontend.dns }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.frontend.dns }}
+    spec:
+      containers:
+        - name: {{ .Values.frontend.dns }}
+          image: {{ .Values.frontend.image }}:{{ .Values.global.tag }}
+          ports:
+            - containerPort: {{ .Values.frontend.port }}

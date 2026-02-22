@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ .Values.falco.dns }}
+  namespace: {{ .Values.global.namespace }}
+spec:
+  selector:
+    matchLabels:
+      app: {{ .Values.falco.dns }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.falco.dns }}
+    spec:
+      containers:
+        - name: falco
+          image: falcosecurity/falco:0.38.2
+          securityContext:
+            privileged: true

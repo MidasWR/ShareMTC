@@ -1,0 +1,12 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: GRPCRoute
+metadata:
+  name: auth-grpc-route
+  namespace: {{ .Values.global.namespace }}
+spec:
+  parentRefs:
+    - name: {{ .Values.envoy.dns }}
+  rules:
+    - backendRefs:
+        - name: authservice
+          port: 8081

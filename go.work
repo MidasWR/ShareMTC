@@ -1,0 +1,10 @@
+go 1.25.0
+
+use (
+	./services/adminservice
+	./services/authservice
+	./services/billingservice
+	./services/hostagent
+	./services/resourceservice
+	./services/sdk
+)

@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ .Values.kafka.dns }}
+  namespace: {{ .Values.global.namespace }}
+spec:
+  serviceName: {{ .Values.kafka.dns }}
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Values.kafka.dns }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.kafka.dns }}
+    spec:
+      containers:
+        - name: kafka
+          image: bitnami/kafka:3.9.0
+          ports:
+            - containerPort: 9092
+          env:
+            - name: KAFKA_CFG_PROCESS_ROLES
+              value: controller,broker
+            - name: KAFKA_CFG_CONTROLLER_LISTENER_NAMES
+              value: CONTROLLER
+            - name: KAFKA_CFG_LISTENERS
+              value: PLAINTEXT://:9092,CONTROLLER://:9093
+            - name: KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP
+              value: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+            - name: KAFKA_CFG_CONTROLLER_QUORUM_VOTERS
+              value: 1@localhost:9093
+            - name: KAFKA_CFG_NODE_ID
+              value: "1"
+            - name: KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE
+              value: "true"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.kafka.dns }}
+  namespace: {{ .Values.global.namespace }}
+spec:
+  selector:
+    app: {{ .Values.kafka.dns }}
+  ports:
+    - port: 9092
+      targetPort: 9092

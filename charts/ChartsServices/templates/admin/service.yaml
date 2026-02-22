@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.admin.dns }}
+  namespace: {{ .Values.global.namespace }}
+spec:
+  selector:
+    app: {{ .Values.admin.dns }}
+  ports:
+    - port: {{ .Values.admin.port }}
+      targetPort: {{ .Values.admin.port }}

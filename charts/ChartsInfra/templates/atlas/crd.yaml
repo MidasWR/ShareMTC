@@ -1,0 +1,17 @@
+apiVersion: atlasgo.io/v1alpha1
+kind: AtlasMigration
+metadata:
+  name: host-atlas
+  namespace: {{ .Values.global.namespace }}
+spec:
+  target:
+    urlFrom:
+      secretKeyRef:
+        name: atlas-db-url
+        key: url
+  projectConfig:
+    config: |
+      env "k8s" {
+        src = "file://migrations"
+        dev = "docker://postgres/16/dev"
+      }

@@ -1,0 +1,18 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.spark.dns }}
+  namespace: {{ .Values.global.namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Values.spark.dns }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.spark.dns }}
+    spec:
+      containers:
+        - name: spark
+          image: bitnami/spark:3.5.2

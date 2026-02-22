@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kafka-topics
+  namespace: {{ .Values.global.namespace }}
+data:
+  topics: |
+    host.metrics
+    host.health

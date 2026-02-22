@@ -1,0 +1,29 @@
+global:
+  namespace: host
+
+kafka:
+  dns: kafka
+
+redis:
+  dns: redis
+
+envoy:
+  dns: envoy-gateway
+
+prometheus:
+  dns: prometheus
+
+postgres:
+  dns: postgresql
+
+falco:
+  dns: falco
+
+kyverno:
+  dns: kyverno
+
+spark:
+  dns: spark
+
+atlas:
+  dns: atlas

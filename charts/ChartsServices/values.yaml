@@ -1,0 +1,32 @@
+global:
+  namespace: host
+  tag: v1.0.0
+
+auth:
+  dns: authservice
+  image: midaswr/host-authservice
+  port: 8081
+
+admin:
+  dns: adminservice
+  image: midaswr/host-adminservice
+  port: 8082
+
+resource:
+  dns: resourceservice
+  image: midaswr/host-resourceservice
+  port: 8083
+
+billing:
+  dns: billingservice
+  image: midaswr/host-billingservice
+  port: 8084
+
+frontend:
+  dns: frontend-service
+  image: midaswr/host-frontend
+  port: 80
+
+hostagent:
+  dns: hostagent
+  image: midaswr/host-hostagent

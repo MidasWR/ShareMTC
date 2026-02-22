@@ -1,0 +1,13 @@
+.DS_Store
+node_modules/
+dist/
+coverage/
+.env
+.env.*
+bin/
+tmp/
+*.log
+*.out
+*.test
+vendor/
+*.swp

@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.auth.dns }}
+  namespace: {{ .Values.global.namespace }}
+spec:
+  selector:
+    app: {{ .Values.auth.dns }}
+  ports:
+    - port: {{ .Values.auth.port }}
+      targetPort: {{ .Values.auth.port }}

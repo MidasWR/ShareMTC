@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.billing.dns }}
+  namespace: {{ .Values.global.namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Values.billing.dns }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.billing.dns }}
+    spec:
+      containers:
+        - name: {{ .Values.billing.dns }}
+          image: {{ .Values.billing.image }}:{{ .Values.global.tag }}
+          ports:
+            - containerPort: {{ .Values.billing.port }}
+          envFrom:
+            - configMapRef:
+                name: host-services-config

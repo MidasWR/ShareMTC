@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ .Values.hostagent.dns }}
+  namespace: {{ .Values.global.namespace }}
+spec:
+  selector:
+    matchLabels:
+      app: {{ .Values.hostagent.dns }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.hostagent.dns }}
+    spec:
+      hostNetwork: true
+      containers:
+        - name: {{ .Values.hostagent.dns }}
+          image: {{ .Values.hostagent.image }}:{{ .Values.global.tag }}
+          securityContext:
+            privileged: true
+          envFrom:
+            - configMapRef:
+                name: host-services-config
