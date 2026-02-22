@@ -236,8 +236,7 @@ if [[ ! -d "${INFRA_CHART_PATH}" || ! -d "${SERVICES_CHART_PATH}" ]]; then
 
   if [[ "${REFRESH_RELEASE_ASSETS}" == "1" ]]; then
     if command -v gh >/dev/null 2>&1; then
-      gh release download --repo "${RELEASE_REPO}" \
-        --tag "${TAG}" \
+      gh release download "${TAG}" --repo "${RELEASE_REPO}" \
         --pattern "host-infra-${TAG}.tgz" \
         --pattern "host-services-${TAG}.tgz" \
         --dir "${SCRIPT_DIR}" \
@@ -245,8 +244,7 @@ if [[ ! -d "${INFRA_CHART_PATH}" || ! -d "${SERVICES_CHART_PATH}" ]]; then
     fi
   elif [[ ! -f "${INFRA_CHART_PATH}" || ! -f "${SERVICES_CHART_PATH}" ]]; then
     if command -v gh >/dev/null 2>&1; then
-      gh release download --repo "${RELEASE_REPO}" \
-        --tag "${TAG}" \
+      gh release download "${TAG}" --repo "${RELEASE_REPO}" \
         --pattern "host-infra-${TAG}.tgz" \
         --pattern "host-services-${TAG}.tgz" \
         --dir "${SCRIPT_DIR}" \
