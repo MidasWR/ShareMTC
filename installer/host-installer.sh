@@ -91,6 +91,22 @@ resolve_envoy_gateway_class() {
   fi
 }
 
+ensure_envoy_gateway_class() {
+  local name="$1"
+  if kubectl get gatewayclass "${name}" >/dev/null 2>&1; then
+    return 0
+  fi
+
+  cat <<EOF | kubectl apply -f -
+apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+metadata:
+  name: ${name}
+spec:
+  controllerName: gateway.envoyproxy.io/gatewayclass-controller
+EOF
+}
+
 ensure_namespace_active() {
   local ns="$1"
   local phase
@@ -135,6 +151,7 @@ install_prerequisites() {
   helm repo update
 
   helm upgrade --install envoy-gateway oci://docker.io/envoyproxy/gateway-helm --version v1.7.0 -n "${ENVOY_NAMESPACE}" --create-namespace
+  ensure_envoy_gateway_class "$(resolve_envoy_gateway_class)"
   adopt_strimzi_cluster_resources "${STRIMZI_NAMESPACE}"
   helm upgrade --install strimzi-kafka-operator strimzi/strimzi-kafka-operator -n "${STRIMZI_NAMESPACE}" --create-namespace
   helm upgrade --install kyverno kyverno/kyverno -n kyverno --create-namespace
