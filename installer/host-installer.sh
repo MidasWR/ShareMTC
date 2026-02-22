@@ -29,21 +29,34 @@ wait_for_crd() {
   done
 }
 
+wait_for_apigroup() {
+  local group="$1"
+  local max_attempts="${2:-60}"
+  local i=0
+  until kubectl api-resources --api-group "${group}" | awk 'NR>1 {print $1}' | grep -q .; do
+    i=$((i + 1))
+    if [[ "${i}" -ge "${max_attempts}" ]]; then
+      echo "Timed out waiting for API group ${group}"
+      exit 1
+    fi
+    sleep 2
+  done
+}
+
 install_prerequisites() {
-  helm repo add kyverno https://kyverno.github.io/kyverno >/dev/null 2>&1 || true
-  helm repo add postgres-operator-charts https://opensource.zalando.com/postgres-operator/charts/postgres-operator >/dev/null 2>&1 || true
-  helm repo add ariga https://ariga.github.io/charts >/dev/null 2>&1 || true
-  helm repo add fairwinds-stable https://charts.fairwinds.com/stable >/dev/null 2>&1 || true
-  helm repo update >/dev/null
+  helm repo add kyverno https://kyverno.github.io/kyverno
+  helm repo add postgres-operator-charts https://opensource.zalando.com/postgres-operator/charts/postgres-operator
+  helm repo add fairwinds-stable https://charts.fairwinds.com/stable
+  helm repo update
 
   helm upgrade --install kyverno kyverno/kyverno -n kyverno --create-namespace
   helm upgrade --install postgres-operator postgres-operator-charts/postgres-operator -n postgres-operator --create-namespace
-  helm upgrade --install atlas-operator ariga/atlas-operator -n atlas-system --create-namespace
+  helm upgrade --install atlas-operator oci://ghcr.io/ariga/charts/atlas-operator -n atlas-system --create-namespace
   helm upgrade --install vpa fairwinds-stable/vpa -n vpa --create-namespace
 
   wait_for_crd "clusterpolicies.kyverno.io"
   wait_for_crd "postgresqls.acid.zalan.do"
-  wait_for_crd "atlasmigrations.atlasgo.io"
+  wait_for_apigroup "atlasgo.io"
   wait_for_crd "verticalpodautoscalers.autoscaling.k8s.io"
 }
 
