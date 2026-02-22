@@ -9,7 +9,17 @@ COMMIT_MSG ?= chore: release $(TAG)
 
 SERVICES := authservice adminservice resourceservice billingservice hostagent frontend
 
-skip = $(filter $(1),$(subst ,, ,$(SKIP)))
+ifeq ($(strip $(SKIP)),)
+ifneq ($(origin skip), undefined)
+SKIP := $(strip $(skip))
+endif
+endif
+
+empty :=
+space := $(empty) $(empty)
+comma := ,
+SKIP_ITEMS := $(strip $(subst $(comma),$(space),$(SKIP)))
+has_skip = $(filter $(1),$(SKIP_ITEMS))
 
 .PHONY: release auto-commit-push guard-tag test build-images chart-package package-installer github-release
 
@@ -43,7 +53,7 @@ guard-tag:
 	fi
 
 test:
-	@if [ "$(call skip,1)" = "1" ]; then \
+	@if [ "$(call has_skip,1)" = "1" ]; then \
 		echo "Skipping tests"; \
 	else \
 		cd services/authservice && go test ./... && \
@@ -53,7 +63,7 @@ test:
 	fi
 
 build-images:
-	@if [ "$(call skip,2)" = "2" ]; then \
+	@if [ "$(call has_skip,2)" = "2" ]; then \
 		echo "Skipping container build"; \
 	else \
 		for svc in $(SERVICES); do \
@@ -63,7 +73,7 @@ build-images:
 	fi
 
 chart-package:
-	@if [ "$(call skip,3)" = "3" ]; then \
+	@if [ "$(call has_skip,3)" = "3" ]; then \
 		echo "Skipping chart package"; \
 	else \
 		helm package charts/ChartsInfra --version $(TAG) --app-version $(TAG) -d dist && \
@@ -71,7 +81,7 @@ chart-package:
 	fi
 
 package-installer:
-	@if [ "$(call skip,4)" = "4" ]; then \
+	@if [ "$(call has_skip,4)" = "4" ]; then \
 		echo "Skipping installer package"; \
 	else \
 		mkdir -p dist && \
@@ -81,7 +91,7 @@ package-installer:
 	fi
 
 github-release:
-	@if [ "$(call skip,5)" = "5" ]; then \
+	@if [ "$(call has_skip,5)" = "5" ]; then \
 		echo "Skipping GitHub release"; \
 	else \
 		if gh release view "$(TAG)" --repo "$(REPO)" >/dev/null 2>&1; then \
