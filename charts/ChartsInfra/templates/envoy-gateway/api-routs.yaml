@@ -16,6 +16,44 @@ spec:
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
+  name: api-route
+  namespace: {{ .Values.global.namespace }}
+spec:
+  parentRefs:
+    - name: {{ .Values.envoy.dns }}
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /v1/auth
+      backendRefs:
+        - name: authservice
+          port: 8081
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /v1/admin
+      backendRefs:
+        - name: adminservice
+          port: 8082
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /v1/resources
+      backendRefs:
+        - name: resourceservice
+          port: 8083
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /v1/billing
+      backendRefs:
+        - name: billingservice
+          port: 8084
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
   name: frontend-route
   namespace: {{ .Values.global.namespace }}
 spec:

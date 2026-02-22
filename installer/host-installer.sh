@@ -11,6 +11,7 @@ RELEASE_REPO="${RELEASE_REPO:-MidasWR/ShareMTC}"
 FORCE_HELM_UPGRADE="${FORCE_HELM_UPGRADE:-1}"
 HELM_TIMEOUT="${HELM_TIMEOUT:-15m}"
 STRIMZI_NAMESPACE="${STRIMZI_NAMESPACE:-strimzi-system}"
+ENVOY_NAMESPACE="${ENVOY_NAMESPACE:-envoy-gateway-system}"
 SPARK_ENABLED="${SPARK_ENABLED:-0}"
 SPARK_IMAGE="${SPARK_IMAGE:-apache/spark}"
 SPARK_TAG="${SPARK_TAG:-3.5.8-scala2.12-java17-python3-ubuntu}"
@@ -58,6 +59,20 @@ wait_for_atlas_crd() {
   done
 }
 
+wait_for_gatewayclass() {
+  local name="${1:-envoy}"
+  local max_attempts="${2:-90}"
+  local i=0
+  until kubectl get gatewayclass "${name}" >/dev/null 2>&1; do
+    i=$((i + 1))
+    if [[ "${i}" -ge "${max_attempts}" ]]; then
+      echo "Timed out waiting for GatewayClass ${name}"
+      exit 1
+    fi
+    sleep 2
+  done
+}
+
 ensure_namespace_active() {
   local ns="$1"
   local phase
@@ -93,6 +108,7 @@ adopt_strimzi_cluster_resources() {
 install_prerequisites() {
   ensure_namespace_active "${NAMESPACE}"
   ensure_namespace_active "${STRIMZI_NAMESPACE}"
+  ensure_namespace_active "${ENVOY_NAMESPACE}"
 
   helm repo add kyverno https://kyverno.github.io/kyverno
   helm repo add postgres-operator-charts https://opensource.zalando.com/postgres-operator/charts/postgres-operator
@@ -100,6 +116,7 @@ install_prerequisites() {
   helm repo add strimzi https://strimzi.io/charts/
   helm repo update
 
+  helm upgrade --install envoy-gateway oci://docker.io/envoyproxy/gateway-helm --version v1.7.0 -n "${ENVOY_NAMESPACE}" --create-namespace
   adopt_strimzi_cluster_resources "${STRIMZI_NAMESPACE}"
   helm upgrade --install strimzi-kafka-operator strimzi/strimzi-kafka-operator -n "${STRIMZI_NAMESPACE}" --create-namespace
   helm upgrade --install kyverno kyverno/kyverno -n kyverno --create-namespace
@@ -113,6 +130,7 @@ install_prerequisites() {
   wait_for_crd "postgresqls.acid.zalan.do"
   wait_for_atlas_crd
   wait_for_crd "verticalpodautoscalers.autoscaling.k8s.io"
+  wait_for_gatewayclass "envoy"
 }
 
 normalize_infra_chart_for_compat() {
