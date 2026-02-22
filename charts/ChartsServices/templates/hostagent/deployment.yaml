@@ -13,6 +13,7 @@ spec:
         app: {{ .Values.hostagent.dns }}
     spec:
       hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
       containers:
         - name: {{ .Values.hostagent.dns }}
           image: {{ .Values.hostagent.image }}:{{ default .Chart.AppVersion .Values.global.tag }}
