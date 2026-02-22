@@ -18,6 +18,7 @@ REFRESH_RELEASE_ASSETS="${REFRESH_RELEASE_ASSETS:-1}"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TMP_DIR="$(mktemp -d)"
+echo "Version ${TAG}"
 trap 'rm -rf "${TMP_DIR}"' EXIT
 
 is_skipped() {
@@ -236,6 +237,7 @@ if [[ ! -d "${INFRA_CHART_PATH}" || ! -d "${SERVICES_CHART_PATH}" ]]; then
   if [[ "${REFRESH_RELEASE_ASSETS}" == "1" ]]; then
     if command -v gh >/dev/null 2>&1; then
       gh release download --repo "${RELEASE_REPO}" \
+        --tag "${TAG}" \
         --pattern "host-infra-${TAG}.tgz" \
         --pattern "host-services-${TAG}.tgz" \
         --dir "${SCRIPT_DIR}" \
@@ -244,6 +246,7 @@ if [[ ! -d "${INFRA_CHART_PATH}" || ! -d "${SERVICES_CHART_PATH}" ]]; then
   elif [[ ! -f "${INFRA_CHART_PATH}" || ! -f "${SERVICES_CHART_PATH}" ]]; then
     if command -v gh >/dev/null 2>&1; then
       gh release download --repo "${RELEASE_REPO}" \
+        --tag "${TAG}" \
         --pattern "host-infra-${TAG}.tgz" \
         --pattern "host-services-${TAG}.tgz" \
         --dir "${SCRIPT_DIR}" \
