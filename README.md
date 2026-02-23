@@ -1,93 +1,91 @@
-# ShareMTC Platform (MTS x Space 2026)
+# ShareMTC Platform
 
-ShareMTC is a provider marketplace for VM and Pod capacity where users can both buy compute and monetize their own hardware (CPU, GPU, RAM, network).
+ShareMTC is a compute marketplace and control plane where providers expose CPU/RAM/GPU/network capacity and users consume that capacity through allocation and billing contracts.
 
-## Repository Structure
+## Project goals
 
-- `installer/` - one-command installer and bootstrap scripts.
-- `services/` - all custom microservices and frontend.
-- `charts/` - Helm charts for app services and infrastructure.
-- `reports/` - iteration reports.
+- Provide a secure control plane for provider onboarding, allocation lifecycle, and billing.
+- Separate domain responsibilities by service and keep APIs contract-driven.
+- Offer data-dense operational dashboards for core, provider, and admin roles.
 
-## Services
+## Repository layout
 
-- `services/authservice` - email/password + Google OAuth2 authentication.
-- `services/adminservice` - provider management for internal and donor machines.
-- `services/resourceservice` - host heartbeats, free resource state, allocation and release with cgroups v2 limits.
-- `services/billingservice` - plans, usage ingestion, accrual history, VIP network bonus logic.
-- `services/hostagent` - host-side metrics collector for user PCs; can publish to Kafka and/or directly to `resourceservice` heartbeat API.
-- `services/frontend` - TypeScript + Tailwind control plane UI with design-system-first architecture.
-- `services/sdk` - shared logger, DB, JWT, HTTP utilities.
+- `installer/` - bootstrap and host installation scripts.
+- `services/` - microservices, frontend, and shared SDK.
+- `charts/` - Helm charts for app and infrastructure stacks.
+- `reports/` - iteration reports with implementation rationale.
 
-## Frontend UI Architecture
+## Service map
 
-`services/frontend` is organized around reusable design primitives and domain screens.
+- `services/authservice` - registration/login, Google OAuth, JWT issuance.
+- `services/adminservice` - provider catalog and admin analytics endpoints.
+- `services/resourceservice` - heartbeat ingest, allocation/release, resource analytics.
+- `services/billingservice` - plan management, usage processing, accrual analytics.
+- `services/hostagent` - host-side telemetry collector for donor/internal machines.
+- `services/frontend` - React + TypeScript control plane UI.
+- `services/sdk` - shared auth, DB, logging, and HTTP primitives.
 
-### Frontend structure
+## Architecture decisions
 
-- `src/design/tokens|primitives|components|patterns` - design system layers.
-- `src/lib` - shared request helpers and low-level utilities.
-- `src/types` - API-facing frontend types.
-- `src/ui` - screen composition and control-plane sections.
+- **Service boundaries:** each Go service follows `cmd/config/internal/{adapter,models,service}`.
+- **Shared auth:** JWT parsing and RBAC middleware live in `services/sdk/auth`.
+- **Frontend SRP:** app shell, routing, auth state, and domain panels are separated by feature module.
+- **Admin analytics:** computed from real persisted allocations/accruals/providers without mocks.
 
-### UX principles currently implemented
+## Frontend architecture
 
-- Contract-safe refactor: API routes and data models are preserved.
-- Single primary CTA in page header with role-oriented section navigation.
-- Explicit screen states: loading, empty, error, and success feedback.
-- Data-heavy consistency: search, filter, sort, density, pagination, column visibility.
-- Accessibility baseline: focus rings, skip link, overlay keyboard close, table semantics.
+`services/frontend/src` now follows feature-oriented composition:
 
-### Frontend quality checks
+- `app/` - shell, navigation, section routing, session hooks.
+- `design/` - primitives/components/patterns for reusable UI building blocks.
+- `features/` - domain modules (`admin`, `resources`, `billing`, `provider`, `dashboard`).
+- `lib/` - auth-aware HTTP client and session helpers.
+- `ui/` - top-level sections bound to app navigation.
+- `types/` - API contracts for all frontend modules.
 
-Run frontend build:
+### Implemented dashboards
 
-```bash
-cd services/frontend
-npm run build
-```
+- **Core Dashboard** - provider health ratio, allocation pressure, and revenue trend chart.
+- **Provider Dashboard** - provider-specific allocations, earnings, and operational state.
+- **Admin Dashboard** - top revenue providers, global metrics, and risk feed.
+- **Admin Console** - tabbed admin module for overview/providers/allocations/billing/risk.
 
-Run smoke e2e checks:
+### Security model
 
-```bash
-cd services/frontend
-npx playwright install chromium
-npm run build
-npm run preview -- --host 127.0.0.1 --port 4173
-# in another terminal:
-npm run test:e2e
-```
+- Backend routes in admin/resource/billing services are protected by:
+  - `RequireAuth` (JWT verification)
+  - `RequireAnyRole("admin", "super-admin", "ops-admin")` for admin-only endpoints
+- Frontend HTTP client attaches `Authorization: Bearer <token>` automatically.
+- `401/403` responses clear local session state to prevent stale privilege usage.
 
-Run local dev:
+## API overview (new analytics endpoints)
 
-```bash
-cd services/frontend
-npm run dev
-```
+- `GET /v1/admin/stats`
+- `GET /v1/admin/providers/{providerID}`
+- `GET /v1/admin/providers/{providerID}/metrics`
+- `GET /v1/resources/admin/stats`
+- `GET /v1/resources/admin/allocations?limit=&offset=`
+- `GET /v1/billing/admin/stats`
+- `GET /v1/billing/admin/accruals?limit=&offset=`
 
-## Architecture Notes
+## Local development
 
-- Go microservices use `net/http`, clear separation (`cmd`, `config`, `internal/adapter`, `internal/models`, `internal/service`).
-- Logging is unified through `zerolog` and `github.com/MidasWR/mc-go-writer`.
-- User PC `hostagent` instances send resource heartbeat to `resourceservice` (`/v1/resources/heartbeat`) and can additionally publish to Kafka for stream processing.
-- Envoy Gateway is used as the external entrypoint.
-- Postgres stores auth, provider, resource, and billing data.
+### Prerequisites
 
-## Prerequisites
+- Linux/macOS with `docker`, `kubectl`, `helm`, `git`, `gh`.
+- Go toolchain and Node.js (LTS recommended).
+- PostgreSQL for local service execution.
 
-- Linux host with `docker`, `kubectl`, `helm`, `gh`, `git`.
-- Optional local Postgres for direct service runs.
-- K3s for cluster deployment path.
-
-## Local Service Development
-
-Run any service:
+### Run backend services
 
 ```bash
 cd services/authservice && go run ./cmd
+cd services/adminservice && go run ./cmd
+cd services/resourceservice && go run ./cmd
+cd services/billingservice && go run ./cmd
 ```
 
-Run frontend:
+### Run frontend
 
 ```bash
 cd services/frontend
@@ -95,88 +93,56 @@ npm install
 npm run dev
 ```
 
-## Release Flow
+## Quality checks
 
-The `Makefile` implements:
+### Frontend
 
-- one tag = one version (`TAG=vX.Y.Z`)
-- optional skip matrix (`SKIP=1,2,...`)
-- Docker build/push to Docker Hub
-- Helm packaging
-- GitHub release artifact publication
-- overwrite mode for existing GitHub release tags (`gh release upload --clobber`)
-- optional auto git add/commit/push before release
+```bash
+cd services/frontend
+npm run build
+npm run test:unit
+```
+
+### Backend
+
+```bash
+cd services/adminservice && go test ./...
+cd services/resourceservice && go test ./...
+cd services/billingservice && go test ./...
+```
+
+### E2E smoke (Playwright)
+
+```bash
+cd services/frontend
+npx playwright install chromium
+npm run build
+npm run preview -- --host 127.0.0.1 --port 4173
+# separate terminal
+npm run test:e2e
+```
+
+## Release flow
+
+`Makefile` supports:
+
+- versioned tags (`TAG=vX.Y.Z`)
+- optional stage skipping (`SKIP=1,2,...`)
+- image build/push, chart packaging, release publishing
+- optional auto commit/push before release
 
 ```bash
 make release TAG=v1.0.0 SKIP=
 ```
 
-With auto commit and push:
+## Reports process
 
-```bash
-make release TAG=v1.0.0 AUTO_COMMIT_PUSH=1 COMMIT_MSG="chore: release v1.0.0"
-```
+Each iteration report in `reports/` must include:
 
-Skip flags:
+- what was implemented
+- why decisions were taken
+- encountered issues
+- chosen mitigations
+- next iteration plan
 
-- `1` tests
-- `2` image build/push
-- `3` chart package
-- `4` installer packaging
-- `5` GitHub release publish
-
-## Installer
-
-Installer is idempotent and supports repeated runs through `helm upgrade --install`.
-
-```bash
-sudo ./installer/host-installer.sh
-```
-
-Install node agent on user PC (shared-hosting donor model):
-
-```bash
-sudo RESOURCE_API_URL=http://<platform-host-ip> ./installer/hostagent-node-installer.sh
-```
-
-`hostagent-node-installer.sh` installs a `systemd` service (`sharemct-hostagent`) that runs hostagent in Docker on the user's machine and reports available resources to the platform.
-
-Release download example:
-
-```bash
-gh release download --repo MidasWR/ShareMTC --pattern "host-installer" --clobber && chmod +x host-installer && sudo ./host-installer
-```
-
-## Helm Layout
-
-- `charts/ChartsServices`:
-  - `template/auth|admin|resource|billing|frontend|hostagent/{deployment,service,vpa}.yaml`
-  - `template/config.yaml`
-- `charts/ChartsInfra`:
-  - `template/kafka|envoy-gateway|redis|prometheus|postgres|falco|kyverno/*`
-  - `template/config.yaml`
-
-All service names are controlled through `values.yaml` `dns` fields.
-`hostagent` chart deployment is disabled by default because primary deployment target is user PCs.
-
-## Security and Observability
-
-- Falco and Kyverno are part of the infra chart.
-- Prometheus deployment is included for metrics collection.
-- Every service exposes `/healthz`.
-
-## Documentation Process
-
-- Architecture and iteration tracking live in `reports/`.
-- Notion MCP can be used to maintain synchronized project documentation.
-- Frontend refactor progress:
-  - `reports/2_frontend_ui_system_refactor.md`
-  - `reports/3_frontend_pr_breakdown.md`
-  - `reports/4_frontend_scale_roadmap.md`
-  - `reports/5_frontend_ux_polish_iteration.md`
-
-## Current Limitations
-
-- Spark jobs are expected to be deployed separately or added as dedicated infra chart templates.
-- GPU metrics currently use host-level detection and require NVIDIA driver paths to be present.
-# ShareMTC
+Latest upgrade report: `reports/4_frontend_admin_dashboards_upgrade.md`.

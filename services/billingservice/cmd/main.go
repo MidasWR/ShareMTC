@@ -9,6 +9,7 @@ import (
 	httpadapter "github.com/MidasWR/ShareMTC/services/billingservice/internal/adapter/http"
 	"github.com/MidasWR/ShareMTC/services/billingservice/internal/adapter/storage"
 	"github.com/MidasWR/ShareMTC/services/billingservice/internal/service"
+	sdkauth "github.com/MidasWR/ShareMTC/services/sdk/auth"
 	"github.com/MidasWR/ShareMTC/services/sdk/db"
 	"github.com/MidasWR/ShareMTC/services/sdk/logging"
 	"github.com/go-chi/chi/v5"
@@ -40,9 +41,15 @@ func main() {
 	r := chi.NewRouter()
 	r.Get("/healthz", handler.Health)
 	r.Route("/v1/billing", func(api chi.Router) {
+		api.Use(sdkauth.RequireAuth(cfg.JWTSecret))
 		api.Post("/plans", handler.CreatePlan)
 		api.Post("/usage", handler.ProcessUsage)
 		api.Get("/accruals", handler.ListAccruals)
+		api.Group(func(admin chi.Router) {
+			admin.Use(sdkauth.RequireAnyRole("admin", "super-admin", "ops-admin"))
+			admin.Get("/admin/accruals", handler.ListAllAccruals)
+			admin.Get("/admin/stats", handler.Stats)
+		})
 	})
 
 	server := &http.Server{

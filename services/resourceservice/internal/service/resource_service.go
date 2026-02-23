@@ -13,6 +13,8 @@ type Repository interface {
 	CreateAllocation(ctx context.Context, alloc models.Allocation) (models.Allocation, error)
 	ReleaseAllocation(ctx context.Context, allocationID string) error
 	ListAllocations(ctx context.Context, providerID string) ([]models.Allocation, error)
+	ListAllAllocations(ctx context.Context, limit int, offset int) ([]models.Allocation, error)
+	Stats(ctx context.Context) (models.ResourceStats, error)
 }
 
 type CGroupApplier interface {
@@ -56,4 +58,12 @@ func (s *ResourceService) Release(ctx context.Context, allocationID string) erro
 
 func (s *ResourceService) List(ctx context.Context, providerID string) ([]models.Allocation, error) {
 	return s.repo.ListAllocations(ctx, providerID)
+}
+
+func (s *ResourceService) ListAll(ctx context.Context, limit int, offset int) ([]models.Allocation, error) {
+	return s.repo.ListAllAllocations(ctx, limit, offset)
+}
+
+func (s *ResourceService) Stats(ctx context.Context) (models.ResourceStats, error) {
+	return s.repo.Stats(ctx)
 }

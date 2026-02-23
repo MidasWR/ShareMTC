@@ -112,3 +112,38 @@ func (r *Repo) ListAccruals(ctx context.Context, providerID string) ([]models.Ac
 	}
 	return result, nil
 }
+
+func (r *Repo) ListAllAccruals(ctx context.Context, limit int, offset int) ([]models.Accrual, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT id, provider_id, usage_id, amount_usd, vip_bonus_usd, total_usd, created_at
+		FROM accruals
+		ORDER BY created_at DESC
+		LIMIT $1 OFFSET $2
+	`, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	result := make([]models.Accrual, 0)
+	for rows.Next() {
+		var a models.Accrual
+		if err := rows.Scan(&a.ID, &a.ProviderID, &a.UsageID, &a.AmountUSD, &a.VIPBonusUSD, &a.TotalUSD, &a.CreatedAt); err != nil {
+			return nil, err
+		}
+		result = append(result, a)
+	}
+	return result, nil
+}
+
+func (r *Repo) Stats(ctx context.Context) (models.BillingStats, error) {
+	var stats models.BillingStats
+	err := r.db.QueryRow(ctx, `
+		SELECT
+			COUNT(*) AS accrual_count,
+			COALESCE(SUM(amount_usd), 0) AS total_amount_usd,
+			COALESCE(SUM(vip_bonus_usd), 0) AS total_bonus_usd,
+			COALESCE(SUM(total_usd), 0) AS total_revenue_usd
+		FROM accruals
+	`).Scan(&stats.AccrualCount, &stats.TotalAmountUSD, &stats.TotalBonusUSD, &stats.TotalRevenueUSD)
+	return stats, err
+}

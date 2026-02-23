@@ -10,6 +10,7 @@ import (
 	httpadapter "github.com/MidasWR/ShareMTC/services/resourceservice/internal/adapter/http"
 	"github.com/MidasWR/ShareMTC/services/resourceservice/internal/adapter/storage"
 	"github.com/MidasWR/ShareMTC/services/resourceservice/internal/service"
+	sdkauth "github.com/MidasWR/ShareMTC/services/sdk/auth"
 	"github.com/MidasWR/ShareMTC/services/sdk/db"
 	"github.com/MidasWR/ShareMTC/services/sdk/logging"
 	"github.com/go-chi/chi/v5"
@@ -40,10 +41,16 @@ func main() {
 	r := chi.NewRouter()
 	r.Get("/healthz", handler.Health)
 	r.Route("/v1/resources", func(api chi.Router) {
+		api.Use(sdkauth.RequireAuth(cfg.JWTSecret))
 		api.Post("/heartbeat", handler.Heartbeat)
 		api.Post("/allocate", handler.Allocate)
 		api.Post("/release/{allocationID}", handler.Release)
 		api.Get("/allocations", handler.List)
+		api.Group(func(admin chi.Router) {
+			admin.Use(sdkauth.RequireAnyRole("admin", "super-admin", "ops-admin"))
+			admin.Get("/admin/allocations", handler.ListAll)
+			admin.Get("/admin/stats", handler.Stats)
+		})
 	})
 
 	server := &http.Server{

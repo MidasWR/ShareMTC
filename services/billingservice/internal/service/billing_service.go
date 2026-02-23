@@ -13,6 +13,8 @@ type Repository interface {
 	CreateUsage(ctx context.Context, usage models.UsageRecord) (models.UsageRecord, error)
 	CreateAccrual(ctx context.Context, accrual models.Accrual) (models.Accrual, error)
 	ListAccruals(ctx context.Context, providerID string) ([]models.Accrual, error)
+	ListAllAccruals(ctx context.Context, limit int, offset int) ([]models.Accrual, error)
+	Stats(ctx context.Context) (models.BillingStats, error)
 }
 
 type BillingService struct {
@@ -63,4 +65,12 @@ func (s *BillingService) ProcessUsage(ctx context.Context, usage models.UsageRec
 
 func (s *BillingService) ListAccruals(ctx context.Context, providerID string) ([]models.Accrual, error) {
 	return s.repo.ListAccruals(ctx, providerID)
+}
+
+func (s *BillingService) ListAllAccruals(ctx context.Context, limit int, offset int) ([]models.Accrual, error) {
+	return s.repo.ListAllAccruals(ctx, limit, offset)
+}
+
+func (s *BillingService) Stats(ctx context.Context) (models.BillingStats, error) {
+	return s.repo.Stats(ctx)
 }

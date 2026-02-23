@@ -107,3 +107,47 @@ func (r *Repo) ListAllocations(ctx context.Context, providerID string) ([]models
 	}
 	return out, nil
 }
+
+func (r *Repo) ListAllAllocations(ctx context.Context, limit int, offset int) ([]models.Allocation, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT id, provider_id, cpu_cores, ram_mb, gpu_units, started_at, released_at
+		FROM allocations
+		ORDER BY started_at DESC
+		LIMIT $1 OFFSET $2
+	`, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make([]models.Allocation, 0)
+	for rows.Next() {
+		var item models.Allocation
+		if err := rows.Scan(&item.ID, &item.ProviderID, &item.CPUCores, &item.RAMMB, &item.GPUUnits, &item.StartedAt, &item.ReleasedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, item)
+	}
+	return out, nil
+}
+
+func (r *Repo) Stats(ctx context.Context) (models.ResourceStats, error) {
+	var stats models.ResourceStats
+	err := r.db.QueryRow(ctx, `
+		SELECT
+			COUNT(*) AS total_allocations,
+			COUNT(*) FILTER (WHERE released_at IS NULL) AS running_allocations,
+			COUNT(*) FILTER (WHERE released_at IS NOT NULL) AS released_allocations,
+			COALESCE(SUM(cpu_cores) FILTER (WHERE released_at IS NULL), 0) AS cpu_cores_running,
+			COALESCE(SUM(ram_mb) FILTER (WHERE released_at IS NULL), 0) AS ram_mb_running,
+			COALESCE(SUM(gpu_units) FILTER (WHERE released_at IS NULL), 0) AS gpu_units_running
+		FROM allocations
+	`).Scan(
+		&stats.TotalAllocations,
+		&stats.RunningAllocations,
+		&stats.ReleasedAllocations,
+		&stats.CPUCoresRunning,
+		&stats.RAMMBRunning,
+		&stats.GPUUnitsRunning,
+	)
+	return stats, err
+}

@@ -18,7 +18,9 @@ func (r *billingRepoStub) CreatePlan(_ context.Context, plan models.Plan) (model
 	r.plan = plan
 	return plan, nil
 }
-func (r *billingRepoStub) GetPlan(_ context.Context, _ string) (models.Plan, error) { return r.plan, nil }
+func (r *billingRepoStub) GetPlan(_ context.Context, _ string) (models.Plan, error) {
+	return r.plan, nil
+}
 func (r *billingRepoStub) CreateUsage(_ context.Context, usage models.UsageRecord) (models.UsageRecord, error) {
 	usage.ID = "u1"
 	return usage, nil
@@ -27,7 +29,15 @@ func (r *billingRepoStub) CreateAccrual(_ context.Context, accrual models.Accrua
 	accrual.ID = "a1"
 	return accrual, nil
 }
-func (r *billingRepoStub) ListAccruals(_ context.Context, _ string) ([]models.Accrual, error) { return nil, nil }
+func (r *billingRepoStub) ListAccruals(_ context.Context, _ string) ([]models.Accrual, error) {
+	return nil, nil
+}
+func (r *billingRepoStub) ListAllAccruals(_ context.Context, _ int, _ int) ([]models.Accrual, error) {
+	return nil, nil
+}
+func (r *billingRepoStub) Stats(_ context.Context) (models.BillingStats, error) {
+	return models.BillingStats{}, nil
+}
 
 func TestUsageCreatesVipBonus(t *testing.T) {
 	repo := &billingRepoStub{

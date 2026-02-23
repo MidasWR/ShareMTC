@@ -16,19 +16,29 @@ func (r *repoStub) UpsertHostResource(_ context.Context, resource models.HostRes
 	r.resource = resource
 	return nil
 }
-func (r *repoStub) GetHostResource(_ context.Context, _ string) (models.HostResource, error) { return r.resource, nil }
+func (r *repoStub) GetHostResource(_ context.Context, _ string) (models.HostResource, error) {
+	return r.resource, nil
+}
 func (r *repoStub) CreateAllocation(_ context.Context, alloc models.Allocation) (models.Allocation, error) {
 	alloc.ID = "a1"
 	alloc.StartedAt = time.Now().UTC()
 	return alloc, nil
 }
-func (r *repoStub) ReleaseAllocation(_ context.Context, _ string) error                          { return nil }
-func (r *repoStub) ListAllocations(_ context.Context, _ string) ([]models.Allocation, error) { return nil, nil }
+func (r *repoStub) ReleaseAllocation(_ context.Context, _ string) error { return nil }
+func (r *repoStub) ListAllocations(_ context.Context, _ string) ([]models.Allocation, error) {
+	return nil, nil
+}
+func (r *repoStub) ListAllAllocations(_ context.Context, _ int, _ int) ([]models.Allocation, error) {
+	return nil, nil
+}
+func (r *repoStub) Stats(_ context.Context) (models.ResourceStats, error) {
+	return models.ResourceStats{}, nil
+}
 
 type cgStub struct{}
 
 func (cgStub) Apply(_ string, _ int, _ int, _ int) error { return nil }
-func (cgStub) Release(_ string) error                     { return nil }
+func (cgStub) Release(_ string) error                    { return nil }
 
 func TestAllocateChecksFreeResources(t *testing.T) {
 	repo := &repoStub{

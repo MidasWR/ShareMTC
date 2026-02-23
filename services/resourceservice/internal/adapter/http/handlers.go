@@ -3,6 +3,7 @@ package httpadapter
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 
 	"github.com/MidasWR/ShareMTC/services/resourceservice/internal/models"
 	"github.com/MidasWR/ShareMTC/services/resourceservice/internal/service"
@@ -74,4 +75,34 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) Health(w http.ResponseWriter, _ *http.Request) {
 	httpx.JSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+func (h *Handler) ListAll(w http.ResponseWriter, r *http.Request) {
+	limit := 50
+	offset := 0
+	if raw := r.URL.Query().Get("limit"); raw != "" {
+		if parsed, err := strconv.Atoi(raw); err == nil && parsed > 0 {
+			limit = parsed
+		}
+	}
+	if raw := r.URL.Query().Get("offset"); raw != "" {
+		if parsed, err := strconv.Atoi(raw); err == nil && parsed >= 0 {
+			offset = parsed
+		}
+	}
+	items, err := h.svc.ListAll(r.Context(), limit, offset)
+	if err != nil {
+		httpx.Error(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	httpx.JSON(w, http.StatusOK, items)
+}
+
+func (h *Handler) Stats(w http.ResponseWriter, r *http.Request) {
+	stats, err := h.svc.Stats(r.Context())
+	if err != nil {
+		httpx.Error(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	httpx.JSON(w, http.StatusOK, stats)
 }

@@ -10,9 +10,8 @@ import { StatusBadge } from "../../../design/patterns/StatusBadge";
 import { Button } from "../../../design/primitives/Button";
 import { Card } from "../../../design/primitives/Card";
 import { Input } from "../../../design/primitives/Input";
-import { API_BASE } from "../../../config/apiBase";
-import { fetchJSON } from "../../../lib/http";
 import { Allocation, UsageAccrual } from "../../../types/api";
+import { loadProviderDashboard } from "../api/providerApi";
 
 
 export function ProviderDashboardPanel() {
@@ -21,6 +20,7 @@ export function ProviderDashboardPanel() {
   const [accruals, setAccruals] = useState<UsageAccrual[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [metrics, setMetrics] = useState({ allocation_total: 0, allocation_running: 0, accrual_total_usd: 0, accrual_vip_bonus_usd: 0 });
   const { push } = useToast();
 
   const runningCount = useMemo(() => allocations.filter((item) => !item.released_at).length, [allocations]);
@@ -34,12 +34,10 @@ export function ProviderDashboardPanel() {
     setLoading(true);
     setError("");
     try {
-      const [alloc, billing] = await Promise.all([
-        fetchJSON<Allocation[]>(`${API_BASE.resource}/v1/resources/allocations?provider_id=${encodeURIComponent(providerID.trim())}`),
-        fetchJSON<UsageAccrual[]>(`${API_BASE.billing}/v1/billing/accruals?provider_id=${encodeURIComponent(providerID.trim())}`)
-      ]);
-      setAllocations(alloc);
-      setAccruals(billing);
+      const data = await loadProviderDashboard(providerID.trim());
+      setAllocations(data.allocations);
+      setAccruals(data.accruals);
+      setMetrics(data.metrics);
       push("info", "Provider dashboard synced");
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Dashboard refresh failed");
@@ -66,9 +64,9 @@ export function ProviderDashboardPanel() {
         {!loading && error ? <div className="mt-4"><InlineAlert kind="error">{error}</InlineAlert></div> : null}
         <div className="mt-4 grid gap-3 md:grid-cols-4">
           <MetricTile label="Total allocations" value={`${allocations.length}`} />
-          <MetricTile label="Running allocations" value={`${runningCount}`} />
+          <MetricTile label="Running allocations" value={`${metrics.allocation_running || runningCount}`} />
           <MetricTile label="Total revenue" value={`$${totalRevenue.toFixed(2)}`} />
-          <MetricTile label="Health state" value={runningCount > 0 ? "active" : "idle"} />
+          <MetricTile label="Health state" value={metrics.allocation_running > 0 ? "active" : "idle"} />
         </div>
       </Card>
 

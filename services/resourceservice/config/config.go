@@ -10,6 +10,7 @@ type Config struct {
 	Port            string
 	PostgresDSN     string
 	MidasWriterAddr string
+	JWTSecret       string
 }
 
 func Load() Config {
@@ -17,6 +18,7 @@ func Load() Config {
 		Port:            env("PORT", "8083"),
 		PostgresDSN:     postgresDSN(),
 		MidasWriterAddr: os.Getenv("MIDAS_WRITER_ADDR"),
+		JWTSecret:       env("JWT_SECRET", "change-me-in-production"),
 	}
 }
 
