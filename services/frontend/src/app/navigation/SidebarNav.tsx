@@ -34,7 +34,9 @@ export function SidebarNav({ tab, groups, enabledMenu, onNavigate }: Props) {
                   onClick={() => onNavigate(item.id)}
                   className={cx(
                     "focus-ring flex w-full items-center rounded-md px-2.5 py-2 text-left text-sm transition-colors",
-                    tab === item.id ? "bg-brand text-white" : "text-textSecondary hover:bg-elevated hover:text-textPrimary"
+                    tab === item.id 
+                      ? "border-l-2 border-brand text-brand bg-brand/10 shadow-[inset_2px_0_10px_rgba(0,255,65,0.2)] rounded-l-none" 
+                      : "text-textSecondary hover:text-textPrimary hover:bg-elevated"
                   )}
                   aria-current={tab === item.id ? "page" : undefined}
                 >

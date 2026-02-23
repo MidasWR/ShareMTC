@@ -4,8 +4,6 @@
 
 body {
   @apply bg-canvas text-textPrimary min-h-screen antialiased;
-  background-image: radial-gradient(circle at 10% 10%, rgba(59, 130, 246, 0.12), transparent 30%),
-    radial-gradient(circle at 90% 20%, rgba(56, 189, 248, 0.1), transparent 35%);
 }
 
 #root {
@@ -13,29 +11,29 @@ body {
 }
 
 * {
-  scrollbar-color: #475569 #111827;
+  scrollbar-color: #27272A #000000;
 }
 
 *::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
 }
 
 *::-webkit-scrollbar-track {
-  background: #111827;
+  background: #000000;
 }
 
 *::-webkit-scrollbar-thumb {
-  background: #475569;
+  background: #27272A;
   border-radius: 999px;
 }
 
 .glass {
-  @apply bg-surface/95 backdrop-blur border border-border rounded-lg shadow-md;
+  @apply bg-surface/95 backdrop-blur border border-border shadow-md;
 }
 
 .focus-ring {
-  @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-canvas;
+  @apply focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-canvas;
 }
 
 .page-shell {
@@ -59,5 +57,13 @@ body {
 }
 
 .surface-card {
-  @apply border border-border rounded-lg bg-gradient-to-b from-elevated/80 to-surface/90 shadow-md;
+  @apply border border-border rounded-md bg-surface shadow-sm;
+}
+
+.neon-glow {
+  @apply shadow-brand border border-brand;
+}
+
+.neon-text {
+  @apply text-brand drop-shadow-brand;
 }
