@@ -33,6 +33,7 @@ export function Button({
   disabled,
   children,
   leftIcon,
+  type,
   ...props
 }: ButtonProps) {
   const isDisabled = disabled || loading;
@@ -44,6 +45,7 @@ export function Button({
         sizeClasses[size],
         className
       )}
+      type={type ?? "button"}
       disabled={isDisabled}
       aria-busy={loading}
       {...props}
