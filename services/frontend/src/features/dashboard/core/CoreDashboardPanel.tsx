@@ -9,6 +9,8 @@ import { Button } from "../../../design/primitives/Button";
 import { MetricTile } from "../../../design/patterns/MetricTile";
 import { PageSectionHeader } from "../../../design/patterns/PageSectionHeader";
 import { SkeletonBlock } from "../../../design/patterns/SkeletonBlock";
+import { Table } from "../../../design/components/Table";
+import { EmptyState } from "../../../design/patterns/EmptyState";
 
 type ChartPoint = {
   day: string;
@@ -29,6 +31,7 @@ export function CoreDashboardPanel() {
   const [billingStats, setBillingStats] = useState({ accrual_count: 0, total_amount_usd: 0, total_bonus_usd: 0, total_revenue_usd: 0 });
   const [healthSummary, setHealthSummary] = useState({ ok: 0, warning: 0, critical: 0 });
   const [metricSummaryCount, setMetricSummaryCount] = useState(0);
+  const [anomalies, setAnomalies] = useState<Array<{ scope: string; issue: string; severity: "high" | "medium" | "low" }>>([]);
   const [series, setSeries] = useState<ChartPoint[]>([]);
   const { push } = useToast();
 
@@ -62,6 +65,11 @@ export function CoreDashboardPanel() {
         { ok: 0, warning: 0, critical: 0 }
       );
       setHealthSummary(summary);
+      setAnomalies([
+        ...(summary.critical > 0 ? [{ scope: "Global", issue: "Critical health checks detected", severity: "high" as const }] : []),
+        ...(summary.warning > summary.ok ? [{ scope: "Global", issue: "Warning checks exceed healthy checks", severity: "medium" as const }] : []),
+        ...(metricSummary.length === 0 ? [{ scope: "Metrics", issue: "No metric streams reported", severity: "low" as const }] : [])
+      ]);
 
       const byDay = new Map<string, number>();
       for (const row of accrualRows) {
@@ -121,6 +129,21 @@ export function CoreDashboardPanel() {
         <MetricTile label="Health warning" value={`${healthSummary.warning}`} />
         <MetricTile label="Total revenue" value={`$${billingStats.total_revenue_usd.toFixed(2)}`} />
       </div>
+
+      <Card title="Anomaly Feed" description="Operational alerts to drive fast triage.">
+        <Table
+          dense
+          ariaLabel="Core anomaly feed"
+          rowKey={(row) => `${row.scope}-${row.issue}`}
+          items={anomalies}
+          emptyState={<EmptyState title="No active anomalies" description="Current checks and metrics are in expected range." />}
+          columns={[
+            { key: "scope", header: "Scope", render: (row) => row.scope },
+            { key: "issue", header: "Issue", render: (row) => row.issue },
+            { key: "severity", header: "Severity", render: (row) => row.severity }
+          ]}
+        />
+      </Card>
     </section>
   );
 }

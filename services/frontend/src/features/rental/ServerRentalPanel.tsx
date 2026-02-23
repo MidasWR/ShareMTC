@@ -9,8 +9,11 @@ import { Button } from "../../design/primitives/Button";
 import { useToast } from "../../design/components/Toast";
 import { Table } from "../../design/components/Table";
 import { EmptyState } from "../../design/patterns/EmptyState";
-import { listVMs } from "../resources/api/resourcesApi";
+import { listVMs, startVM, stopVM, rebootVM, terminateVM } from "../resources/api/resourcesApi";
 import { AppTab } from "../../app/navigation/menu";
+import { StatusBadge } from "../../design/patterns/StatusBadge";
+import { Badge } from "../../design/primitives/Badge";
+import { FilterBar } from "../../design/components/FilterBar";
 
 type Props = {
   onNavigate: (tab: AppTab) => void;
@@ -31,7 +34,10 @@ export function ServerRentalPanel({ onNavigate }: Props) {
   const [estimate, setEstimate] = useState<number>(0);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"" | "active" | "queued" | "failed">("");
+  const [typeFilter, setTypeFilter] = useState<"" | "hourly" | "monthly">("");
   const [createTarget, setCreateTarget] = useState<AppTab>("vm");
+  const [vmByOrder, setVmByOrder] = useState<Record<string, string>>({});
   const { push } = useToast();
 
   const selectedPlan = useMemo(() => plans.find((item) => item.id === form.plan_id), [plans, form.plan_id]);
@@ -65,6 +71,26 @@ export function ServerRentalPanel({ onNavigate }: Props) {
     }
   }
 
+  async function handleLifecycle(row: ServerOrder, action: "start" | "stop" | "reboot" | "terminate") {
+    const vmID = row.id ? vmByOrder[row.id] : undefined;
+    if (!vmID) {
+      push("error", "No VM mapping found for this order");
+      return;
+    }
+    setLoading(true);
+    try {
+      if (action === "start") await startVM(vmID);
+      if (action === "stop") await stopVM(vmID);
+      if (action === "reboot") await rebootVM(vmID);
+      if (action === "terminate") await terminateVM(vmID);
+      push("success", `Lifecycle action '${action}' completed`);
+    } catch (error) {
+      push("error", error instanceof Error ? error.message : `Failed to ${action} VM`);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function handleEstimate(event: FormEvent) {
     event.preventDefault();
     setLoading(true);
@@ -84,6 +110,13 @@ export function ServerRentalPanel({ onNavigate }: Props) {
       const created = await createServerOrder(form);
       setOrders((prev) => [created, ...prev]);
       setEstimate(created.estimated_price_usd ?? estimate);
+      if (created.id) {
+        const allVms = await listVMs({ search: created.id });
+        const match = allVms.find((item) => item.name === created.id || item.template === created.plan_id);
+        if (match?.id) {
+          setVmByOrder((prev) => ({ ...prev, [created.id as string]: match.id as string }));
+        }
+      }
       push("success", "Server order created");
     } catch (error) {
       push("error", error instanceof Error ? error.message : "Failed to create order");
@@ -94,9 +127,17 @@ export function ServerRentalPanel({ onNavigate }: Props) {
 
   const filteredOrders = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return orders;
-    return orders.filter((row) => (row.id || "").toLowerCase().includes(q) || row.plan_id.toLowerCase().includes(q) || row.os_name.toLowerCase().includes(q));
-  }, [orders, search]);
+    return orders.filter((row) => {
+      const queryOk =
+        q.length === 0 ||
+        (row.id || "").toLowerCase().includes(q) ||
+        row.plan_id.toLowerCase().includes(q) ||
+        row.os_name.toLowerCase().includes(q);
+      const statusOk = !statusFilter || (row.status || "").toLowerCase() === statusFilter;
+      const typeOk = !typeFilter || row.period === typeFilter;
+      return queryOk && statusOk && typeOk;
+    });
+  }, [orders, search, statusFilter, typeFilter]);
 
   return (
     <section className="section-stack">
@@ -105,32 +146,60 @@ export function ServerRentalPanel({ onNavigate }: Props) {
         description="Manage your running instances, view logs, and configure new servers."
       />
 
-      <Card title="Controls" description="Search, refresh, and create resources from one entry point.">
-        <div className="grid gap-3 md:grid-cols-[2fr_auto_auto]">
-          <Input label="Search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="ID, plan, OS" />
-          <Button className="md:mt-7" variant="secondary" onClick={refresh} loading={loading}>
-            Refresh
-          </Button>
-          <div className="md:mt-7 flex items-center gap-2">
-            <Select
-              label="Create route"
-              value={createTarget}
-              onChange={(event) => setCreateTarget(event.target.value as AppTab)}
-              options={[
-                { value: "vm", label: "VM" },
-                { value: "sharedVm", label: "Shared VM" },
-                { value: "pods", label: "PODs" },
-                { value: "sharedPods", label: "Shared PODs" },
-                { value: "k8sClusters", label: "Kubernetes Cluster" }
-              ]}
-            />
-            <Button onClick={() => onNavigate(createTarget)}>Create</Button>
-          </div>
-        </div>
+      <Card title="Controls" description="RunPod-like manage toolbar: filters, refresh, and create actions.">
+        <FilterBar
+          search={<Input label="Search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="ID, plan, OS" />}
+          filters={
+            <>
+              <Select
+                label="Status"
+                value={statusFilter}
+                onChange={(event) => setStatusFilter(event.target.value as "" | "active" | "queued" | "failed")}
+                options={[
+                  { value: "", label: "Any status" },
+                  { value: "active", label: "Active" },
+                  { value: "queued", label: "Queued" },
+                  { value: "failed", label: "Failed" }
+                ]}
+              />
+              <Select
+                label="Type"
+                value={typeFilter}
+                onChange={(event) => setTypeFilter(event.target.value as "" | "hourly" | "monthly")}
+                options={[
+                  { value: "", label: "Any type" },
+                  { value: "hourly", label: "Hourly" },
+                  { value: "monthly", label: "Monthly" }
+                ]}
+              />
+            </>
+          }
+          actions={
+            <>
+              <Button variant="secondary" onClick={refresh} loading={loading}>
+                Refresh
+              </Button>
+              <Select
+                label="Create"
+                value={createTarget}
+                onChange={(event) => setCreateTarget(event.target.value as AppTab)}
+                options={[
+                  { value: "vm", label: "VM" },
+                  { value: "sharedVm", label: "Shared VM" },
+                  { value: "pods", label: "PODs" },
+                  { value: "sharedPods", label: "Shared PODs" },
+                  { value: "k8sClusters", label: "Kubernetes Cluster" }
+                ]}
+              />
+              <Button onClick={() => onNavigate(createTarget)}>Create</Button>
+            </>
+          }
+        />
       </Card>
       
       <Card title="Your Instances" description="Active and past server rentals.">
         <Table
+          dense
           ariaLabel="Server history"
           rowKey={(row) => row.id ?? `${row.plan_id}-${row.created_at}`}
           items={filteredOrders}
@@ -141,11 +210,22 @@ export function ServerRentalPanel({ onNavigate }: Props) {
             { key: "os", header: "OS", render: (row) => row.os_name },
             { key: "status", header: "Status", render: (row) => (
               <span className="flex items-center gap-2">
-                <span className={`h-2 w-2 rounded-full ${row.status === "active" ? "bg-success" : "bg-brand animate-pulseSoft"}`}></span>
-                {row.status ?? "running"}
+                <StatusBadge status={row.status === "active" ? "running" : row.status === "queued" ? "starting" : row.status === "failed" ? "error" : "running"} />
               </span>
             ) },
-            { key: "actions", header: "Actions", render: () => <span className="text-textMuted text-xs">Use VM/POD tabs</span> }
+            { key: "period", header: "Billing", render: (row) => <Badge variant="neutral">{row.period}</Badge> },
+            {
+              key: "actions",
+              header: "Actions",
+              render: (row) => (
+                <div className="flex flex-wrap gap-1">
+                  <Button size="sm" variant="secondary" onClick={() => handleLifecycle(row, "start")}>Start</Button>
+                  <Button size="sm" variant="secondary" onClick={() => handleLifecycle(row, "stop")}>Stop</Button>
+                  <Button size="sm" variant="secondary" onClick={() => handleLifecycle(row, "reboot")}>Reboot</Button>
+                  <Button size="sm" variant="destructive" onClick={() => handleLifecycle(row, "terminate")}>Terminate</Button>
+                </div>
+              )
+            }
           ]}
         />
       </Card>

@@ -50,7 +50,7 @@ func (r *repoStub) UpsertVMTemplate(_ context.Context, tpl models.VMTemplate) (m
 	r.templates = append(r.templates, tpl)
 	return tpl, nil
 }
-func (r *repoStub) ListVMTemplates(_ context.Context) ([]models.VMTemplate, error) {
+func (r *repoStub) ListVMTemplates(_ context.Context, _ models.CatalogFilter) ([]models.VMTemplate, error) {
 	return r.templates, nil
 }
 func (r *repoStub) CreateVM(_ context.Context, vm models.VM) (models.VM, error) {
@@ -66,7 +66,7 @@ func (r *repoStub) GetVM(_ context.Context, vmID string) (models.VM, error) {
 	}
 	return r.vm, nil
 }
-func (r *repoStub) ListVMs(_ context.Context, _ string, _ string, _ string) ([]models.VM, error) {
+func (r *repoStub) ListVMs(_ context.Context, _ string, _ models.CatalogFilter) ([]models.VM, error) {
 	if r.vm.ID == "" {
 		return []models.VM{}, nil
 	}
@@ -228,6 +228,18 @@ func TestVMLifecycle(t *testing.T) {
 	}
 	if vm.Status != models.VMStatusRunning {
 		t.Fatalf("expected running after provision, got %s", vm.Status)
+	}
+	if vm.Region != "any" {
+		t.Fatalf("expected default region any, got %s", vm.Region)
+	}
+	if vm.CloudType != "secure" {
+		t.Fatalf("expected default cloud type secure, got %s", vm.CloudType)
+	}
+	if vm.AvailabilityTier != "low" {
+		t.Fatalf("expected default availability low, got %s", vm.AvailabilityTier)
+	}
+	if vm.VCPU != vm.CPUCores {
+		t.Fatalf("expected vcpu mirror cpu_cores, got %d", vm.VCPU)
 	}
 
 	vm, err = svc.StopVM(ctx, vm.ID)

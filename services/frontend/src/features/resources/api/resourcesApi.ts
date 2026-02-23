@@ -10,7 +10,8 @@ import {
   SharedPod,
   SharedVM,
   VM,
-  VMTemplate
+  VMTemplate,
+  CatalogFilter
 } from "../../../types/api";
 
 export function listAllocations(providerID: string) {
@@ -49,8 +50,18 @@ export function getResourceStats() {
   return apiClient.get<ResourceStats>(`${API_BASE.resource}/v1/resources/admin/stats`);
 }
 
-export function listVMTemplates() {
-  return apiClient.get<VMTemplate[]>(`${API_BASE.resource}/v1/resources/vm-templates`);
+export function listVMTemplates(params?: CatalogFilter) {
+  const search = new URLSearchParams();
+  if (params?.search) search.set("search", params.search);
+  if (params?.region) search.set("region", params.region);
+  if (params?.cloud_type) search.set("cloud_type", params.cloud_type);
+  if (params?.availability_tier) search.set("availability_tier", params.availability_tier);
+  if (params?.sort_by) search.set("sort_by", params.sort_by);
+  if (params?.network_volume_supported) search.set("network_volume_supported", params.network_volume_supported);
+  if (params?.global_networking_supported) search.set("global_networking_supported", params.global_networking_supported);
+  if (typeof params?.min_vram_gb === "number") search.set("min_vram_gb", String(params.min_vram_gb));
+  const query = search.toString();
+  return apiClient.get<VMTemplate[]>(`${API_BASE.resource}/v1/resources/vm-templates${query ? `?${query}` : ""}`);
 }
 
 export function upsertVMTemplate(payload: VMTemplate) {
@@ -61,10 +72,17 @@ export function createVM(payload: VM) {
   return apiClient.post<VM>(`${API_BASE.resource}/v1/resources/vms`, payload);
 }
 
-export function listVMs(params?: { status?: string; search?: string }) {
+export function listVMs(params?: CatalogFilter) {
   const search = new URLSearchParams();
   if (params?.status) search.set("status", params.status);
   if (params?.search) search.set("search", params.search);
+  if (params?.region) search.set("region", params.region);
+  if (params?.cloud_type) search.set("cloud_type", params.cloud_type);
+  if (params?.availability_tier) search.set("availability_tier", params.availability_tier);
+  if (params?.sort_by) search.set("sort_by", params.sort_by);
+  if (params?.network_volume_supported) search.set("network_volume_supported", params.network_volume_supported);
+  if (params?.global_networking_supported) search.set("global_networking_supported", params.global_networking_supported);
+  if (typeof params?.min_vram_gb === "number") search.set("min_vram_gb", String(params.min_vram_gb));
   const query = search.toString();
   return apiClient.get<VM[]>(`${API_BASE.resource}/v1/resources/vms${query ? `?${query}` : ""}`);
 }

@@ -132,10 +132,19 @@ export type VM = {
   template?: string;
   os_name: string;
   ip_address?: string;
+  region?: string;
+  cloud_type?: "secure" | "community";
   cpu_cores: number;
+  vcpu?: number;
   ram_mb: number;
+  system_ram_gb?: number;
   gpu_units: number;
+  vram_gb?: number;
   network_mbps: number;
+  network_volume_supported?: boolean;
+  global_networking_supported?: boolean;
+  availability_tier?: "low" | "medium" | "high";
+  max_instances?: number;
   status?: VMStatus;
   created_at?: string;
   updated_at?: string;
@@ -147,11 +156,32 @@ export type VMTemplate = {
   name: string;
   description: string;
   os_name: string;
+  region?: string;
+  cloud_type?: "secure" | "community";
   cpu_cores: number;
+  vcpu?: number;
   ram_mb: number;
+  system_ram_gb?: number;
   gpu_units: number;
+  vram_gb?: number;
   network_mbps: number;
+  network_volume_supported?: boolean;
+  global_networking_supported?: boolean;
+  availability_tier?: "low" | "medium" | "high";
+  max_instances?: number;
   created_at?: string;
+};
+
+export type CatalogFilter = {
+  search?: string;
+  region?: string;
+  cloud_type?: "secure" | "community" | "";
+  availability_tier?: "low" | "medium" | "high" | "";
+  status?: VMStatus | "";
+  sort_by?: "name" | "vram" | "availability" | "";
+  network_volume_supported?: "true" | "false" | "";
+  global_networking_supported?: "true" | "false" | "";
+  min_vram_gb?: number;
 };
 
 export type SharedVM = {

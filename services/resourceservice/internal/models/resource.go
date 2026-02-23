@@ -75,10 +75,19 @@ type VM struct {
 	Template    string    `json:"template"`
 	OSName      string    `json:"os_name"`
 	IPAddress   string    `json:"ip_address"`
+	Region      string    `json:"region"`
+	CloudType   string    `json:"cloud_type"`
 	CPUCores    int       `json:"cpu_cores"`
+	VCPU        int       `json:"vcpu"`
 	RAMMB       int       `json:"ram_mb"`
+	SystemRAMGB int       `json:"system_ram_gb"`
 	GPUUnits    int       `json:"gpu_units"`
+	VRAMGB      int       `json:"vram_gb"`
 	NetworkMbps int       `json:"network_mbps"`
+	NetworkVolumeSupported  bool      `json:"network_volume_supported"`
+	GlobalNetworkingSupport bool      `json:"global_networking_supported"`
+	AvailabilityTier        string    `json:"availability_tier"`
+	MaxInstances            int       `json:"max_instances"`
 	Status      VMStatus  `json:"status"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
@@ -90,11 +99,32 @@ type VMTemplate struct {
 	Name        string    `json:"name"`
 	Description string    `json:"description"`
 	OSName      string    `json:"os_name"`
+	Region      string    `json:"region"`
+	CloudType   string    `json:"cloud_type"`
 	CPUCores    int       `json:"cpu_cores"`
+	VCPU        int       `json:"vcpu"`
 	RAMMB       int       `json:"ram_mb"`
+	SystemRAMGB int       `json:"system_ram_gb"`
 	GPUUnits    int       `json:"gpu_units"`
+	VRAMGB      int       `json:"vram_gb"`
 	NetworkMbps int       `json:"network_mbps"`
+	NetworkVolumeSupported  bool      `json:"network_volume_supported"`
+	GlobalNetworkingSupport bool      `json:"global_networking_supported"`
+	AvailabilityTier        string    `json:"availability_tier"`
+	MaxInstances            int       `json:"max_instances"`
 	CreatedAt   time.Time `json:"created_at"`
+}
+
+type CatalogFilter struct {
+	Search                    string `json:"search"`
+	Region                    string `json:"region"`
+	CloudType                 string `json:"cloud_type"`
+	AvailabilityTier          string `json:"availability_tier"`
+	Status                    string `json:"status"`
+	SortBy                    string `json:"sort_by"`
+	NetworkVolumeSupported    string `json:"network_volume_supported"`
+	GlobalNetworkingSupported string `json:"global_networking_supported"`
+	MinVRAMGB                 int    `json:"min_vram_gb"`
 }
 
 type SharedVM struct {

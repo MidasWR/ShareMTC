@@ -44,10 +44,19 @@ func (r *Repo) Migrate(ctx context.Context) error {
 			name TEXT NOT NULL,
 			description TEXT NOT NULL,
 			os_name TEXT NOT NULL,
+			region TEXT NOT NULL DEFAULT 'any',
+			cloud_type TEXT NOT NULL DEFAULT 'secure',
 			cpu_cores INTEGER NOT NULL,
+			vcpu INTEGER NOT NULL DEFAULT 0,
 			ram_mb INTEGER NOT NULL,
+			system_ram_gb INTEGER NOT NULL DEFAULT 0,
 			gpu_units INTEGER NOT NULL,
+			vram_gb INTEGER NOT NULL DEFAULT 0,
 			network_mbps INTEGER NOT NULL,
+			network_volume_supported BOOLEAN NOT NULL DEFAULT FALSE,
+			global_networking_supported BOOLEAN NOT NULL DEFAULT FALSE,
+			availability_tier TEXT NOT NULL DEFAULT 'low',
+			max_instances INTEGER NOT NULL DEFAULT 1,
 			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 		);
 		CREATE TABLE IF NOT EXISTS vms (
@@ -58,16 +67,47 @@ func (r *Repo) Migrate(ctx context.Context) error {
 			template TEXT NOT NULL,
 			os_name TEXT NOT NULL,
 			ip_address TEXT NOT NULL,
+			region TEXT NOT NULL DEFAULT 'any',
+			cloud_type TEXT NOT NULL DEFAULT 'secure',
 			cpu_cores INTEGER NOT NULL,
+			vcpu INTEGER NOT NULL DEFAULT 0,
 			ram_mb INTEGER NOT NULL,
+			system_ram_gb INTEGER NOT NULL DEFAULT 0,
 			gpu_units INTEGER NOT NULL,
+			vram_gb INTEGER NOT NULL DEFAULT 0,
 			network_mbps INTEGER NOT NULL,
+			network_volume_supported BOOLEAN NOT NULL DEFAULT FALSE,
+			global_networking_supported BOOLEAN NOT NULL DEFAULT FALSE,
+			availability_tier TEXT NOT NULL DEFAULT 'low',
+			max_instances INTEGER NOT NULL DEFAULT 1,
 			status TEXT NOT NULL,
 			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 			updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 		);
 		CREATE INDEX IF NOT EXISTS idx_vms_user_id ON vms(user_id);
 		CREATE INDEX IF NOT EXISTS idx_vms_status ON vms(status);
+		CREATE INDEX IF NOT EXISTS idx_vms_region_cloud ON vms(region, cloud_type);
+		CREATE INDEX IF NOT EXISTS idx_vms_vram_availability ON vms(vram_gb, availability_tier);
+		CREATE INDEX IF NOT EXISTS idx_templates_region_cloud ON vm_templates(region, cloud_type);
+		CREATE INDEX IF NOT EXISTS idx_templates_vram_availability ON vm_templates(vram_gb, availability_tier);
+		ALTER TABLE vm_templates ADD COLUMN IF NOT EXISTS region TEXT NOT NULL DEFAULT 'any';
+		ALTER TABLE vm_templates ADD COLUMN IF NOT EXISTS cloud_type TEXT NOT NULL DEFAULT 'secure';
+		ALTER TABLE vm_templates ADD COLUMN IF NOT EXISTS vcpu INTEGER NOT NULL DEFAULT 0;
+		ALTER TABLE vm_templates ADD COLUMN IF NOT EXISTS system_ram_gb INTEGER NOT NULL DEFAULT 0;
+		ALTER TABLE vm_templates ADD COLUMN IF NOT EXISTS vram_gb INTEGER NOT NULL DEFAULT 0;
+		ALTER TABLE vm_templates ADD COLUMN IF NOT EXISTS network_volume_supported BOOLEAN NOT NULL DEFAULT FALSE;
+		ALTER TABLE vm_templates ADD COLUMN IF NOT EXISTS global_networking_supported BOOLEAN NOT NULL DEFAULT FALSE;
+		ALTER TABLE vm_templates ADD COLUMN IF NOT EXISTS availability_tier TEXT NOT NULL DEFAULT 'low';
+		ALTER TABLE vm_templates ADD COLUMN IF NOT EXISTS max_instances INTEGER NOT NULL DEFAULT 1;
+		ALTER TABLE vms ADD COLUMN IF NOT EXISTS region TEXT NOT NULL DEFAULT 'any';
+		ALTER TABLE vms ADD COLUMN IF NOT EXISTS cloud_type TEXT NOT NULL DEFAULT 'secure';
+		ALTER TABLE vms ADD COLUMN IF NOT EXISTS vcpu INTEGER NOT NULL DEFAULT 0;
+		ALTER TABLE vms ADD COLUMN IF NOT EXISTS system_ram_gb INTEGER NOT NULL DEFAULT 0;
+		ALTER TABLE vms ADD COLUMN IF NOT EXISTS vram_gb INTEGER NOT NULL DEFAULT 0;
+		ALTER TABLE vms ADD COLUMN IF NOT EXISTS network_volume_supported BOOLEAN NOT NULL DEFAULT FALSE;
+		ALTER TABLE vms ADD COLUMN IF NOT EXISTS global_networking_supported BOOLEAN NOT NULL DEFAULT FALSE;
+		ALTER TABLE vms ADD COLUMN IF NOT EXISTS availability_tier TEXT NOT NULL DEFAULT 'low';
+		ALTER TABLE vms ADD COLUMN IF NOT EXISTS max_instances INTEGER NOT NULL DEFAULT 1;
 		CREATE TABLE IF NOT EXISTS shared_vms (
 			id TEXT PRIMARY KEY,
 			vm_id TEXT NOT NULL REFERENCES vms(id) ON DELETE CASCADE,
@@ -240,27 +280,77 @@ func (r *Repo) UpsertVMTemplate(ctx context.Context, tpl models.VMTemplate) (mod
 		tpl.ID = uuid.NewString()
 	}
 	err := r.db.QueryRow(ctx, `
-		INSERT INTO vm_templates (id, code, name, description, os_name, cpu_cores, ram_mb, gpu_units, network_mbps)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		INSERT INTO vm_templates (
+			id, code, name, description, os_name, region, cloud_type, cpu_cores, vcpu, ram_mb, system_ram_gb, gpu_units, vram_gb, network_mbps,
+			network_volume_supported, global_networking_supported, availability_tier, max_instances
+		)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
 		ON CONFLICT (code) DO UPDATE SET
 			name = EXCLUDED.name,
 			description = EXCLUDED.description,
 			os_name = EXCLUDED.os_name,
+			region = EXCLUDED.region,
+			cloud_type = EXCLUDED.cloud_type,
 			cpu_cores = EXCLUDED.cpu_cores,
+			vcpu = EXCLUDED.vcpu,
 			ram_mb = EXCLUDED.ram_mb,
+			system_ram_gb = EXCLUDED.system_ram_gb,
 			gpu_units = EXCLUDED.gpu_units,
-			network_mbps = EXCLUDED.network_mbps
+			vram_gb = EXCLUDED.vram_gb,
+			network_mbps = EXCLUDED.network_mbps,
+			network_volume_supported = EXCLUDED.network_volume_supported,
+			global_networking_supported = EXCLUDED.global_networking_supported,
+			availability_tier = EXCLUDED.availability_tier,
+			max_instances = EXCLUDED.max_instances
 		RETURNING id, created_at
-	`, tpl.ID, tpl.Code, tpl.Name, tpl.Description, tpl.OSName, tpl.CPUCores, tpl.RAMMB, tpl.GPUUnits, tpl.NetworkMbps).Scan(&tpl.ID, &tpl.CreatedAt)
+	`,
+		tpl.ID,
+		tpl.Code,
+		tpl.Name,
+		tpl.Description,
+		tpl.OSName,
+		tpl.Region,
+		tpl.CloudType,
+		tpl.CPUCores,
+		tpl.VCPU,
+		tpl.RAMMB,
+		tpl.SystemRAMGB,
+		tpl.GPUUnits,
+		tpl.VRAMGB,
+		tpl.NetworkMbps,
+		tpl.NetworkVolumeSupported,
+		tpl.GlobalNetworkingSupport,
+		tpl.AvailabilityTier,
+		tpl.MaxInstances,
+	).Scan(&tpl.ID, &tpl.CreatedAt)
 	return tpl, err
 }
 
-func (r *Repo) ListVMTemplates(ctx context.Context) ([]models.VMTemplate, error) {
+func (r *Repo) ListVMTemplates(ctx context.Context, filter models.CatalogFilter) ([]models.VMTemplate, error) {
+	orderBy := "created_at DESC"
+	switch filter.SortBy {
+	case "vram":
+		orderBy = "vram_gb DESC"
+	case "name":
+		orderBy = "name ASC"
+	case "availability":
+		orderBy = "availability_tier ASC"
+	}
 	rows, err := r.db.Query(ctx, `
-		SELECT id, code, name, description, os_name, cpu_cores, ram_mb, gpu_units, network_mbps, created_at
+		SELECT
+			id, code, name, description, os_name, region, cloud_type, cpu_cores, vcpu, ram_mb, system_ram_gb,
+			gpu_units, vram_gb, network_mbps, network_volume_supported, global_networking_supported, availability_tier, max_instances, created_at
 		FROM vm_templates
-		ORDER BY created_at DESC
-	`)
+		WHERE
+			($1 = '' OR LOWER(name) LIKE '%' || LOWER($1) || '%' OR LOWER(code) LIKE '%' || LOWER($1) || '%')
+			AND ($2 = '' OR region = $2)
+			AND ($3 = '' OR cloud_type = $3)
+			AND ($4 = '' OR availability_tier = $4)
+			AND ($5 = '' OR network_volume_supported = ($5 = 'true'))
+			AND ($6 = '' OR global_networking_supported = ($6 = 'true'))
+			AND ($7 <= 0 OR vram_gb >= $7)
+		ORDER BY `+orderBy+`
+	`, filter.Search, filter.Region, filter.CloudType, filter.AvailabilityTier, filter.NetworkVolumeSupported, filter.GlobalNetworkingSupported, filter.MinVRAMGB)
 	if err != nil {
 		return nil, err
 	}
@@ -268,7 +358,11 @@ func (r *Repo) ListVMTemplates(ctx context.Context) ([]models.VMTemplate, error)
 	out := make([]models.VMTemplate, 0)
 	for rows.Next() {
 		var item models.VMTemplate
-		if err := rows.Scan(&item.ID, &item.Code, &item.Name, &item.Description, &item.OSName, &item.CPUCores, &item.RAMMB, &item.GPUUnits, &item.NetworkMbps, &item.CreatedAt); err != nil {
+		if err := rows.Scan(
+			&item.ID, &item.Code, &item.Name, &item.Description, &item.OSName, &item.Region, &item.CloudType,
+			&item.CPUCores, &item.VCPU, &item.RAMMB, &item.SystemRAMGB, &item.GPUUnits, &item.VRAMGB, &item.NetworkMbps,
+			&item.NetworkVolumeSupported, &item.GlobalNetworkingSupport, &item.AvailabilityTier, &item.MaxInstances, &item.CreatedAt,
+		); err != nil {
 			return nil, err
 		}
 		out = append(out, item)
@@ -281,34 +375,79 @@ func (r *Repo) CreateVM(ctx context.Context, vm models.VM) (models.VM, error) {
 		vm.ID = uuid.NewString()
 	}
 	err := r.db.QueryRow(ctx, `
-		INSERT INTO vms (id, user_id, provider_id, name, template, os_name, ip_address, cpu_cores, ram_mb, gpu_units, network_mbps, status)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+		INSERT INTO vms (
+			id, user_id, provider_id, name, template, os_name, ip_address, region, cloud_type, cpu_cores, vcpu, ram_mb, system_ram_gb,
+			gpu_units, vram_gb, network_mbps, network_volume_supported, global_networking_supported, availability_tier, max_instances, status
+		)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
 		RETURNING created_at, updated_at
-	`, vm.ID, vm.UserID, vm.ProviderID, vm.Name, vm.Template, vm.OSName, vm.IPAddress, vm.CPUCores, vm.RAMMB, vm.GPUUnits, vm.NetworkMbps, vm.Status).Scan(&vm.CreatedAt, &vm.UpdatedAt)
+	`,
+		vm.ID,
+		vm.UserID,
+		vm.ProviderID,
+		vm.Name,
+		vm.Template,
+		vm.OSName,
+		vm.IPAddress,
+		vm.Region,
+		vm.CloudType,
+		vm.CPUCores,
+		vm.VCPU,
+		vm.RAMMB,
+		vm.SystemRAMGB,
+		vm.GPUUnits,
+		vm.VRAMGB,
+		vm.NetworkMbps,
+		vm.NetworkVolumeSupported,
+		vm.GlobalNetworkingSupport,
+		vm.AvailabilityTier,
+		vm.MaxInstances,
+		vm.Status,
+	).Scan(&vm.CreatedAt, &vm.UpdatedAt)
 	return vm, err
 }
 
 func (r *Repo) GetVM(ctx context.Context, vmID string) (models.VM, error) {
 	var out models.VM
 	err := r.db.QueryRow(ctx, `
-		SELECT id, user_id, provider_id, name, template, os_name, ip_address, cpu_cores, ram_mb, gpu_units, network_mbps, status, created_at, updated_at
+		SELECT id, user_id, provider_id, name, template, os_name, ip_address, region, cloud_type, cpu_cores, vcpu, ram_mb, system_ram_gb, gpu_units, vram_gb, network_mbps,
+		       network_volume_supported, global_networking_supported, availability_tier, max_instances, status, created_at, updated_at
 		FROM vms
 		WHERE id = $1
 	`, vmID).Scan(
-		&out.ID, &out.UserID, &out.ProviderID, &out.Name, &out.Template, &out.OSName, &out.IPAddress, &out.CPUCores, &out.RAMMB, &out.GPUUnits, &out.NetworkMbps, &out.Status, &out.CreatedAt, &out.UpdatedAt,
+		&out.ID, &out.UserID, &out.ProviderID, &out.Name, &out.Template, &out.OSName, &out.IPAddress, &out.Region, &out.CloudType,
+		&out.CPUCores, &out.VCPU, &out.RAMMB, &out.SystemRAMGB, &out.GPUUnits, &out.VRAMGB, &out.NetworkMbps,
+		&out.NetworkVolumeSupported, &out.GlobalNetworkingSupport, &out.AvailabilityTier, &out.MaxInstances,
+		&out.Status, &out.CreatedAt, &out.UpdatedAt,
 	)
 	return out, err
 }
 
-func (r *Repo) ListVMs(ctx context.Context, userID string, status string, search string) ([]models.VM, error) {
+func (r *Repo) ListVMs(ctx context.Context, userID string, filter models.CatalogFilter) ([]models.VM, error) {
+	orderBy := "updated_at DESC"
+	switch filter.SortBy {
+	case "vram":
+		orderBy = "vram_gb DESC"
+	case "name":
+		orderBy = "name ASC"
+	case "availability":
+		orderBy = "availability_tier ASC"
+	}
 	rows, err := r.db.Query(ctx, `
-		SELECT id, user_id, provider_id, name, template, os_name, ip_address, cpu_cores, ram_mb, gpu_units, network_mbps, status, created_at, updated_at
+		SELECT id, user_id, provider_id, name, template, os_name, ip_address, region, cloud_type, cpu_cores, vcpu, ram_mb, system_ram_gb, gpu_units, vram_gb, network_mbps,
+		       network_volume_supported, global_networking_supported, availability_tier, max_instances, status, created_at, updated_at
 		FROM vms
 		WHERE user_id = $1
 		  AND ($2 = '' OR status = $2)
 		  AND ($3 = '' OR LOWER(name) LIKE '%' || LOWER($3) || '%' OR LOWER(id) LIKE '%' || LOWER($3) || '%')
-		ORDER BY updated_at DESC
-	`, userID, status, search)
+		  AND ($4 = '' OR region = $4)
+		  AND ($5 = '' OR cloud_type = $5)
+		  AND ($6 = '' OR availability_tier = $6)
+		  AND ($7 = '' OR network_volume_supported = ($7 = 'true'))
+		  AND ($8 = '' OR global_networking_supported = ($8 = 'true'))
+		  AND ($9 <= 0 OR vram_gb >= $9)
+		ORDER BY `+orderBy+`
+	`, userID, filter.Status, filter.Search, filter.Region, filter.CloudType, filter.AvailabilityTier, filter.NetworkVolumeSupported, filter.GlobalNetworkingSupported, filter.MinVRAMGB)
 	if err != nil {
 		return nil, err
 	}
@@ -316,7 +455,12 @@ func (r *Repo) ListVMs(ctx context.Context, userID string, status string, search
 	out := make([]models.VM, 0)
 	for rows.Next() {
 		var item models.VM
-		if err := rows.Scan(&item.ID, &item.UserID, &item.ProviderID, &item.Name, &item.Template, &item.OSName, &item.IPAddress, &item.CPUCores, &item.RAMMB, &item.GPUUnits, &item.NetworkMbps, &item.Status, &item.CreatedAt, &item.UpdatedAt); err != nil {
+		if err := rows.Scan(
+			&item.ID, &item.UserID, &item.ProviderID, &item.Name, &item.Template, &item.OSName, &item.IPAddress,
+			&item.Region, &item.CloudType, &item.CPUCores, &item.VCPU, &item.RAMMB, &item.SystemRAMGB, &item.GPUUnits, &item.VRAMGB, &item.NetworkMbps,
+			&item.NetworkVolumeSupported, &item.GlobalNetworkingSupport, &item.AvailabilityTier, &item.MaxInstances,
+			&item.Status, &item.CreatedAt, &item.UpdatedAt,
+		); err != nil {
 			return nil, err
 		}
 		out = append(out, item)

@@ -115,7 +115,8 @@ func (h *Handler) UpsertVMTemplate(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) ListVMTemplates(w http.ResponseWriter, r *http.Request) {
-	items, err := h.svc.ListVMTemplates(r.Context())
+	filter := readCatalogFilter(r)
+	items, err := h.svc.ListVMTemplates(r.Context(), filter)
 	if err != nil {
 		httpx.Error(w, http.StatusInternalServerError, err.Error())
 		return
@@ -149,9 +150,8 @@ func (h *Handler) ListVMs(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusUnauthorized, "unauthorized")
 		return
 	}
-	status := r.URL.Query().Get("status")
-	search := r.URL.Query().Get("search")
-	items, err := h.svc.ListVMs(r.Context(), claims.UserID, status, search)
+	filter := readCatalogFilter(r)
+	items, err := h.svc.ListVMs(r.Context(), claims.UserID, filter)
 	if err != nil {
 		httpx.Error(w, http.StatusInternalServerError, err.Error())
 		return
@@ -435,4 +435,18 @@ func parseTimeQuery(raw string) time.Time {
 		return time.Time{}
 	}
 	return parsed
+}
+
+func readCatalogFilter(r *http.Request) models.CatalogFilter {
+	return models.CatalogFilter{
+		Search:                    strings.TrimSpace(r.URL.Query().Get("search")),
+		Region:                    strings.TrimSpace(r.URL.Query().Get("region")),
+		CloudType:                 strings.TrimSpace(r.URL.Query().Get("cloud_type")),
+		AvailabilityTier:          strings.TrimSpace(r.URL.Query().Get("availability_tier")),
+		Status:                    strings.TrimSpace(r.URL.Query().Get("status")),
+		SortBy:                    strings.TrimSpace(r.URL.Query().Get("sort_by")),
+		NetworkVolumeSupported:    strings.TrimSpace(r.URL.Query().Get("network_volume_supported")),
+		GlobalNetworkingSupported: strings.TrimSpace(r.URL.Query().Get("global_networking_supported")),
+		MinVRAMGB:                 intQuery(r, "min_vram_gb", 0),
+	}
 }

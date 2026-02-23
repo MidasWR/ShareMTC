@@ -21,10 +21,10 @@ type Repository interface {
 	Stats(ctx context.Context) (models.ResourceStats, error)
 
 	UpsertVMTemplate(ctx context.Context, tpl models.VMTemplate) (models.VMTemplate, error)
-	ListVMTemplates(ctx context.Context) ([]models.VMTemplate, error)
+	ListVMTemplates(ctx context.Context, filter models.CatalogFilter) ([]models.VMTemplate, error)
 	CreateVM(ctx context.Context, vm models.VM) (models.VM, error)
 	GetVM(ctx context.Context, vmID string) (models.VM, error)
-	ListVMs(ctx context.Context, userID string, status string, search string) ([]models.VM, error)
+	ListVMs(ctx context.Context, userID string, filter models.CatalogFilter) ([]models.VM, error)
 	UpdateVMStatus(ctx context.Context, vmID string, status models.VMStatus) error
 
 	CreateSharedVM(ctx context.Context, item models.SharedVM) (models.SharedVM, error)
@@ -105,11 +105,29 @@ func (s *ResourceService) UpsertVMTemplate(ctx context.Context, tpl models.VMTem
 	if tpl.CPUCores <= 0 || tpl.RAMMB <= 0 || tpl.NetworkMbps <= 0 {
 		return models.VMTemplate{}, errors.New("template cpu_cores, ram_mb and network_mbps must be positive")
 	}
+	if tpl.Region == "" {
+		tpl.Region = "any"
+	}
+	if tpl.CloudType == "" {
+		tpl.CloudType = "secure"
+	}
+	if tpl.AvailabilityTier == "" {
+		tpl.AvailabilityTier = "low"
+	}
+	if tpl.VCPU <= 0 {
+		tpl.VCPU = tpl.CPUCores
+	}
+	if tpl.SystemRAMGB <= 0 {
+		tpl.SystemRAMGB = tpl.RAMMB / 1024
+	}
+	if tpl.MaxInstances <= 0 {
+		tpl.MaxInstances = 1
+	}
 	return s.repo.UpsertVMTemplate(ctx, tpl)
 }
 
-func (s *ResourceService) ListVMTemplates(ctx context.Context) ([]models.VMTemplate, error) {
-	return s.repo.ListVMTemplates(ctx)
+func (s *ResourceService) ListVMTemplates(ctx context.Context, filter models.CatalogFilter) ([]models.VMTemplate, error) {
+	return s.repo.ListVMTemplates(ctx, filter)
 }
 
 func (s *ResourceService) CreateVM(ctx context.Context, vm models.VM) (models.VM, error) {
@@ -121,6 +139,24 @@ func (s *ResourceService) CreateVM(ctx context.Context, vm models.VM) (models.VM
 	}
 	vm.Status = models.VMStatusProvisioning
 	vm.IPAddress = fmt.Sprintf("10.%d.%d.%d", time.Now().UTC().Second()%255, time.Now().UTC().Minute()%255, time.Now().UTC().Hour()%255)
+	if vm.Region == "" {
+		vm.Region = "any"
+	}
+	if vm.CloudType == "" {
+		vm.CloudType = "secure"
+	}
+	if vm.AvailabilityTier == "" {
+		vm.AvailabilityTier = "low"
+	}
+	if vm.VCPU <= 0 {
+		vm.VCPU = vm.CPUCores
+	}
+	if vm.SystemRAMGB <= 0 {
+		vm.SystemRAMGB = vm.RAMMB / 1024
+	}
+	if vm.MaxInstances <= 0 {
+		vm.MaxInstances = 1
+	}
 	created, err := s.repo.CreateVM(ctx, vm)
 	if err != nil {
 		return models.VM{}, err
@@ -135,8 +171,8 @@ func (s *ResourceService) GetVM(ctx context.Context, vmID string) (models.VM, er
 	return s.repo.GetVM(ctx, vmID)
 }
 
-func (s *ResourceService) ListVMs(ctx context.Context, userID string, status string, search string) ([]models.VM, error) {
-	return s.repo.ListVMs(ctx, userID, status, search)
+func (s *ResourceService) ListVMs(ctx context.Context, userID string, filter models.CatalogFilter) ([]models.VM, error) {
+	return s.repo.ListVMs(ctx, userID, filter)
 }
 
 func (s *ResourceService) StartVM(ctx context.Context, vmID string) (models.VM, error) {

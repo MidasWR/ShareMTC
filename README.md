@@ -65,6 +65,15 @@ ShareMTC is a compute marketplace and control plane where providers expose CPU/R
 - Sidebar route icons were added for all core/admin/provider sections.
 - UI language defaults to English, and visible panel copy is aligned to EN.
 
+### RunPod-style UX direction
+
+- Catalog and manage flows now follow a RunPod-like operational pattern:
+  - top filter toolbar (`GPU/CPU`, cloud type, region, network features, additional filters),
+  - VRAM slider row,
+  - grouped instance tiles (`Featured`, `Latest generation`),
+  - dense operational tables with status chips and quick actions.
+- This UX is backed by real API filters (no placeholder controls).
+
 ### Security model
 
 - Backend routes in admin/resource/billing services are protected by:
@@ -108,9 +117,10 @@ ShareMTC is a compute marketplace and control plane where providers expose CPU/R
 - `POST /v1/billing/rental/orders`
 - `GET /v1/billing/rental/orders`
 - `GET /v1/resources/vm-templates`
+- `GET /v1/resources/vm-templates?search=&region=&cloud_type=&availability_tier=&network_volume_supported=&global_networking_supported=&min_vram_gb=&sort_by=`
 - `POST /v1/resources/vm-templates`
 - `POST /v1/resources/vms`
-- `GET /v1/resources/vms?status=&search=`
+- `GET /v1/resources/vms?status=&search=&region=&cloud_type=&availability_tier=&network_volume_supported=&global_networking_supported=&min_vram_gb=&sort_by=`
 - `GET /v1/resources/vms/{vmID}`
 - `POST /v1/resources/vms/{vmID}/start`
 - `POST /v1/resources/vms/{vmID}/stop`
@@ -211,3 +221,4 @@ Latest upgrade reports:
 - `reports/4_frontend_admin_dashboards_upgrade.md`
 - `reports/6_full_rebrand_russian_marketplace.md`
 - `reports/7_core_vm_k8s_fullstack_iteration.md`
+- `reports/8_runpod_style_core_ux_iteration.md`

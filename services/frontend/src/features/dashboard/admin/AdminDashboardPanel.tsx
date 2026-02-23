@@ -10,6 +10,7 @@ import { MetricTile } from "../../../design/patterns/MetricTile";
 import { PageSectionHeader } from "../../../design/patterns/PageSectionHeader";
 import { Button } from "../../../design/primitives/Button";
 import { Card } from "../../../design/primitives/Card";
+import { Badge } from "../../../design/primitives/Badge";
 
 type ProviderLoad = {
   provider: string;
@@ -139,7 +140,15 @@ export function AdminDashboardPanel() {
           columns={[
             { key: "provider", header: "Provider", render: (row) => row.provider },
             { key: "issue", header: "Issue", render: (row) => row.issue },
-            { key: "severity", header: "Severity", render: (row) => row.severity }
+            {
+              key: "severity",
+              header: "Severity",
+              render: (row) => (
+                <Badge variant={row.severity === "high" ? "danger" : row.severity === "medium" ? "warning" : "neutral"}>
+                  {row.severity}
+                </Badge>
+              )
+            }
           ]}
         />
       </Card>

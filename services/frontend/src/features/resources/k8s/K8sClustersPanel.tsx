@@ -8,6 +8,7 @@ import { Card } from "../../../design/primitives/Card";
 import { Input } from "../../../design/primitives/Input";
 import { createK8sCluster, deleteK8sCluster, listK8sClusters, refreshK8sCluster } from "../api/resourcesApi";
 import { KubernetesCluster } from "../../../types/api";
+import { StatusBadge } from "../../../design/patterns/StatusBadge";
 
 export function K8sClustersPanel() {
   const [rows, setRows] = useState<KubernetesCluster[]>([]);
@@ -93,6 +94,7 @@ export function K8sClustersPanel() {
         <Button variant="secondary" onClick={refresh} loading={loading}>Refresh</Button>
         <div className="mt-3">
           <Table
+            dense
             ariaLabel="Kubernetes cluster table"
             rowKey={(row) => row.id ?? row.name}
             items={rows}
@@ -101,7 +103,17 @@ export function K8sClustersPanel() {
               { key: "name", header: "Name", render: (row) => row.name },
               { key: "provider", header: "Provider", render: (row) => row.provider_id },
               { key: "nodes", header: "Nodes", render: (row) => String(row.node_count) },
-              { key: "status", header: "Status", render: (row) => row.status || "unknown" },
+              {
+                key: "status",
+                header: "Status",
+                render: (row) => {
+                  const value = row.status || "unknown";
+                  if (value === "running") return <StatusBadge status="running" />;
+                  if (value === "creating" || value === "suspended") return <StatusBadge status="starting" />;
+                  if (value === "deleting" || value === "deleted") return <StatusBadge status="stopped" />;
+                  return <StatusBadge status="error" />;
+                }
+              },
               { key: "endpoint", header: "Endpoint", render: (row) => row.endpoint || "-" },
               {
                 key: "actions",

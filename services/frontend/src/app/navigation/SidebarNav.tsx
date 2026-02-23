@@ -46,6 +46,12 @@ type Props = {
 
 export function SidebarNav({ tab, groups, enabledMenu, onNavigate, onLogout, onShortcuts }: Props) {
   const t = useTranslation();
+  const groupLabel: Record<NavGroup, string> = {
+    core: "Manage",
+    provider: "Resources",
+    admin: "Administration",
+    ops: "Account"
+  };
 
   return (
     <aside className="border-b border-border bg-surface flex flex-col h-full lg:min-h-screen lg:border-b-0 lg:border-r">
@@ -61,7 +67,7 @@ export function SidebarNav({ tab, groups, enabledMenu, onNavigate, onLogout, onS
           return (
             <details key={group} className="group" open>
               <summary className="flex cursor-pointer items-center justify-between px-2 py-1 text-xs uppercase tracking-wide text-textMuted hover:text-textPrimary transition-colors outline-none focus-visible:ring-1 focus-visible:ring-brand rounded">
-                <span>{t.sidebar[group]}</span>
+                <span>{groupLabel[group] || t.sidebar[group]}</span>
                 <FaChevronDown className="transition-transform group-open:rotate-180 opacity-50" />
               </summary>
               <div className="mt-2 space-y-1">

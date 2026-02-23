@@ -19,4 +19,26 @@ describe("resources API query composition", () => {
     expect(params.toString()).toContain("metric_type=cpu_usage_percent");
     expect(params.toString()).toContain("limit=200");
   });
+
+  it("creates query string for runpod-style catalog filters", () => {
+    const params = new URLSearchParams();
+    params.set("search", "RTX");
+    params.set("region", "EU-RO-1");
+    params.set("cloud_type", "secure");
+    params.set("availability_tier", "high");
+    params.set("network_volume_supported", "true");
+    params.set("global_networking_supported", "false");
+    params.set("sort_by", "vram");
+    params.set("min_vram_gb", "48");
+
+    const query = params.toString();
+    expect(query).toContain("search=RTX");
+    expect(query).toContain("region=EU-RO-1");
+    expect(query).toContain("cloud_type=secure");
+    expect(query).toContain("availability_tier=high");
+    expect(query).toContain("network_volume_supported=true");
+    expect(query).toContain("global_networking_supported=false");
+    expect(query).toContain("sort_by=vram");
+    expect(query).toContain("min_vram_gb=48");
+  });
 });

@@ -8,6 +8,7 @@ import { Card } from "../../../design/primitives/Card";
 import { Input } from "../../../design/primitives/Input";
 import { createVM, listVMs, rebootVM, startVM, stopVM, terminateVM } from "../api/resourcesApi";
 import { VM } from "../../../types/api";
+import { StatusBadge } from "../../../design/patterns/StatusBadge";
 
 export function VMPanel() {
   const [rows, setRows] = useState<VM[]>([]);
@@ -41,10 +42,19 @@ export function VMPanel() {
         name,
         template: "fastpanel",
         os_name: "Ubuntu 22.04",
+        region: "any",
+        cloud_type: "secure",
         cpu_cores: 4,
+        vcpu: 4,
         ram_mb: 8192,
+        system_ram_gb: 16,
         gpu_units: 1,
-        network_mbps: 500
+        vram_gb: 24,
+        network_mbps: 500,
+        network_volume_supported: true,
+        global_networking_supported: false,
+        availability_tier: "medium",
+        max_instances: 8
       });
       await refresh();
       push("success", "VM created");
@@ -91,6 +101,7 @@ export function VMPanel() {
           </Button>
         </div>
         <Table
+          dense
           ariaLabel="VM table"
           rowKey={(row) => row.id ?? `${row.name}-${row.provider_id}`}
           items={rows}
@@ -100,7 +111,17 @@ export function VMPanel() {
             { key: "provider", header: "Provider", render: (row) => row.provider_id },
             { key: "shape", header: "Shape", render: (row) => `${row.cpu_cores} CPU / ${row.ram_mb} MB / ${row.gpu_units} GPU` },
             { key: "ip", header: "IP", render: (row) => row.ip_address || "-" },
-            { key: "status", header: "Status", render: (row) => row.status || "unknown" },
+            {
+              key: "status",
+              header: "Status",
+              render: (row) => {
+                const value = row.status || "unknown";
+                if (value === "running") return <StatusBadge status="running" />;
+                if (value === "provisioning") return <StatusBadge status="starting" />;
+                if (value === "stopped") return <StatusBadge status="stopped" />;
+                return <StatusBadge status="error" />;
+              }
+            },
             {
               key: "actions",
               header: "Actions",
