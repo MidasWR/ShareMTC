@@ -8,8 +8,10 @@ import { TableToolbar } from "../design/components/TableToolbar";
 import { useToast } from "../design/components/Toast";
 import { useTableControls } from "../design/hooks/useTableControls";
 import { EmptyState } from "../design/patterns/EmptyState";
+import { InlineAlert } from "../design/patterns/InlineAlert";
 import { LogViewer } from "../design/patterns/LogViewer";
 import { MetricTile } from "../design/patterns/MetricTile";
+import { PageSectionHeader } from "../design/patterns/PageSectionHeader";
 import { StatusBadge } from "../design/patterns/StatusBadge";
 import { Button } from "../design/primitives/Button";
 import { Card } from "../design/primitives/Card";
@@ -198,6 +200,11 @@ export function HostPanel() {
 
   return (
     <section className="section-stack">
+      <PageSectionHeader
+        title="Pods & Allocations"
+        description="Create, inspect, and safely stop pod allocations for a provider."
+      />
+
       <Card title="Pod allocations" description="Create and monitor running allocations for provider compute capacity.">
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[2fr_1fr_1fr_1fr]">
           <Input
@@ -208,7 +215,7 @@ export function HostPanel() {
             helpText="Used for list/create/release API operations."
           />
           <Button variant="secondary" className="md:mt-7" onClick={loadAllocations} loading={loading}>
-            Refresh list
+            Load allocations
           </Button>
           <Button variant="secondary" className="md:mt-7" onClick={heartbeat} loading={loading}>
             Send heartbeat
@@ -222,7 +229,9 @@ export function HostPanel() {
           <MetricTile label="Running" value={`${activeAllocations}`} />
           <MetricTile label="Released" value={`${Math.max(0, allocations.length - activeAllocations)}`} />
         </div>
-        <p className="mt-4 text-sm text-textSecondary">{statusText}</p>
+        <div className="mt-4">
+          <InlineAlert kind="info">{statusText}</InlineAlert>
+        </div>
       </Card>
 
       <Card title="Allocation list" description="Data-dense table with details and safe actions.">
@@ -259,7 +268,7 @@ export function HostPanel() {
               />
             </>
           }
-          actions={<Button variant="ghost" onClick={() => { setSearch(""); setStatusFilter("all"); setSortBy("newest"); }}>Reset</Button>}
+          actions={<Button variant="ghost" onClick={() => { setSearch(""); setStatusFilter("all"); setSortBy("newest"); }}>Clear filters</Button>}
         />
         <div className="mb-3 grid gap-2 md:grid-cols-[1fr_auto] md:items-start">
           <TableToolbar
@@ -290,7 +299,7 @@ export function HostPanel() {
           emptyState={
             <EmptyState
               title="No allocations found"
-              description="Set provider ID and refresh list, or create a new allocation."
+              description="Set provider ID, then load data or create a new allocation."
               action={<Button onClick={() => setShowCreateModal(true)}>Create first pod</Button>}
             />
           }

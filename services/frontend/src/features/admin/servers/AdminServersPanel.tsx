@@ -11,6 +11,8 @@ import { EmptyState } from "../../../design/patterns/EmptyState";
 import { MetricTile } from "../../../design/patterns/MetricTile";
 import { SkeletonBlock } from "../../../design/patterns/SkeletonBlock";
 import { StatusBadge } from "../../../design/patterns/StatusBadge";
+import { PageSectionHeader } from "../../../design/patterns/PageSectionHeader";
+import { InlineAlert } from "../../../design/patterns/InlineAlert";
 import { Button } from "../../../design/primitives/Button";
 import { Card } from "../../../design/primitives/Card";
 import { Input } from "../../../design/primitives/Input";
@@ -142,26 +144,28 @@ export function AdminServersPanel() {
 
   return (
     <section className="section-stack">
+      <PageSectionHeader
+        title="Admin Servers"
+        description="Manage provider machines, capacity metadata, and operational visibility."
+        actions={
+          <>
+            <Button variant="secondary" onClick={refresh} loading={loading}>
+              Refresh
+            </Button>
+            <Button onClick={() => setIsCreateOpen(true)}>Add server</Button>
+          </>
+        }
+      />
+
       <div className="grid gap-3 md:grid-cols-3">
         <MetricTile label="Total servers" value={`${providers.length}`} />
         <MetricTile label="Online" value={`${onlineCount}`} />
         <MetricTile label="Offline" value={`${Math.max(0, providers.length - onlineCount)}`} />
       </div>
 
-      <Card
-        title="Admin server control center"
-        description="Fleet inventory, server onboarding, and operational visibility."
-        actions={
-          <div className="flex gap-2">
-            <Button variant="secondary" onClick={refresh} loading={loading}>
-              Refresh
-            </Button>
-            <Button onClick={() => setIsCreateOpen(true)}>Add server</Button>
-          </div>
-        }
-      >
+      <Card title="Server inventory" description="Search, filter, and inspect provider nodes.">
         {loading ? <SkeletonBlock lines={6} /> : null}
-        {!loading && error ? <p role="alert" className="rounded-md border border-danger/40 bg-danger/15 px-3 py-2 text-sm text-danger">{error}</p> : null}
+        {!loading && error ? <InlineAlert kind="error">{error}</InlineAlert> : null}
         {!loading && !error ? (
           <>
             <FilterBar
@@ -189,7 +193,11 @@ export function AdminServersPanel() {
                   />
                 </>
               }
-              actions={<Button variant="ghost" onClick={() => { setSearch(""); setStatusFilter("all"); setSortBy("name"); }}>Reset</Button>}
+              actions={
+                <Button variant="ghost" onClick={() => { setSearch(""); setStatusFilter("all"); setSortBy("name"); }}>
+                  Clear filters
+                </Button>
+              }
             />
             <div className="mb-3 grid gap-2 md:grid-cols-[1fr_auto] md:items-start">
               <TableToolbar
@@ -213,7 +221,7 @@ export function AdminServersPanel() {
               ariaLabel="Admin servers table"
               rowKey={(provider) => provider.id}
               items={table.pagedItems}
-              emptyState={<EmptyState title="No servers found" description="Add server to start building your provider fleet." />}
+              emptyState={<EmptyState title="No servers found" description="Try different filters or add a new server." />}
               columns={activeColumns}
             />
           </>
@@ -233,7 +241,7 @@ export function AdminServersPanel() {
         ) : null}
       </Drawer>
 
-      <Modal open={isCreateOpen} title="Add server" description="Register a server/provider in admin service." onClose={() => setIsCreateOpen(false)}>
+      <Modal open={isCreateOpen} title="Add server" description="Register a provider node in admin service." onClose={() => setIsCreateOpen(false)}>
         <form className="space-y-3" onSubmit={createServer}>
           <Input label="Display name" value={form.display_name} onChange={(event) => setForm((prev) => ({ ...prev, display_name: event.target.value }))} />
           <Input label="Machine ID" value={form.machine_id} onChange={(event) => setForm((prev) => ({ ...prev, machine_id: event.target.value }))} />

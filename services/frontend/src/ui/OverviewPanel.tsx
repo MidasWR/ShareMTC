@@ -1,9 +1,15 @@
 import { MetricTile } from "../design/patterns/MetricTile";
+import { PageSectionHeader } from "../design/patterns/PageSectionHeader";
 import { Card } from "../design/primitives/Card";
 
 export function OverviewPanel() {
   return (
     <section className="section-stack">
+      <PageSectionHeader
+        title="Overview"
+        description="Quick orientation across consumer, provider, billing, and admin workflows."
+      />
+
       <Card title="Platform overview" description="Operational summary for Pods-as-a-Service and marketplace compute roles.">
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <MetricTile label="Consumer flow" value="Create -> Run -> Stop" hint="CPU/GPU pod lifecycle" />

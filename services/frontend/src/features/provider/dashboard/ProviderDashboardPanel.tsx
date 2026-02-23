@@ -2,7 +2,10 @@ import { useMemo, useState } from "react";
 import { Table } from "../../../design/components/Table";
 import { useToast } from "../../../design/components/Toast";
 import { EmptyState } from "../../../design/patterns/EmptyState";
+import { InlineAlert } from "../../../design/patterns/InlineAlert";
 import { MetricTile } from "../../../design/patterns/MetricTile";
+import { PageSectionHeader } from "../../../design/patterns/PageSectionHeader";
+import { SkeletonBlock } from "../../../design/patterns/SkeletonBlock";
 import { StatusBadge } from "../../../design/patterns/StatusBadge";
 import { Button } from "../../../design/primitives/Button";
 import { Card } from "../../../design/primitives/Card";
@@ -18,6 +21,7 @@ export function ProviderDashboardPanel() {
   const [allocations, setAllocations] = useState<Allocation[]>([]);
   const [accruals, setAccruals] = useState<UsageAccrual[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const { push } = useToast();
 
   const runningCount = useMemo(() => allocations.filter((item) => !item.released_at).length, [allocations]);
@@ -29,6 +33,7 @@ export function ProviderDashboardPanel() {
       return;
     }
     setLoading(true);
+    setError("");
     try {
       const [alloc, billing] = await Promise.all([
         fetchJSON<Allocation[]>(`${RESOURCE_BASE}/v1/resources/allocations?provider_id=${encodeURIComponent(providerID.trim())}`),
@@ -38,6 +43,7 @@ export function ProviderDashboardPanel() {
       setAccruals(billing);
       push("info", "Provider dashboard synced");
     } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Dashboard refresh failed");
       push("error", requestError instanceof Error ? requestError.message : "Dashboard refresh failed");
     } finally {
       setLoading(false);
@@ -46,27 +52,34 @@ export function ProviderDashboardPanel() {
 
   return (
     <section className="section-stack">
-      <Card title="Provider dashboard" description="Health, utilization, and earnings for shared resources.">
+      <PageSectionHeader
+        title="Provider Dashboard"
+        description="Track utilization, earnings, and current allocation health for shared resources."
+      />
+
+      <Card title="Provider selector" description="Load dashboard data for a specific provider ID.">
         <div className="grid gap-3 md:grid-cols-[2fr_auto]">
           <Input label="Provider ID" value={providerID} onChange={(event) => setProviderID(event.target.value)} placeholder="Provider UUID" />
           <Button className="md:mt-7" onClick={refresh} loading={loading}>
-            Refresh
+            Load dashboard
           </Button>
         </div>
+        {!loading && error ? <div className="mt-4"><InlineAlert kind="error">{error}</InlineAlert></div> : null}
         <div className="mt-4 grid gap-3 md:grid-cols-4">
-          <MetricTile label="Allocations total" value={`${allocations.length}`} />
-          <MetricTile label="Running now" value={`${runningCount}`} />
-          <MetricTile label="Revenue total" value={`$${totalRevenue.toFixed(2)}`} />
+          <MetricTile label="Total allocations" value={`${allocations.length}`} />
+          <MetricTile label="Running allocations" value={`${runningCount}`} />
+          <MetricTile label="Total revenue" value={`$${totalRevenue.toFixed(2)}`} />
           <MetricTile label="Health state" value={runningCount > 0 ? "active" : "idle"} />
         </div>
       </Card>
 
       <Card title="Live allocations" description="Current and historical resource allocations.">
+        {loading ? <SkeletonBlock lines={5} /> : null}
         <Table
           dense
           ariaLabel="Provider allocations dashboard table"
           rowKey={(item) => item.id}
-          items={allocations}
+          items={!loading ? allocations : []}
           emptyState={<EmptyState title="No allocations yet" description="Start sharing resources to see utilization here." />}
           columns={[
             { key: "id", header: "Allocation ID", render: (item) => <span className="font-mono text-xs">{item.id}</span> },

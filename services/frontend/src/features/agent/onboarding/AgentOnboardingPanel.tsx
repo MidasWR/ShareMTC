@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useToast } from "../../../design/components/Toast";
+import { InlineAlert } from "../../../design/patterns/InlineAlert";
 import { MetricTile } from "../../../design/patterns/MetricTile";
+import { PageSectionHeader } from "../../../design/patterns/PageSectionHeader";
 import { Button } from "../../../design/primitives/Button";
 import { Card } from "../../../design/primitives/Card";
 import { Input } from "../../../design/primitives/Input";
@@ -22,6 +24,7 @@ export function AgentOnboardingPanel() {
   const [providerID, setProviderID] = useState("");
   const [verificationState, setVerificationState] = useState("Not verified");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const { push } = useToast();
 
   async function copyCommand() {
@@ -35,10 +38,12 @@ export function AgentOnboardingPanel() {
 
   async function verifyAgent() {
     if (!providerID.trim()) {
+      setError("Provider ID is required for verification");
       push("error", "Provider ID is required for heartbeat verification");
       return;
     }
     setLoading(true);
+    setError("");
     try {
       await fetchJSON<{ status: string }>(`${RESOURCE_BASE}/v1/resources/heartbeat`, {
         method: "POST",
@@ -56,6 +61,7 @@ export function AgentOnboardingPanel() {
       push("success", "Agent heartbeat verified");
     } catch (requestError) {
       const message = requestError instanceof Error ? requestError.message : "Verification failed";
+      setError(message);
       setVerificationState(`Verification failed: ${message}`);
       push("error", "Agent verification failed");
     } finally {
@@ -65,7 +71,12 @@ export function AgentOnboardingPanel() {
 
   return (
     <section className="section-stack">
-      <Card title="Agent onboarding" description="Install and verify host agent for shared resource providers.">
+      <PageSectionHeader
+        title="Agent Onboarding"
+        description="Install host agent, start the runtime, and verify heartbeat connectivity."
+      />
+
+      <Card title="Install flow" description="Select OS, copy command, and verify provider heartbeat.">
         <div className="grid gap-3 md:grid-cols-2">
           <Select
             label="Operating system"
@@ -93,9 +104,10 @@ export function AgentOnboardingPanel() {
             Copy command
           </Button>
           <Button onClick={verifyAgent} loading={loading}>
-            Verify heartbeat
+            Verify connection
           </Button>
         </div>
+        {error ? <div className="mt-3"><InlineAlert kind="error">{error}</InlineAlert></div> : null}
       </Card>
 
       <div className="grid gap-3 md:grid-cols-3">

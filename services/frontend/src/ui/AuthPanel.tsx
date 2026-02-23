@@ -3,6 +3,7 @@ import { useToast } from "../design/components/Toast";
 import { Button } from "../design/primitives/Button";
 import { Card } from "../design/primitives/Card";
 import { Input } from "../design/primitives/Input";
+import { InlineAlert } from "../design/patterns/InlineAlert";
 import { setSession } from "../lib/auth";
 import { fetchJSON } from "../lib/http";
 
@@ -82,7 +83,7 @@ export function AuthPanel({ onAuthenticated }: AuthPanelProps) {
 
   return (
     <section className="grid gap-4 lg:grid-cols-2">
-      <Card title="Email Registration" description="Create account and receive JWT token in local storage.">
+      <Card title="Create account" description="Register a local account and start a secured session.">
         <form className="space-y-3" onSubmit={(e) => submit("register", e)}>
           <Input label="Email" placeholder="name@example.com" value={email} onChange={(e) => setEmail(e.target.value)} error={email ? emailError : ""} />
           <Input
@@ -93,14 +94,14 @@ export function AuthPanel({ onAuthenticated }: AuthPanelProps) {
             onChange={(e) => setPassword(e.target.value)}
             error={password ? passwordError : ""}
           />
-          {error ? <p role="alert" className="rounded-md border border-danger/40 bg-danger/15 px-3 py-2 text-sm text-danger">{error}</p> : null}
+          {error ? <InlineAlert kind="error">{error}</InlineAlert> : null}
           <Button type="submit" className="w-full" loading={loading === "register"}>
             Register
           </Button>
         </form>
       </Card>
 
-      <Card title="Login & OAuth2" description="Use existing credentials or federated login.">
+      <Card title="Sign in" description="Use email credentials or federated identity provider.">
         <div className="space-y-3">
           <Button variant="secondary" className="w-full" onClick={login} loading={loading === "login"}>
             Login with email
@@ -111,7 +112,7 @@ export function AuthPanel({ onAuthenticated }: AuthPanelProps) {
           >
             Continue with Google
           </a>
-          <p className="text-xs text-textMuted">Consumer and provider identity share the same auth surface.</p>
+          <p className="text-xs text-textMuted">Consumer and provider accounts share the same auth endpoint.</p>
         </div>
       </Card>
     </section>

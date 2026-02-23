@@ -2,7 +2,10 @@ import { useMemo, useState } from "react";
 import { Table } from "../../../design/components/Table";
 import { useToast } from "../../../design/components/Toast";
 import { EmptyState } from "../../../design/patterns/EmptyState";
+import { InlineAlert } from "../../../design/patterns/InlineAlert";
 import { MetricTile } from "../../../design/patterns/MetricTile";
+import { PageSectionHeader } from "../../../design/patterns/PageSectionHeader";
+import { SkeletonBlock } from "../../../design/patterns/SkeletonBlock";
 import { Button } from "../../../design/primitives/Button";
 import { Card } from "../../../design/primitives/Card";
 import { Input } from "../../../design/primitives/Input";
@@ -27,10 +30,12 @@ export function SharingAdminPanel() {
   const [rows, setRows] = useState<SharingRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [providerFilter, setProviderFilter] = useState("");
+  const [error, setError] = useState("");
   const { push } = useToast();
 
   async function refresh() {
     setLoading(true);
+    setError("");
     try {
       const providers = await fetchJSON<Provider[]>(`${ADMIN_BASE}/v1/admin/providers/`);
       const nextRows = await Promise.all(
@@ -61,6 +66,7 @@ export function SharingAdminPanel() {
       setRows(nextRows);
       push("info", "Sharing admin data synced");
     } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Sharing admin sync failed");
       push("error", requestError instanceof Error ? requestError.message : "Sharing admin sync failed");
     } finally {
       setLoading(false);
@@ -77,12 +83,22 @@ export function SharingAdminPanel() {
 
   return (
     <section className="section-stack">
-      <Card
-        title="Sharing admin"
-        description="Moderation baseline for shared provider capacity and operational risk."
+      <PageSectionHeader
+        title="Admin Sharing"
+        description="Review sharing posture, provider risk, and moderation baseline."
         actions={
           <Button onClick={refresh} loading={loading}>
-            Sync all providers
+            Sync providers
+          </Button>
+        }
+      />
+
+      <Card
+        title="Sharing overview"
+        description="At-a-glance distribution and risk indicators."
+        actions={
+          <Button variant="secondary" onClick={refresh} loading={loading}>
+            Refresh data
           </Button>
         }
       >
@@ -94,7 +110,7 @@ export function SharingAdminPanel() {
             onChange={(event) => setProviderFilter(event.target.value)}
           />
           <Button variant="secondary" className="md:mt-7" onClick={() => setProviderFilter("")}>
-            Reset
+            Clear filter
           </Button>
         </div>
         <div className="mt-4 grid gap-3 md:grid-cols-3">
@@ -105,12 +121,14 @@ export function SharingAdminPanel() {
       </Card>
 
       <Card title="Sharing risk table" description="Operational posture for provider supply and sharing stability.">
+        {loading ? <SkeletonBlock lines={6} /> : null}
+        {!loading && error ? <InlineAlert kind="error">{error}</InlineAlert> : null}
         <Table
           dense
           ariaLabel="Sharing admin risk table"
           rowKey={(row) => row.provider_id}
-          items={filteredRows}
-          emptyState={<EmptyState title="No sharing data" description="Sync providers to build moderation view." />}
+          items={!loading && !error ? filteredRows : []}
+          emptyState={<EmptyState title="No sharing data" description="Use Sync providers to build moderation view." />}
           columns={[
             { key: "provider", header: "Provider", render: (row) => row.display_name },
             { key: "id", header: "Provider ID", render: (row) => <span className="font-mono text-xs">{row.provider_id}</span> },

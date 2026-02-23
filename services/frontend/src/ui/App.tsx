@@ -157,7 +157,7 @@ export function App() {
         <main className="page-container section-stack flex min-h-screen max-w-5xl flex-col justify-center">
           <header className="text-center">
             <h1 className="text-2xl font-semibold">ShareMTC Control Plane</h1>
-            <p className="mt-2 text-sm text-textSecondary">Authentication required. Sign in to access pods, billing, and provider operations.</p>
+            <p className="mt-2 text-sm text-textSecondary">Sign in to access operational modules, dashboards, and server management controls.</p>
           </header>
           <AuthPanel onAuthenticated={handleAuthenticated} />
         </main>
@@ -266,7 +266,7 @@ export function App() {
                 <Breadcrumbs items={[{ id: "home", label: "Control Plane" }, { id: tab, label: activeLabel }]} />
                 <div>
                   <h2 className="text-xl font-semibold">{activeLabel}</h2>
-                  <p className="text-sm text-textSecondary">Single-CTA, data-dense, contract-safe frontend refactor baseline.</p>
+                  <p className="text-sm text-textSecondary">Operational UI with role-based access, data-dense controls, and contract-safe integrations.</p>
                 </div>
               </div>
               <div className="flex items-center gap-2">

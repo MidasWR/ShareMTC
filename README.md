@@ -173,6 +173,7 @@ All service names are controlled through `values.yaml` `dns` fields.
   - `reports/2_frontend_ui_system_refactor.md`
   - `reports/3_frontend_pr_breakdown.md`
   - `reports/4_frontend_scale_roadmap.md`
+  - `reports/5_frontend_ux_polish_iteration.md`
 
 ## Current Limitations
 

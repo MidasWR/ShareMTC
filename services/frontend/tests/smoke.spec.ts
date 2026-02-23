@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 test("blocks app when unauthenticated", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByText("Authentication required. Sign in to access pods, billing, and provider operations.")).toBeVisible();
+  await expect(page.getByText("Sign in to access operational modules, dashboards, and server management controls.")).toBeVisible();
 });
 
 test("shows shell when session exists", async ({ page }) => {

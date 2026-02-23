@@ -6,7 +6,10 @@ import { TableToolbar } from "../design/components/TableToolbar";
 import { useToast } from "../design/components/Toast";
 import { useTableControls } from "../design/hooks/useTableControls";
 import { EmptyState } from "../design/patterns/EmptyState";
+import { InlineAlert } from "../design/patterns/InlineAlert";
+import { PageSectionHeader } from "../design/patterns/PageSectionHeader";
 import { MetricTile } from "../design/patterns/MetricTile";
+import { SkeletonBlock } from "../design/patterns/SkeletonBlock";
 import { Button } from "../design/primitives/Button";
 import { Card } from "../design/primitives/Card";
 import { Input } from "../design/primitives/Input";
@@ -23,6 +26,8 @@ export function BillingPanel() {
   const [accruals, setAccruals] = useState<UsageAccrual[]>([]);
   const [costPreview, setCostPreview] = useState("--");
   const [loading, setLoading] = useState(false);
+  const [statusMessage, setStatusMessage] = useState("No usage operation yet");
+  const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState<"newest" | "total">("newest");
   const [visibleColumns, setVisibleColumns] = useState<string[]>(["id", "usage", "amount", "bonus", "total", "created"]);
@@ -68,10 +73,12 @@ export function BillingPanel() {
   async function previewUsage(event: FormEvent) {
     event.preventDefault();
     if (!providerID || !planID) {
+      setError("Provider ID and plan ID are required");
       push("error", "Provider ID and plan ID are required");
       return;
     }
     setLoading(true);
+    setError("");
     try {
       const preview = await fetchJSON<{ total_usd: number; vip_bonus_usd: number }>(`${BILLING_BASE}/v1/billing/usage`, {
         method: "POST",
@@ -87,8 +94,10 @@ export function BillingPanel() {
         })
       });
       setCostPreview(`$${preview.total_usd.toFixed(2)} (bonus: $${preview.vip_bonus_usd.toFixed(2)})`);
+      setStatusMessage("Usage processed and preview updated");
       push("success", "Usage accrual processed");
     } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Usage preview failed");
       push("error", requestError instanceof Error ? requestError.message : "Usage preview failed");
     } finally {
       setLoading(false);
@@ -97,15 +106,19 @@ export function BillingPanel() {
 
   async function loadAccruals() {
     if (!providerID) {
+      setError("Provider ID is required");
       push("error", "Provider ID is required");
       return;
     }
     setLoading(true);
+    setError("");
     try {
       const rows = await fetchJSON<UsageAccrual[]>(`${BILLING_BASE}/v1/billing/accruals?provider_id=${encodeURIComponent(providerID)}`);
       setAccruals(rows);
+      setStatusMessage(`Loaded ${rows.length} accrual rows`);
       push("info", `Loaded ${rows.length} accruals`);
     } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Accrual load failed");
       push("error", requestError instanceof Error ? requestError.message : "Accrual load failed");
     } finally {
       setLoading(false);
@@ -114,6 +127,11 @@ export function BillingPanel() {
 
   return (
     <section className="section-stack">
+      <PageSectionHeader
+        title="Billing & Usage"
+        description="Process usage and review accrual history with predictable financial visibility."
+      />
+
       <Card title="Billing usage" description="Use existing billing contract for cost preview and accrual history.">
         <form className="grid gap-3 md:grid-cols-2 xl:grid-cols-[2fr_2fr_1fr_1fr]" onSubmit={previewUsage}>
           <Input label="Provider ID" value={providerID} onChange={(event) => setProviderID(event.target.value)} />
@@ -130,9 +148,13 @@ export function BillingPanel() {
           <MetricTile label="Accrued total" value={`$${totalAccrued.toFixed(2)}`} />
           <MetricTile label="VIP bonus total" value={`$${totalBonus.toFixed(2)}`} />
         </div>
+        <div className="mt-4">
+          {error ? <InlineAlert kind="error">{error}</InlineAlert> : <InlineAlert kind="info">{statusMessage}</InlineAlert>}
+        </div>
       </Card>
 
       <Card title="Accrual history" description="Data density mode for financial records.">
+        {loading ? <SkeletonBlock lines={4} /> : null}
         <FilterBar
           search={
             <Input
@@ -153,7 +175,7 @@ export function BillingPanel() {
               ]}
             />
           }
-          actions={<Button variant="ghost" onClick={() => { setSearch(""); setSortBy("newest"); }}>Reset</Button>}
+          actions={<Button variant="ghost" onClick={() => { setSearch(""); setSortBy("newest"); }}>Clear filters</Button>}
         />
         <div className="mb-3 grid gap-2 md:grid-cols-[1fr_auto] md:items-start">
           <TableToolbar
@@ -180,7 +202,7 @@ export function BillingPanel() {
           dense={table.density === "compact"}
           ariaLabel="Billing accrual history table"
           rowKey={(row) => row.id}
-          items={table.pagedItems}
+          items={!loading ? table.pagedItems : []}
           emptyState={<EmptyState title="No accrual records" description="Process usage and load accruals for a provider." />}
           columns={activeColumns}
         />
