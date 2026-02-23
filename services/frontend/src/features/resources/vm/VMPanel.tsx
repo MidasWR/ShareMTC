@@ -9,6 +9,7 @@ import { Input } from "../../../design/primitives/Input";
 import { createVM, listVMs, rebootVM, startVM, stopVM, terminateVM } from "../api/resourcesApi";
 import { VM } from "../../../types/api";
 import { StatusBadge } from "../../../design/patterns/StatusBadge";
+import { ActionDropdown } from "../../../design/components/ActionDropdown";
 
 export function VMPanel() {
   const [rows, setRows] = useState<VM[]>([]);
@@ -84,21 +85,20 @@ export function VMPanel() {
   return (
     <section className="section-stack">
       <PageSectionHeader title="VM" description="Create, control, and inspect dedicated virtual machines." />
-      <Card title="Create VM" description="Launch a new VM with default FastPanel profile.">
-        <div className="grid gap-3 md:grid-cols-3">
+      <Card title="Quick Create VM" description="Minimal create form with default FastPanel profile.">
+        <div className="grid items-end gap-3 md:grid-cols-[1fr_1fr_auto]">
           <Input label="Provider ID" value={providerID} onChange={(event) => setProviderID(event.target.value)} />
           <Input label="VM Name" value={name} onChange={(event) => setName(event.target.value)} />
-          <Button className="md:mt-7" onClick={createNewVM} loading={loading}>
-            Create VM
-          </Button>
+          <Button onClick={createNewVM} loading={loading}>Create</Button>
         </div>
       </Card>
-      <Card title="VM Fleet" description="Search and manage lifecycle actions.">
+      <Card
+        title="VM Fleet"
+        description="Search and manage lifecycle actions."
+        actions={<Button variant="secondary" onClick={refresh} loading={loading}>Refresh</Button>}
+      >
         <div className="mb-3 grid gap-3 md:grid-cols-[2fr_auto]">
           <Input label="Search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="VM name or ID" />
-          <Button className="md:mt-7" variant="secondary" onClick={refresh} loading={loading}>
-            Refresh
-          </Button>
         </div>
         <Table
           dense
@@ -126,12 +126,20 @@ export function VMPanel() {
               key: "actions",
               header: "Actions",
               render: (row) => (
-                <div className="flex flex-wrap gap-2">
-                  <Button size="sm" variant="secondary" onClick={() => row.id && mutate(row.id, "start")}>Start</Button>
-                  <Button size="sm" variant="secondary" onClick={() => row.id && mutate(row.id, "stop")}>Stop</Button>
-                  <Button size="sm" variant="secondary" onClick={() => row.id && mutate(row.id, "reboot")}>Reboot</Button>
-                  <Button size="sm" variant="destructive" onClick={() => row.id && mutate(row.id, "terminate")}>Terminate</Button>
-                </div>
+                <ActionDropdown
+                  label="Actions"
+                  disabled={!row.id || loading}
+                  options={[
+                    { value: "start", label: "Start" },
+                    { value: "stop", label: "Stop" },
+                    { value: "reboot", label: "Reboot" },
+                    { value: "terminate", label: "Terminate" }
+                  ]}
+                  onSelect={(action) => {
+                    if (!row.id) return;
+                    mutate(row.id, action as "start" | "stop" | "reboot" | "terminate");
+                  }}
+                />
               )
             }
           ]}

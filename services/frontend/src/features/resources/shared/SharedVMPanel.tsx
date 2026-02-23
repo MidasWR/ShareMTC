@@ -50,19 +50,21 @@ export function SharedVMPanel() {
   return (
     <section className="section-stack">
       <PageSectionHeader title="Shared VM" description="Manage shared VM access and visibility." />
-      <Card title="Share VM" description="Grant VM access to multiple users by user IDs.">
-        <div className="grid gap-3 md:grid-cols-3">
+      <Card title="Quick Share VM" description="Compact sharing form for user access.">
+        <div className="grid items-end gap-3 md:grid-cols-[1fr_1fr_auto]">
           <Input label="VM ID" value={vmID} onChange={(event) => setVmID(event.target.value)} />
           <Input label="Share with" value={targets} onChange={(event) => setTargets(event.target.value)} placeholder="user1,user2" />
-          <Button className="md:mt-7" onClick={createShare} loading={loading}>
-            Share VM
-          </Button>
+          <Button onClick={createShare} loading={loading}>Share</Button>
         </div>
       </Card>
-      <Card title="Shared VM Entries" description="VMs you own or have access to.">
-        <Button variant="secondary" onClick={refresh} loading={loading}>Refresh</Button>
+      <Card
+        title="Shared VM Entries"
+        description="VMs you own or have access to."
+        actions={<Button variant="secondary" onClick={refresh} loading={loading}>Refresh</Button>}
+      >
         <div className="mt-3">
           <Table
+            dense
             ariaLabel="Shared VM table"
             rowKey={(row) => row.id ?? `${row.vm_id}-${row.owner_user_id}`}
             items={rows}

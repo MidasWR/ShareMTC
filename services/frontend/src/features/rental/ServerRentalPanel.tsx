@@ -14,6 +14,7 @@ import { AppTab } from "../../app/navigation/menu";
 import { StatusBadge } from "../../design/patterns/StatusBadge";
 import { Badge } from "../../design/primitives/Badge";
 import { FilterBar } from "../../design/components/FilterBar";
+import { ActionDropdown } from "../../design/components/ActionDropdown";
 
 type Props = {
   onNavigate: (tab: AppTab) => void;
@@ -146,7 +147,7 @@ export function ServerRentalPanel({ onNavigate }: Props) {
         description="Manage your running instances, view logs, and configure new servers."
       />
 
-      <Card title="Controls" description="RunPod-like manage toolbar: filters, refresh, and create actions.">
+      <Card title="Controls" description="Search, filter, refresh, and route to create screens.">
         <FilterBar
           search={<Input label="Search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="ID, plan, OS" />}
           filters={
@@ -218,20 +219,25 @@ export function ServerRentalPanel({ onNavigate }: Props) {
               key: "actions",
               header: "Actions",
               render: (row) => (
-                <div className="flex flex-wrap gap-1">
-                  <Button size="sm" variant="secondary" onClick={() => handleLifecycle(row, "start")}>Start</Button>
-                  <Button size="sm" variant="secondary" onClick={() => handleLifecycle(row, "stop")}>Stop</Button>
-                  <Button size="sm" variant="secondary" onClick={() => handleLifecycle(row, "reboot")}>Reboot</Button>
-                  <Button size="sm" variant="destructive" onClick={() => handleLifecycle(row, "terminate")}>Terminate</Button>
-                </div>
+                <ActionDropdown
+                  label="Actions"
+                  disabled={loading}
+                  options={[
+                    { value: "start", label: "Start" },
+                    { value: "stop", label: "Stop" },
+                    { value: "reboot", label: "Reboot" },
+                    { value: "terminate", label: "Terminate" }
+                  ]}
+                  onSelect={(action) => handleLifecycle(row, action as "start" | "stop" | "reboot" | "terminate")}
+                />
               )
             }
           ]}
         />
       </Card>
 
-      <Card title="Deploy New Server" description="Step 1/3: Select plan and configuration.">
-        <form className="grid gap-4 md:grid-cols-2 lg:grid-cols-3" onSubmit={handleEstimate}>
+      <Card title="Quick Deploy" description="Compact order form for server provisioning.">
+        <form className="grid gap-3 md:grid-cols-2 xl:grid-cols-3" onSubmit={handleEstimate}>
           <Select
             label="Plan"
             value={form.plan_id}
@@ -259,16 +265,12 @@ export function ServerRentalPanel({ onNavigate }: Props) {
           <Input label="RAM (GB)" value={`${form.ram_gb}`} onChange={(event) => setForm((prev) => ({ ...prev, ram_gb: Number(event.target.value) || 0 }))} />
           <Input label="GPU units" value={`${form.gpu_units}`} onChange={(event) => setForm((prev) => ({ ...prev, gpu_units: Number(event.target.value) || 0 }))} />
           <Input label="Network (Mbps)" value={`${form.network_mbps}`} onChange={(event) => setForm((prev) => ({ ...prev, network_mbps: Number(event.target.value) || 0 }))} />
-          <div className="md:col-span-2 lg:col-span-3 flex items-center gap-3 mt-2 border-t border-border pt-4">
-            <Button type="submit" loading={loading} variant="secondary">Estimate Cost</Button>
+          <div className="md:col-span-2 xl:col-span-3 flex flex-wrap items-center gap-2">
+            <Button type="submit" loading={loading} variant="secondary">Estimate</Button>
             <Button type="button" onClick={handleCreateOrder} loading={loading}>
-              Deploy Server
+              Deploy
             </Button>
-            <div className="ml-auto text-sm bg-elevated px-4 py-2 rounded-md border border-border">
-              <span className="text-textSecondary mr-2">Estimated:</span>
-              <span className="font-mono text-brand font-bold">${estimate.toFixed(2)}</span>
-              <span className="text-xs text-textMuted ml-1">/{selectedPlan?.period === "hourly" ? "hr" : "mo"}</span>
-            </div>
+            <Badge variant="info">Estimated ${estimate.toFixed(2)}/{selectedPlan?.period === "hourly" ? "hr" : "mo"}</Badge>
           </div>
         </form>
       </Card>

@@ -9,6 +9,7 @@ import { Input } from "../../../design/primitives/Input";
 import { createK8sCluster, deleteK8sCluster, listK8sClusters, refreshK8sCluster } from "../api/resourcesApi";
 import { KubernetesCluster } from "../../../types/api";
 import { StatusBadge } from "../../../design/patterns/StatusBadge";
+import { ActionDropdown } from "../../../design/components/ActionDropdown";
 
 export function K8sClustersPanel() {
   const [rows, setRows] = useState<KubernetesCluster[]>([]);
@@ -81,17 +82,18 @@ export function K8sClustersPanel() {
   return (
     <section className="section-stack">
       <PageSectionHeader title="Kubernetes Clusters" description="Create and manage clusters through internal orchestrator." />
-      <Card title="Create Cluster" description="Provision a Kubernetes cluster in the selected provider pool.">
-        <form className="grid gap-3 md:grid-cols-3" onSubmit={create}>
+      <Card title="Quick Create Cluster" description="Minimal create form for internal orchestrator.">
+        <form className="grid items-end gap-3 md:grid-cols-[1fr_1fr_auto]" onSubmit={create}>
           <Input label="Cluster Name" value={name} onChange={(event) => setName(event.target.value)} />
           <Input label="Provider ID" value={providerID} onChange={(event) => setProviderID(event.target.value)} />
-          <Button className="md:mt-7" loading={loading} type="submit">
-            Create Cluster
-          </Button>
+          <Button loading={loading} type="submit">Create</Button>
         </form>
       </Card>
-      <Card title="Clusters" description="Cluster status, endpoint and lifecycle actions.">
-        <Button variant="secondary" onClick={refresh} loading={loading}>Refresh</Button>
+      <Card
+        title="Clusters"
+        description="Cluster status, endpoint and lifecycle actions."
+        actions={<Button variant="secondary" onClick={refresh} loading={loading}>Refresh</Button>}
+      >
         <div className="mt-3">
           <Table
             dense
@@ -119,10 +121,19 @@ export function K8sClustersPanel() {
                 key: "actions",
                 header: "Actions",
                 render: (row) => (
-                  <div className="flex gap-2">
-                    <Button size="sm" variant="secondary" onClick={() => row.id && sync(row.id)}>Refresh</Button>
-                    <Button size="sm" variant="destructive" onClick={() => row.id && remove(row.id)}>Delete</Button>
-                  </div>
+                  <ActionDropdown
+                    label="Actions"
+                    disabled={!row.id || loading}
+                    options={[
+                      { value: "refresh", label: "Refresh" },
+                      { value: "delete", label: "Delete" }
+                    ]}
+                    onSelect={(action) => {
+                      if (!row.id) return;
+                      if (action === "refresh") sync(row.id);
+                      if (action === "delete") remove(row.id);
+                    }}
+                  />
                 )
               }
             ]}

@@ -57,17 +57,21 @@ export function MyTemplatesPanel() {
   return (
     <section className="section-stack">
       <PageSectionHeader title="My Templates" description="Create and manage server installation templates." />
-      <Card title="Create Template" description="Templates used for VM/server bootstrap (FastPanel, aaPanel, etc).">
-        <form className="grid gap-3 md:grid-cols-3" onSubmit={submit}>
+      <Card title="Quick Create" description="Minimal template form for bootstrap profiles.">
+        <form className="grid items-end gap-3 md:grid-cols-[1fr_1fr_auto]" onSubmit={submit}>
           <Input label="Template Code" value={code} onChange={(event) => setCode(event.target.value)} />
           <Input label="Template Name" value={name} onChange={(event) => setName(event.target.value)} />
-          <Button className="md:mt-7" loading={loading} type="submit">Save Template</Button>
+          <Button loading={loading} type="submit">Save</Button>
         </form>
       </Card>
-      <Card title="Template List" description="Saved templates available for VM creation.">
-        <Button variant="secondary" onClick={refresh} loading={loading}>Refresh</Button>
+      <Card
+        title="Template List"
+        description="Saved templates available for VM creation."
+        actions={<Button variant="secondary" onClick={refresh} loading={loading}>Refresh</Button>}
+      >
         <div className="mt-3">
           <Table
+            dense
             ariaLabel="VM templates table"
             rowKey={(row) => row.id ?? row.code}
             items={rows}

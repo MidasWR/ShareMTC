@@ -50,19 +50,21 @@ export function SharedPodsPanel() {
   return (
     <section className="section-stack">
       <PageSectionHeader title="Shared PODs" description="Track and manage POD sharing across users/providers." />
-      <Card title="Share POD" description="Share POD by code with one or more user IDs.">
-        <div className="grid gap-3 md:grid-cols-3">
+      <Card title="Quick Share POD" description="Compact sharing form for POD access.">
+        <div className="grid items-end gap-3 md:grid-cols-[1fr_1fr_auto]">
           <Input label="POD Code" value={podCode} onChange={(event) => setPodCode(event.target.value)} />
           <Input label="Share with" value={targets} onChange={(event) => setTargets(event.target.value)} placeholder="user1,user2" />
-          <Button className="md:mt-7" onClick={createShare} loading={loading}>
-            Share POD
-          </Button>
+          <Button onClick={createShare} loading={loading}>Share</Button>
         </div>
       </Card>
-      <Card title="Shared POD Entries" description="POD shares with owner and access level.">
-        <Button variant="secondary" onClick={refresh} loading={loading}>Refresh</Button>
+      <Card
+        title="Shared POD Entries"
+        description="POD shares with owner and access level."
+        actions={<Button variant="secondary" onClick={refresh} loading={loading}>Refresh</Button>}
+      >
         <div className="mt-3">
           <Table
+            dense
             ariaLabel="Shared POD table"
             rowKey={(row) => row.id ?? `${row.pod_code}-${row.owner_user_id}`}
             items={rows}
