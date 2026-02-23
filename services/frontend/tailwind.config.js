@@ -8,20 +8,20 @@ export default {
         mono: ["JetBrains Mono", "ui-monospace", "SFMono-Regular", "monospace"]
       },
       colors: {
-        canvas: "#0B1220",
-        surface: "#111827",
-        elevated: "#1F2937",
-        border: "#334155",
-        borderStrong: "#475569",
-        textPrimary: "#F8FAFC",
-        textSecondary: "#CBD5E1",
-        textMuted: "#94A3B8",
-        brand: "#6366F1",
-        brandHover: "#4F46E5",
+        canvas: "#070A12",
+        surface: "#0F172A",
+        elevated: "#111C31",
+        border: "#22314D",
+        borderStrong: "#33507A",
+        textPrimary: "#E8F1FF",
+        textSecondary: "#AFC7E8",
+        textMuted: "#7E99BC",
+        brand: "#3B82F6",
+        brandHover: "#2563EB",
         success: "#10B981",
         warning: "#F59E0B",
         danger: "#EF4444",
-        info: "#3B82F6"
+        info: "#38BDF8"
       },
       borderRadius: {
         sm: "6px",
@@ -35,6 +35,15 @@ export default {
       },
       spacing: {
         18: "4.5rem"
+      },
+      keyframes: {
+        pulseSoft: {
+          "0%, 100%": { opacity: "0.8", transform: "scale(1)" },
+          "50%": { opacity: "1", transform: "scale(1.06)" }
+        }
+      },
+      animation: {
+        pulseSoft: "pulseSoft 1.8s ease-in-out infinite"
       }
     }
   },

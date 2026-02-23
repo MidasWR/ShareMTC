@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -36,18 +37,32 @@ func main() {
 	}
 
 	svc := service.NewProviderService(repo)
-	handler := httpadapter.NewHandler(svc)
+	installCommand := fmt.Sprintf("curl -fsSL https://raw.githubusercontent.com/%s/%s/installer/hostagent-node-installer.sh | sudo bash", cfg.GitHubRepo, cfg.ReleaseTag)
+	handler := httpadapter.NewHandler(svc, installCommand)
 	r := chi.NewRouter()
 	r.Get("/healthz", handler.Health)
+	r.Route("/v1/catalog", func(api chi.Router) {
+		api.Get("/pods", handler.ListPodCatalog)
+		api.Get("/templates", handler.ListPodTemplates)
+	})
 	r.Route("/v1/admin", func(api chi.Router) {
 		api.Use(sdkauth.RequireAuth(cfg.JWTSecret))
 		api.Use(sdkauth.RequireAnyRole("admin", "super-admin", "ops-admin"))
 		api.Get("/stats", handler.Stats)
+		api.Get("/agent/install-command", handler.AgentInstallCommand)
 		api.Route("/providers", func(providers chi.Router) {
 			providers.Post("/", handler.CreateProvider)
 			providers.Get("/", handler.ListProviders)
 			providers.Get("/{providerID}", handler.GetProvider)
 			providers.Get("/{providerID}/metrics", handler.ProviderMetrics)
+		})
+		api.Route("/pods", func(pods chi.Router) {
+			pods.Post("/", handler.UpsertPodCatalog)
+			pods.Delete("/{podID}", handler.DeletePodCatalog)
+		})
+		api.Route("/templates", func(templates chi.Router) {
+			templates.Post("/", handler.UpsertPodTemplate)
+			templates.Delete("/{templateID}", handler.DeletePodTemplate)
 		})
 	})
 

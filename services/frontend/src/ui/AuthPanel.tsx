@@ -1,4 +1,5 @@
 import { FormEvent, useMemo, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { useToast } from "../design/components/Toast";
 import { Button } from "../design/primitives/Button";
 import { Card } from "../design/primitives/Card";
@@ -13,6 +14,7 @@ type AuthPanelProps = {
 };
 
 export function AuthPanel({ onAuthenticated }: AuthPanelProps) {
+  const [mode, setMode] = useState<"login" | "register">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState<"" | "register" | "login">("");
@@ -20,21 +22,21 @@ export function AuthPanel({ onAuthenticated }: AuthPanelProps) {
   const { push } = useToast();
 
   const emailError = useMemo(() => {
-    if (!email) return "Email is required";
-    if (!email.includes("@")) return "Email should contain @";
+    if (!email) return "Укажите email";
+    if (!email.includes("@")) return "Email должен содержать @";
     return "";
   }, [email]);
 
   const passwordError = useMemo(() => {
-    if (!password) return "Password is required";
-    if (password.length < 8) return "Password must be at least 8 characters";
+    if (!password) return "Укажите пароль";
+    if (password.length < 8) return "Пароль должен быть не короче 8 символов";
     return "";
   }, [password]);
 
   async function submit(path: "register" | "login", e: FormEvent) {
     e.preventDefault();
     if (emailError || passwordError) {
-      setError("Please fix form errors before submitting");
+      setError("Исправьте ошибки в форме перед отправкой");
       return;
     }
     setError("");
@@ -47,10 +49,10 @@ export function AuthPanel({ onAuthenticated }: AuthPanelProps) {
       });
       setSession(json.token, json.user);
       onAuthenticated?.();
-      push("success", `Authenticated as ${json.user.email}`);
+      push("success", `Вы вошли как ${json.user.email}`);
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Request failed");
-      push("error", "Authentication failed");
+      setError(requestError instanceof Error ? requestError.message : "Ошибка запроса");
+      push("error", "Ошибка аутентификации");
     } finally {
       setLoading("");
     }
@@ -58,7 +60,7 @@ export function AuthPanel({ onAuthenticated }: AuthPanelProps) {
 
   async function login() {
     if (emailError || passwordError) {
-      setError("Please fix form errors before submitting");
+      setError("Исправьте ошибки в форме перед отправкой");
       return;
     }
     setError("");
@@ -71,47 +73,72 @@ export function AuthPanel({ onAuthenticated }: AuthPanelProps) {
       });
       setSession(json.token, json.user);
       onAuthenticated?.();
-      push("success", `Authenticated as ${json.user.email}`);
+      push("success", `Вы вошли как ${json.user.email}`);
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Request failed");
-      push("error", "Authentication failed");
+      setError(requestError instanceof Error ? requestError.message : "Ошибка запроса");
+      push("error", "Ошибка аутентификации");
     } finally {
       setLoading("");
     }
   }
 
   return (
-    <section className="grid gap-4 lg:grid-cols-2">
-      <Card title="Create account" description="Register a local account and start a secured session.">
-        <form className="space-y-3" onSubmit={(e) => submit("register", e)}>
-          <Input label="Email" placeholder="name@example.com" value={email} onChange={(e) => setEmail(e.target.value)} error={email ? emailError : ""} />
-          <Input
-            label="Password"
-            placeholder="At least 8 characters"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            error={password ? passwordError : ""}
-          />
-          {error ? <InlineAlert kind="error">{error}</InlineAlert> : null}
-          <Button type="submit" className="w-full" loading={loading === "register"}>
-            Register
-          </Button>
-        </form>
-      </Card>
-
-      <Card title="Sign in" description="Use email credentials or federated identity provider.">
-        <div className="space-y-3">
+    <section className="mx-auto w-full max-w-xl">
+      <Card
+        title="Доступ к платформе"
+        description="Авторизация и регистрация с плавным переключением между режимами."
+      >
+        <div className="mb-4 inline-flex rounded-md border border-border p-1">
+          <button
+            type="button"
+            className={`rounded px-3 py-1 text-sm ${mode === "login" ? "bg-brand text-white" : "text-textSecondary"}`}
+            onClick={() => setMode("login")}
+          >
+            Вход
+          </button>
+          <button
+            type="button"
+            className={`rounded px-3 py-1 text-sm ${mode === "register" ? "bg-brand text-white" : "text-textSecondary"}`}
+            onClick={() => setMode("register")}
+          >
+            Регистрация
+          </button>
+        </div>
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={mode}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.2 }}
+          >
+            <form className="space-y-3" onSubmit={(e) => submit(mode, e)}>
+              <Input label="Email" placeholder="name@example.com" value={email} onChange={(e) => setEmail(e.target.value)} error={email ? emailError : ""} />
+              <Input
+                label="Пароль"
+                placeholder="Минимум 8 символов"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                error={password ? passwordError : ""}
+              />
+              {error ? <InlineAlert kind="error">{error}</InlineAlert> : null}
+              <Button type="submit" className="w-full" loading={loading === mode}>
+                {mode === "login" ? "Войти по email" : "Создать аккаунт"}
+              </Button>
+            </form>
+          </motion.div>
+        </AnimatePresence>
+        <div className="mt-3 space-y-2">
           <Button variant="secondary" className="w-full" onClick={login} loading={loading === "login"}>
-            Login with email
+            Быстрый вход
           </Button>
           <a
             className="focus-ring inline-flex h-10 w-full items-center justify-center rounded-md border border-border bg-elevated text-sm font-medium text-textPrimary hover:bg-slate-700/40"
             href={`${API_BASE.auth}/v1/auth/google/start`}
           >
-            Continue with Google
+            Продолжить через Google
           </a>
-          <p className="text-xs text-textMuted">Consumer and provider accounts share the same auth endpoint.</p>
         </div>
       </Card>
     </section>

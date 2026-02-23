@@ -13,6 +13,12 @@ type ProviderRepository interface {
 	GetByID(ctx context.Context, providerID string) (models.Provider, error)
 	Stats(ctx context.Context) (models.AdminStats, error)
 	ProviderMetrics(ctx context.Context, providerID string) (models.ProviderMetrics, error)
+	ListPodCatalog(ctx context.Context) ([]models.PodCatalogItem, error)
+	UpsertPodCatalog(ctx context.Context, item models.PodCatalogItem) (models.PodCatalogItem, error)
+	DeletePodCatalog(ctx context.Context, id string) error
+	ListPodTemplates(ctx context.Context) ([]models.PodTemplate, error)
+	UpsertPodTemplate(ctx context.Context, item models.PodTemplate) (models.PodTemplate, error)
+	DeletePodTemplate(ctx context.Context, id string) error
 }
 
 type ProviderService struct {
@@ -45,4 +51,28 @@ func (s *ProviderService) Stats(ctx context.Context) (models.AdminStats, error) 
 
 func (s *ProviderService) ProviderMetrics(ctx context.Context, providerID string) (models.ProviderMetrics, error) {
 	return s.repo.ProviderMetrics(ctx, providerID)
+}
+
+func (s *ProviderService) ListPodCatalog(ctx context.Context) ([]models.PodCatalogItem, error) {
+	return s.repo.ListPodCatalog(ctx)
+}
+
+func (s *ProviderService) UpsertPodCatalog(ctx context.Context, item models.PodCatalogItem) (models.PodCatalogItem, error) {
+	return s.repo.UpsertPodCatalog(ctx, item)
+}
+
+func (s *ProviderService) DeletePodCatalog(ctx context.Context, id string) error {
+	return s.repo.DeletePodCatalog(ctx, id)
+}
+
+func (s *ProviderService) ListPodTemplates(ctx context.Context) ([]models.PodTemplate, error) {
+	return s.repo.ListPodTemplates(ctx)
+}
+
+func (s *ProviderService) UpsertPodTemplate(ctx context.Context, item models.PodTemplate) (models.PodTemplate, error) {
+	return s.repo.UpsertPodTemplate(ctx, item)
+}
+
+func (s *ProviderService) DeletePodTemplate(ctx context.Context, id string) error {
+	return s.repo.DeletePodTemplate(ctx, id)
 }

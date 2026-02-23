@@ -10,6 +10,10 @@ import { AgentOnboardingPanel } from "../features/agent/onboarding/AgentOnboardi
 import { AdminDashboardPanel } from "../features/dashboard/admin/AdminDashboardPanel";
 import { CoreDashboardPanel } from "../features/dashboard/core/CoreDashboardPanel";
 import { AdminConsolePanel } from "../features/admin/console/AdminConsolePanel";
+import { PodsCatalogPanel } from "../features/catalog/PodsCatalogPanel";
+import { ServerRentalPanel } from "../features/rental/ServerRentalPanel";
+import { SettingsPanel } from "../features/settings/SettingsPanel";
+import { AdminAccessPanel } from "../features/admin/access/AdminAccessPanel";
 import { SharingAdminPanel } from "../features/admin/sharing/SharingAdminPanel";
 import { ProviderDashboardPanel } from "../features/provider/dashboard/ProviderDashboardPanel";
 import { HostPanel } from "./HostPanel";
@@ -22,15 +26,19 @@ export function App() {
   const canAdmin = role === "admin" || role === "super-admin" || role === "ops-admin";
   const { tab, enabledMenu, navigateToTab } = useSectionRouting(canAdmin);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
-  const activeLabel = menu.find((item) => item.id === tab)?.label ?? "Overview";
+  const activeLabel = menu.find((item) => item.id === tab)?.label ?? "Обзор";
 
   const content = useMemo(() => {
     if (tab === "overview") return <OverviewPanel />;
     if (tab === "coreDashboard") return <CoreDashboardPanel />;
+    if (tab === "podsCatalog") return <PodsCatalogPanel />;
     if (tab === "pods") return <HostPanel />;
     if (tab === "billing") return <BillingPanel />;
+    if (tab === "serverRental") return <ServerRentalPanel />;
+    if (tab === "settings") return <SettingsPanel />;
     if (tab === "providerDashboard") return <ProviderDashboardPanel />;
     if (tab === "agentOnboarding") return <AgentOnboardingPanel />;
+    if (tab === "adminAccess") return <AdminAccessPanel onSuccess={() => navigateToTab("adminServers")} />;
     if (tab === "adminDashboard") return <AdminDashboardPanel />;
     if (tab === "adminServers") return <AdminConsolePanel />;
     if (tab === "adminSharing") return <SharingAdminPanel />;
@@ -42,6 +50,12 @@ export function App() {
     setShortcutsOpen(false);
     navigateToTab("overview", false);
   }
+
+  useEffect(() => {
+    if (window.location.pathname === "/admin") {
+      navigateToTab("adminAccess", false);
+    }
+  }, [navigateToTab]);
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -58,9 +72,9 @@ export function App() {
         const quickTabs: Record<string, AppTab> = {
           "1": "overview",
           "2": "pods",
-          "3": "billing",
-          "4": "providerDashboard",
-          "5": "agentOnboarding",
+          "3": "podsCatalog",
+          "4": "serverRental",
+          "5": "settings",
           "6": canAdmin ? "adminServers" : "vip"
         };
         const nextTab = quickTabs[event.key];
@@ -75,12 +89,21 @@ export function App() {
   }, [canAdmin, navigateToTab]);
 
   if (!isAuthenticated) {
+    if (window.location.pathname === "/admin") {
+      return (
+        <ToastProvider>
+          <main className="page-container section-stack flex min-h-screen max-w-3xl flex-col justify-center">
+            <AdminAccessPanel onSuccess={refreshSession} />
+          </main>
+        </ToastProvider>
+      );
+    }
     return (
       <ToastProvider>
         <main className="page-container section-stack flex min-h-screen max-w-5xl flex-col justify-center">
           <header className="text-center">
             <h1 className="text-2xl font-semibold">ShareMTC Control Plane</h1>
-            <p className="mt-2 text-sm text-textSecondary">Sign in to access operational modules, dashboards, and server management controls.</p>
+            <p className="mt-2 text-sm text-textSecondary">Войдите, чтобы управлять pods, арендой серверов и админ-инфраструктурой.</p>
           </header>
           <AuthPanel onAuthenticated={refreshSession} />
         </main>

@@ -8,10 +8,11 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/MidasWR/ShareMTC/services/authservice/config"
 	httpadapter "github.com/MidasWR/ShareMTC/services/authservice/internal/adapter/http"
 	"github.com/MidasWR/ShareMTC/services/authservice/internal/adapter/storage"
 	"github.com/MidasWR/ShareMTC/services/authservice/internal/service"
-	"github.com/MidasWR/ShareMTC/services/authservice/config"
+	sdkauth "github.com/MidasWR/ShareMTC/services/sdk/auth"
 	"github.com/MidasWR/ShareMTC/services/sdk/db"
 	"github.com/MidasWR/ShareMTC/services/sdk/logging"
 	"github.com/go-chi/chi/v5"
@@ -48,8 +49,17 @@ func main() {
 	r.Route("/v1/auth", func(api chi.Router) {
 		api.Post("/register", handler.Register)
 		api.Post("/login", handler.Login)
+		api.Post("/admin/direct", handler.DirectAdminLogin)
 		api.Get("/google/start", handler.GoogleStart)
 		api.Get("/google/callback", handler.GoogleCallback)
+		api.Group(func(secure chi.Router) {
+			secure.Use(sdkauth.RequireAuth(cfg.JWTSecret))
+			secure.Get("/settings", handler.GetSettings)
+			secure.Put("/settings", handler.UpsertSettings)
+			secure.Get("/ssh-keys", handler.ListSSHKeys)
+			secure.Post("/ssh-keys", handler.CreateSSHKey)
+			secure.Delete("/ssh-keys/{keyID}", handler.DeleteSSHKey)
+		})
 	})
 
 	server := &http.Server{

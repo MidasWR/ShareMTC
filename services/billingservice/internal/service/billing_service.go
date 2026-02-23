@@ -15,6 +15,10 @@ type Repository interface {
 	ListAccruals(ctx context.Context, providerID string) ([]models.Accrual, error)
 	ListAllAccruals(ctx context.Context, limit int, offset int) ([]models.Accrual, error)
 	Stats(ctx context.Context) (models.BillingStats, error)
+	ListRentalPlans(ctx context.Context) ([]models.RentalPlan, error)
+	GetRentalPlan(ctx context.Context, planID string) (models.RentalPlan, error)
+	CreateServerOrder(ctx context.Context, order models.ServerOrder) (models.ServerOrder, error)
+	ListServerOrders(ctx context.Context, userID string) ([]models.ServerOrder, error)
 }
 
 type BillingService struct {
@@ -73,4 +77,38 @@ func (s *BillingService) ListAllAccruals(ctx context.Context, limit int, offset 
 
 func (s *BillingService) Stats(ctx context.Context) (models.BillingStats, error) {
 	return s.repo.Stats(ctx)
+}
+
+func (s *BillingService) ListRentalPlans(ctx context.Context) ([]models.RentalPlan, error) {
+	return s.repo.ListRentalPlans(ctx)
+}
+
+func (s *BillingService) EstimateServerOrder(ctx context.Context, order models.ServerOrder) (models.ServerOrder, error) {
+	plan, err := s.repo.GetRentalPlan(ctx, order.PlanID)
+	if err != nil {
+		return models.ServerOrder{}, err
+	}
+	if order.Period == "" {
+		order.Period = plan.Period
+	}
+	networkUnits := float64(order.NetworkMbps) / 100
+	order.EstimatedPrice = plan.BasePriceUSD +
+		float64(order.CPUCores)*plan.PricePerCPU +
+		float64(order.RAMGB)*plan.PricePerRAMGB +
+		float64(order.GPUUnits)*plan.PricePerGPU +
+		networkUnits*plan.PricePerNet100
+	order.Status = "created"
+	return order, nil
+}
+
+func (s *BillingService) CreateServerOrder(ctx context.Context, order models.ServerOrder) (models.ServerOrder, error) {
+	estimated, err := s.EstimateServerOrder(ctx, order)
+	if err != nil {
+		return models.ServerOrder{}, err
+	}
+	return s.repo.CreateServerOrder(ctx, estimated)
+}
+
+func (s *BillingService) ListServerOrders(ctx context.Context, userID string) ([]models.ServerOrder, error) {
+	return s.repo.ListServerOrders(ctx, userID)
 }

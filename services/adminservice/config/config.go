@@ -11,6 +11,8 @@ type Config struct {
 	PostgresDSN     string
 	MidasWriterAddr string
 	JWTSecret       string
+	GitHubRepo      string
+	ReleaseTag      string
 }
 
 func Load() Config {
@@ -19,6 +21,8 @@ func Load() Config {
 		PostgresDSN:     postgresDSN(),
 		MidasWriterAddr: os.Getenv("MIDAS_WRITER_ADDR"),
 		JWTSecret:       env("JWT_SECRET", "change-me-in-production"),
+		GitHubRepo:      env("GITHUB_REPO", "MidasWR/ShareMTC"),
+		ReleaseTag:      env("RELEASE_TAG", "latest"),
 	}
 }
 

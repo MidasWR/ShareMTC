@@ -62,3 +62,70 @@ export type BillingStats = {
 export type ApiError = {
   error?: string;
 };
+
+export type PodTemplate = {
+  id: string;
+  code: string;
+  name: string;
+  description: string;
+  gpu_class: string;
+  created_at?: string;
+};
+
+export type PodCatalogItem = {
+  id: string;
+  code: string;
+  name: string;
+  description: string;
+  gpu_model: string;
+  gpu_vram_gb: number;
+  cpu_cores: number;
+  ram_gb: number;
+  network_mbps: number;
+  hourly_price_usd: number;
+  monthly_price_usd: number;
+  os_name: string;
+  template_ids: string[];
+};
+
+export type RentalPlan = {
+  id: string;
+  name: string;
+  period: "hourly" | "monthly";
+  base_price_usd: number;
+  price_per_cpu: number;
+  price_per_ram_gb: number;
+  price_per_gpu: number;
+  price_per_net_100mbps: number;
+};
+
+export type ServerOrder = {
+  id?: string;
+  user_id?: string;
+  plan_id: string;
+  os_name: string;
+  network_mbps: number;
+  cpu_cores: number;
+  ram_gb: number;
+  gpu_units: number;
+  period: "hourly" | "monthly";
+  estimated_price_usd?: number;
+  status?: string;
+  created_at?: string;
+};
+
+export type UserSettings = {
+  user_id?: string;
+  theme: string;
+  language: string;
+  timezone: string;
+  updated_at?: string;
+};
+
+export type SSHKey = {
+  id?: string;
+  user_id?: string;
+  name: string;
+  public_key: string;
+  created_at?: string;
+};

@@ -28,7 +28,7 @@ export function ProviderDashboardPanel() {
 
   async function refresh() {
     if (!providerID.trim()) {
-      push("error", "Provider ID is required");
+      push("error", "Требуется Provider ID");
       return;
     }
     setLoading(true);
@@ -38,10 +38,10 @@ export function ProviderDashboardPanel() {
       setAllocations(data.allocations);
       setAccruals(data.accruals);
       setMetrics(data.metrics);
-      push("info", "Provider dashboard synced");
+      push("info", "Данные провайдера синхронизированы");
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Dashboard refresh failed");
-      push("error", requestError instanceof Error ? requestError.message : "Dashboard refresh failed");
+      setError(requestError instanceof Error ? requestError.message : "Ошибка обновления дашборда");
+      push("error", requestError instanceof Error ? requestError.message : "Ошибка обновления дашборда");
     } finally {
       setLoading(false);
     }
@@ -50,40 +50,40 @@ export function ProviderDashboardPanel() {
   return (
     <section className="section-stack">
       <PageSectionHeader
-        title="Provider Dashboard"
-        description="Track utilization, earnings, and current allocation health for shared resources."
+        title="Дашборд провайдера"
+        description="Утилизация, доходность и состояние активных аллокаций для shared-ресурсов."
       />
 
-      <Card title="Provider selector" description="Load dashboard data for a specific provider ID.">
+      <Card title="Выбор провайдера" description="Загрузка дашборда по конкретному Provider ID.">
         <div className="grid gap-3 md:grid-cols-[2fr_auto]">
-          <Input label="Provider ID" value={providerID} onChange={(event) => setProviderID(event.target.value)} placeholder="Provider UUID" />
+          <Input label="Provider ID" value={providerID} onChange={(event) => setProviderID(event.target.value)} placeholder="UUID провайдера" />
           <Button className="md:mt-7" onClick={refresh} loading={loading}>
-            Load dashboard
+            Загрузить дашборд
           </Button>
         </div>
         {!loading && error ? <div className="mt-4"><InlineAlert kind="error">{error}</InlineAlert></div> : null}
         <div className="mt-4 grid gap-3 md:grid-cols-4">
-          <MetricTile label="Total allocations" value={`${allocations.length}`} />
-          <MetricTile label="Running allocations" value={`${metrics.allocation_running || runningCount}`} />
-          <MetricTile label="Total revenue" value={`$${totalRevenue.toFixed(2)}`} />
-          <MetricTile label="Health state" value={metrics.allocation_running > 0 ? "active" : "idle"} />
+          <MetricTile label="Всего аллокаций" value={`${allocations.length}`} />
+          <MetricTile label="Активные аллокации" value={`${metrics.allocation_running || runningCount}`} />
+          <MetricTile label="Общая выручка" value={`$${totalRevenue.toFixed(2)}`} />
+          <MetricTile label="Состояние" value={metrics.allocation_running > 0 ? "активно" : "idle"} />
         </div>
       </Card>
 
-      <Card title="Live allocations" description="Current and historical resource allocations.">
+      <Card title="Лента аллокаций" description="Текущие и исторические аллокации ресурсов.">
         {loading ? <SkeletonBlock lines={5} /> : null}
         <Table
           dense
-          ariaLabel="Provider allocations dashboard table"
+          ariaLabel="Таблица аллокаций провайдера"
           rowKey={(item) => item.id}
           items={!loading ? allocations : []}
-          emptyState={<EmptyState title="No allocations yet" description="Start sharing resources to see utilization here." />}
+          emptyState={<EmptyState title="Аллокаций пока нет" description="Начните шеринг ресурсов, чтобы увидеть утилизацию." />}
           columns={[
-            { key: "id", header: "Allocation ID", render: (item) => <span className="font-mono text-xs">{item.id}</span> },
+            { key: "id", header: "ID аллокации", render: (item) => <span className="font-mono text-xs">{item.id}</span> },
             { key: "cpu", header: "CPU", render: (item) => <span className="tabular-nums">{item.cpu_cores}</span> },
-            { key: "ram", header: "RAM MB", render: (item) => <span className="tabular-nums">{item.ram_mb}</span> },
+            { key: "ram", header: "RAM МБ", render: (item) => <span className="tabular-nums">{item.ram_mb}</span> },
             { key: "gpu", header: "GPU", render: (item) => <span className="tabular-nums">{item.gpu_units}</span> },
-            { key: "status", header: "Status", render: (item) => <StatusBadge status={item.released_at ? "stopped" : "running"} /> }
+            { key: "status", header: "Статус", render: (item) => <StatusBadge status={item.released_at ? "stopped" : "running"} /> }
           ]}
         />
       </Card>

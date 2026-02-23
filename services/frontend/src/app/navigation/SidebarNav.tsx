@@ -9,17 +9,17 @@ type Props = {
 };
 
 const groupLabels: Record<NavGroup, string> = {
-  core: "Core",
-  provider: "Provider",
-  admin: "Admin",
-  ops: "Operations"
+  core: "Основное",
+  provider: "Провайдер",
+  admin: "Администрирование",
+  ops: "Операции"
 };
 
 export function SidebarNav({ tab, groups, enabledMenu, onNavigate }: Props) {
   return (
     <aside className="border-b border-border bg-surface px-4 py-4 lg:min-h-screen lg:border-b-0 lg:border-r lg:px-5 lg:py-6">
       <h1 className="text-lg font-semibold">ShareMTC Control Plane</h1>
-      <p className="mt-1 text-xs text-textSecondary">Pods-as-a-Service + Marketplace Compute</p>
+      <p className="mt-1 text-xs text-textSecondary">GPU Pods, аренда серверов и шеринговая инфраструктура</p>
       <nav className="mt-6 space-y-5" aria-label="Primary navigation">
         {groups.map((group) => {
           const items = enabledMenu.filter((entry) => entry.group === group);

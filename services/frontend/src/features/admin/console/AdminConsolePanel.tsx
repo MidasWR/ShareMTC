@@ -11,14 +11,17 @@ import { Table } from "../../../design/components/Table";
 import { AdminDashboardPanel } from "../../dashboard/admin/AdminDashboardPanel";
 import { AdminServersPanel } from "../servers/AdminServersPanel";
 import { SharingAdminPanel } from "../sharing/SharingAdminPanel";
+import { getAgentInstallCommand } from "../api/adminApi";
+import { AdminPodsPanel } from "../catalog/AdminPodsPanel";
 
-type AdminTab = "overview" | "providers" | "allocations" | "billing" | "risk";
+type AdminTab = "overview" | "providers" | "pods" | "allocations" | "billing" | "risk";
 
 export function AdminConsolePanel() {
   const [tab, setTab] = useState<AdminTab>("overview");
   const [loading, setLoading] = useState(false);
   const [allocations, setAllocations] = useState<Array<{ id: string; provider_id: string; cpu_cores: number; ram_mb: number; gpu_units: number; released_at?: string | null }>>([]);
   const [accruals, setAccruals] = useState<Array<{ id: string; provider_id: string; total_usd: number; vip_bonus_usd: number; created_at: string }>>([]);
+  const [installCommand, setInstallCommand] = useState("");
   const { push } = useToast();
 
   async function refreshData() {
@@ -27,11 +30,20 @@ export function AdminConsolePanel() {
       const [allocRows, accrualRows] = await Promise.all([listAllAllocations(200, 0), listAllAccruals(200, 0)]);
       setAllocations(allocRows);
       setAccruals(accrualRows);
-      push("info", "Admin console data refreshed");
+      push("info", "Данные админ-консоли обновлены");
     } catch (error) {
-      push("error", error instanceof Error ? error.message : "Admin console refresh failed");
+      push("error", error instanceof Error ? error.message : "Ошибка обновления админ-консоли");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function refreshInstallCommand() {
+    try {
+      const payload = await getAgentInstallCommand();
+      setInstallCommand(payload.command);
+    } catch (error) {
+      push("error", error instanceof Error ? error.message : "Не удалось получить команду установки");
     }
   }
 
@@ -44,7 +56,7 @@ export function AdminConsolePanel() {
       .filter(([, count]) => count > 5)
       .map(([providerID, count]) => ({
         provider_id: providerID,
-        issue: "High concurrent allocation pressure",
+        issue: "Высокая нагрузка по активным аллокациям",
         score: count
       }));
   }, [allocations]);
@@ -52,21 +64,32 @@ export function AdminConsolePanel() {
   return (
     <section className="section-stack">
       <PageSectionHeader
-        title="Admin Console"
-        description="Unified admin module with overview, provider operations, allocations, billing, and risk."
+        title="Админ-консоль"
+        description="Единый административный модуль: обзор, провайдеры, аллокации, биллинг и риск."
         actions={
-          <Button variant="secondary" onClick={refreshData} loading={loading}>
-            Refresh console
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="secondary" onClick={refreshInstallCommand}>
+              Обновить curl
+            </Button>
+            <Button variant="secondary" onClick={refreshData} loading={loading}>
+              Обновить консоль
+            </Button>
+          </div>
         }
       />
+      <Card title="Установка агента (one-command)" description="Скопируйте команду для установки hostagent на хост-машину.">
+        <div className="rounded-md border border-border bg-elevated p-3 font-mono text-xs text-textSecondary">
+          {installCommand || "Нажмите «Обновить curl», чтобы получить актуальную команду."}
+        </div>
+      </Card>
       <Tabs
         items={[
-          { id: "overview", label: "Overview" },
-          { id: "providers", label: "Providers" },
-          { id: "allocations", label: "Allocations" },
-          { id: "billing", label: "Billing" },
-          { id: "risk", label: "Risk/Sharing" }
+          { id: "overview", label: "Обзор" },
+          { id: "providers", label: "Провайдеры" },
+          { id: "pods", label: "Каталог Pods" },
+          { id: "allocations", label: "Аллокации" },
+          { id: "billing", label: "Биллинг" },
+          { id: "risk", label: "Риски/шеринг" }
         ]}
         value={tab}
         onChange={(next) => setTab(next)}
@@ -74,59 +97,60 @@ export function AdminConsolePanel() {
 
       {tab === "overview" ? <AdminDashboardPanel /> : null}
       {tab === "providers" ? <AdminServersPanel /> : null}
+      {tab === "pods" ? <AdminPodsPanel /> : null}
       {tab === "risk" ? <SharingAdminPanel /> : null}
 
       {tab === "allocations" ? (
-        <Card title="Allocation registry" description="Server-side admin feed across all providers.">
+        <Card title="Реестр аллокаций" description="Админский поток аллокаций по всем провайдерам.">
           <Table
             dense
-            ariaLabel="Admin allocations"
+            ariaLabel="Админские аллокации"
             rowKey={(row) => row.id}
             items={allocations}
-            emptyState={<EmptyState title="No allocations found" description="Allocation feed is empty for the selected time window." />}
+            emptyState={<EmptyState title="Аллокации не найдены" description="Поток аллокаций пуст за выбранный период." />}
             columns={[
-              { key: "id", header: "Allocation", render: (row) => <span className="font-mono text-xs">{row.id}</span> },
-              { key: "provider", header: "Provider", render: (row) => <span className="font-mono text-xs">{row.provider_id}</span> },
+              { key: "id", header: "Аллокация", render: (row) => <span className="font-mono text-xs">{row.id}</span> },
+              { key: "provider", header: "Провайдер", render: (row) => <span className="font-mono text-xs">{row.provider_id}</span> },
               { key: "cpu", header: "CPU", render: (row) => row.cpu_cores },
-              { key: "ram", header: "RAM MB", render: (row) => row.ram_mb },
+              { key: "ram", header: "RAM МБ", render: (row) => row.ram_mb },
               { key: "gpu", header: "GPU", render: (row) => row.gpu_units },
-              { key: "status", header: "Status", render: (row) => (row.released_at ? "released" : "running") }
+              { key: "status", header: "Статус", render: (row) => (row.released_at ? "освобождён" : "активен") }
             ]}
           />
         </Card>
       ) : null}
 
       {tab === "billing" ? (
-        <Card title="Billing registry" description="Accrual feed for reconciliation and payout control.">
+        <Card title="Реестр биллинга" description="Поток начислений для сверки и контроля выплат.">
           <Table
             dense
-            ariaLabel="Admin billing accruals"
+            ariaLabel="Админские начисления биллинга"
             rowKey={(row) => row.id}
             items={accruals}
-            emptyState={<EmptyState title="No accruals found" description="Billing feed is empty for the selected time window." />}
+            emptyState={<EmptyState title="Начисления не найдены" description="Поток биллинга пуст за выбранный период." />}
             columns={[
-              { key: "id", header: "Accrual", render: (row) => <span className="font-mono text-xs">{row.id}</span> },
-              { key: "provider", header: "Provider", render: (row) => <span className="font-mono text-xs">{row.provider_id}</span> },
-              { key: "bonus", header: "Bonus", render: (row) => `$${row.vip_bonus_usd.toFixed(2)}` },
-              { key: "total", header: "Total", render: (row) => `$${row.total_usd.toFixed(2)}` },
-              { key: "created", header: "Created", render: (row) => new Date(row.created_at).toLocaleString() }
+              { key: "id", header: "Начисление", render: (row) => <span className="font-mono text-xs">{row.id}</span> },
+              { key: "provider", header: "Провайдер", render: (row) => <span className="font-mono text-xs">{row.provider_id}</span> },
+              { key: "bonus", header: "Бонус", render: (row) => `$${row.vip_bonus_usd.toFixed(2)}` },
+              { key: "total", header: "Итого", render: (row) => `$${row.total_usd.toFixed(2)}` },
+              { key: "created", header: "Создано", render: (row) => new Date(row.created_at).toLocaleString() }
             ]}
           />
         </Card>
       ) : null}
 
       {tab === "risk" ? (
-        <Card title="Automated risk signals" description="Derived risks from utilization patterns.">
+        <Card title="Автоматические сигналы риска" description="Производные риски по паттернам утилизации.">
           <Table
             dense
-            ariaLabel="Admin computed risk rows"
+            ariaLabel="Админские сигналы риска"
             rowKey={(row) => `${row.provider_id}-${row.issue}`}
             items={riskRows}
-            emptyState={<EmptyState title="No computed risks" description="No high-pressure providers detected right now." />}
+            emptyState={<EmptyState title="Риски не обнаружены" description="Провайдеры под высокой нагрузкой не выявлены." />}
             columns={[
-              { key: "provider", header: "Provider", render: (row) => row.provider_id },
-              { key: "issue", header: "Issue", render: (row) => row.issue },
-              { key: "score", header: "Score", render: (row) => row.score }
+              { key: "provider", header: "Провайдер", render: (row) => row.provider_id },
+              { key: "issue", header: "Проблема", render: (row) => row.issue },
+              { key: "score", header: "Скор", render: (row) => row.score }
             ]}
           />
         </Card>

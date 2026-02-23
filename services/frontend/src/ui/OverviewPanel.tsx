@@ -6,16 +6,16 @@ export function OverviewPanel() {
   return (
     <section className="section-stack">
       <PageSectionHeader
-        title="Overview"
-        description="Quick orientation across consumer, provider, billing, and admin workflows."
+        title="Обзор"
+        description="Быстрая ориентация по сценариям аренды, шеринга и администрирования."
       />
 
-      <Card title="Platform overview" description="Operational summary for Pods-as-a-Service and marketplace compute roles.">
+      <Card title="Сводка платформы" description="Ключевые контуры работы GPU Pods и вычислительного маркетплейса.">
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <MetricTile label="Consumer flow" value="Create -> Run -> Stop" hint="CPU/GPU pod lifecycle" />
-          <MetricTile label="Provider flow" value="Connect -> Heartbeat" hint="Node health and policy" />
-          <MetricTile label="Billing flow" value="Usage -> Accrual" hint="VIP multiplier support" />
-          <MetricTile label="Admin focus" value="Audit & blocks" hint="Anomaly management" />
+          <MetricTile label="Контур аренды" value="Выбор -> Запуск -> Завершение" hint="Жизненный цикл pod/сервера" />
+          <MetricTile label="Контур провайдера" value="Подключение -> Heartbeat" hint="Состояние и доступность нод" />
+          <MetricTile label="Контур биллинга" value="Использование -> Начисление" hint="Почасовой и помесячный режим" />
+          <MetricTile label="Контур админа" value="Аудит и контроль" hint="Управление рисками и доступом" />
         </div>
       </Card>
     </section>

@@ -38,6 +38,18 @@ func (r *billingRepoStub) ListAllAccruals(_ context.Context, _ int, _ int) ([]mo
 func (r *billingRepoStub) Stats(_ context.Context) (models.BillingStats, error) {
 	return models.BillingStats{}, nil
 }
+func (r *billingRepoStub) ListRentalPlans(_ context.Context) ([]models.RentalPlan, error) {
+	return nil, nil
+}
+func (r *billingRepoStub) GetRentalPlan(_ context.Context, _ string) (models.RentalPlan, error) {
+	return models.RentalPlan{}, nil
+}
+func (r *billingRepoStub) CreateServerOrder(_ context.Context, order models.ServerOrder) (models.ServerOrder, error) {
+	return order, nil
+}
+func (r *billingRepoStub) ListServerOrders(_ context.Context, _ string) ([]models.ServerOrder, error) {
+	return nil, nil
+}
 
 func TestUsageCreatesVipBonus(t *testing.T) {
 	repo := &billingRepoStub{

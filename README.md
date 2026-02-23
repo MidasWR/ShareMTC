@@ -39,6 +39,10 @@ ShareMTC is a compute marketplace and control plane where providers expose CPU/R
 - `app/` - shell, navigation, section routing, session hooks.
 - `design/` - primitives/components/patterns for reusable UI building blocks.
 - `features/` - domain modules (`admin`, `resources`, `billing`, `provider`, `dashboard`).
+- `features/catalog` - каталог GPU Pods и шаблоны запуска.
+- `features/rental` - визард аренды серверов (hourly/monthly).
+- `features/settings` - персонализация и SSH-ключи.
+- `features/admin/access` - прямой вход `/admin`.
 - `lib/` - auth-aware HTTP client and session helpers.
 - `ui/` - top-level sections bound to app navigation.
 - `types/` - API contracts for all frontend modules.
@@ -49,6 +53,13 @@ ShareMTC is a compute marketplace and control plane where providers expose CPU/R
 - **Provider Dashboard** - provider-specific allocations, earnings, and operational state.
 - **Admin Dashboard** - top revenue providers, global metrics, and risk feed.
 - **Admin Console** - tabbed admin module for overview/providers/allocations/billing/risk.
+
+### Rebrand and localization
+
+- Полный ребрендинг визуальной темы (новые цвета/поверхности/контраст).
+- Основной UI переведен на русский язык.
+- Добавлены микроанимации: auth-flow переключения, health-indicators, transitions.
+- Добавлены логотипы/иконки для ключевых сущностей (Ubuntu, NVIDIA, network, compute).
 
 ### Security model
 
@@ -67,6 +78,26 @@ ShareMTC is a compute marketplace and control plane where providers expose CPU/R
 - `GET /v1/resources/admin/allocations?limit=&offset=`
 - `GET /v1/billing/admin/stats`
 - `GET /v1/billing/admin/accruals?limit=&offset=`
+
+## API overview (marketplace/rental/settings)
+
+- `GET /v1/catalog/pods`
+- `GET /v1/catalog/templates`
+- `POST /v1/admin/pods/`
+- `DELETE /v1/admin/pods/{podID}`
+- `POST /v1/admin/templates/`
+- `DELETE /v1/admin/templates/{templateID}`
+- `GET /v1/admin/agent/install-command`
+- `POST /v1/auth/admin/direct`
+- `GET /v1/auth/settings`
+- `PUT /v1/auth/settings`
+- `GET /v1/auth/ssh-keys`
+- `POST /v1/auth/ssh-keys`
+- `DELETE /v1/auth/ssh-keys/{keyID}`
+- `GET /v1/billing/rental/plans`
+- `POST /v1/billing/rental/estimate`
+- `POST /v1/billing/rental/orders`
+- `GET /v1/billing/rental/orders`
 
 ## Local development
 
@@ -129,6 +160,10 @@ npm run test:e2e
 - versioned tags (`TAG=vX.Y.Z`)
 - optional stage skipping (`SKIP=1,2,...`)
 - image build/push, chart packaging, release publishing
+- hostagent multi-platform binaries for GitHub Releases assets:
+  - `hostagent-linux-amd64`
+  - `hostagent-darwin-amd64`
+  - `hostagent-windows-amd64.exe`
 - optional auto commit/push before release
 
 ```bash
@@ -145,4 +180,7 @@ Each iteration report in `reports/` must include:
 - chosen mitigations
 - next iteration plan
 
-Latest upgrade report: `reports/4_frontend_admin_dashboards_upgrade.md`.
+Latest upgrade reports:
+
+- `reports/4_frontend_admin_dashboards_upgrade.md`
+- `reports/6_full_rebrand_russian_marketplace.md`

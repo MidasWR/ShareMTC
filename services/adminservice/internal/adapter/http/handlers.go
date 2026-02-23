@@ -11,11 +11,12 @@ import (
 )
 
 type Handler struct {
-	svc *service.ProviderService
+	svc            *service.ProviderService
+	installCommand string
 }
 
-func NewHandler(svc *service.ProviderService) *Handler {
-	return &Handler{svc: svc}
+func NewHandler(svc *service.ProviderService, installCommand string) *Handler {
+	return &Handler{svc: svc, installCommand: installCommand}
 }
 
 func (h *Handler) CreateProvider(w http.ResponseWriter, r *http.Request) {
@@ -84,4 +85,90 @@ func (h *Handler) ProviderMetrics(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) Health(w http.ResponseWriter, _ *http.Request) {
 	httpx.JSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+func (h *Handler) ListPodCatalog(w http.ResponseWriter, r *http.Request) {
+	items, err := h.svc.ListPodCatalog(r.Context())
+	if err != nil {
+		httpx.Error(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	httpx.JSON(w, http.StatusOK, items)
+}
+
+func (h *Handler) UpsertPodCatalog(w http.ResponseWriter, r *http.Request) {
+	var req models.PodCatalogItem
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid json")
+		return
+	}
+	if req.Name == "" || req.GPUModel == "" || req.Code == "" {
+		httpx.Error(w, http.StatusBadRequest, "code, name and gpu_model are required")
+		return
+	}
+	item, err := h.svc.UpsertPodCatalog(r.Context(), req)
+	if err != nil {
+		httpx.Error(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	httpx.JSON(w, http.StatusOK, item)
+}
+
+func (h *Handler) DeletePodCatalog(w http.ResponseWriter, r *http.Request) {
+	podID := chi.URLParam(r, "podID")
+	if podID == "" {
+		httpx.Error(w, http.StatusBadRequest, "podID is required")
+		return
+	}
+	if err := h.svc.DeletePodCatalog(r.Context(), podID); err != nil {
+		httpx.Error(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	httpx.JSON(w, http.StatusOK, map[string]string{"status": "deleted"})
+}
+
+func (h *Handler) ListPodTemplates(w http.ResponseWriter, r *http.Request) {
+	items, err := h.svc.ListPodTemplates(r.Context())
+	if err != nil {
+		httpx.Error(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	httpx.JSON(w, http.StatusOK, items)
+}
+
+func (h *Handler) UpsertPodTemplate(w http.ResponseWriter, r *http.Request) {
+	var req models.PodTemplate
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid json")
+		return
+	}
+	if req.Name == "" || req.Code == "" {
+		httpx.Error(w, http.StatusBadRequest, "code and name are required")
+		return
+	}
+	item, err := h.svc.UpsertPodTemplate(r.Context(), req)
+	if err != nil {
+		httpx.Error(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	httpx.JSON(w, http.StatusOK, item)
+}
+
+func (h *Handler) DeletePodTemplate(w http.ResponseWriter, r *http.Request) {
+	templateID := chi.URLParam(r, "templateID")
+	if templateID == "" {
+		httpx.Error(w, http.StatusBadRequest, "templateID is required")
+		return
+	}
+	if err := h.svc.DeletePodTemplate(r.Context(), templateID); err != nil {
+		httpx.Error(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	httpx.JSON(w, http.StatusOK, map[string]string{"status": "deleted"})
+}
+
+func (h *Handler) AgentInstallCommand(w http.ResponseWriter, _ *http.Request) {
+	httpx.JSON(w, http.StatusOK, models.AgentInstallCommand{
+		Command: h.installCommand,
+	})
 }

@@ -1,6 +1,6 @@
 import { API_BASE } from "../../../config/apiBase";
 import { apiClient } from "../../../lib/http";
-import { BillingStats, UsageAccrual } from "../../../types/api";
+import { BillingStats, RentalPlan, ServerOrder, UsageAccrual } from "../../../types/api";
 
 export function listAccruals(providerID: string) {
   return apiClient.get<UsageAccrual[]>(`${API_BASE.billing}/v1/billing/accruals?provider_id=${encodeURIComponent(providerID)}`);
@@ -24,4 +24,20 @@ export function listAllAccruals(limit = 50, offset = 0) {
 
 export function getBillingStats() {
   return apiClient.get<BillingStats>(`${API_BASE.billing}/v1/billing/admin/stats`);
+}
+
+export function listRentalPlans() {
+  return apiClient.get<RentalPlan[]>(`${API_BASE.billing}/v1/billing/rental/plans`);
+}
+
+export function estimateServerOrder(payload: ServerOrder) {
+  return apiClient.post<ServerOrder>(`${API_BASE.billing}/v1/billing/rental/estimate`, payload);
+}
+
+export function createServerOrder(payload: ServerOrder) {
+  return apiClient.post<ServerOrder>(`${API_BASE.billing}/v1/billing/rental/orders`, payload);
+}
+
+export function listServerOrders() {
+  return apiClient.get<ServerOrder[]>(`${API_BASE.billing}/v1/billing/rental/orders`);
 }

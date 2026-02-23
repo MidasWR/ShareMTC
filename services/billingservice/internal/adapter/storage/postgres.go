@@ -47,8 +47,36 @@ func (r *Repo) Migrate(ctx context.Context) error {
 			total_usd DOUBLE PRECISION NOT NULL,
 			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 		);
+		CREATE TABLE IF NOT EXISTS rental_plans (
+			id UUID PRIMARY KEY,
+			name TEXT NOT NULL,
+			period TEXT NOT NULL,
+			base_price_usd DOUBLE PRECISION NOT NULL,
+			price_per_cpu DOUBLE PRECISION NOT NULL,
+			price_per_ram_gb DOUBLE PRECISION NOT NULL,
+			price_per_gpu DOUBLE PRECISION NOT NULL,
+			price_per_net_100mbps DOUBLE PRECISION NOT NULL,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+		);
+		CREATE TABLE IF NOT EXISTS server_orders (
+			id UUID PRIMARY KEY,
+			user_id TEXT NOT NULL,
+			plan_id UUID NOT NULL REFERENCES rental_plans(id),
+			os_name TEXT NOT NULL,
+			network_mbps INTEGER NOT NULL,
+			cpu_cores INTEGER NOT NULL,
+			ram_gb INTEGER NOT NULL,
+			gpu_units INTEGER NOT NULL,
+			period TEXT NOT NULL,
+			estimated_price_usd DOUBLE PRECISION NOT NULL,
+			status TEXT NOT NULL DEFAULT 'created',
+			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+		);
 	`)
-	return err
+	if err != nil {
+		return err
+	}
+	return r.seedRentalPlans(ctx)
 }
 
 func (r *Repo) CreatePlan(ctx context.Context, plan models.Plan) (models.Plan, error) {
@@ -146,4 +174,126 @@ func (r *Repo) Stats(ctx context.Context) (models.BillingStats, error) {
 		FROM accruals
 	`).Scan(&stats.AccrualCount, &stats.TotalAmountUSD, &stats.TotalBonusUSD, &stats.TotalRevenueUSD)
 	return stats, err
+}
+
+func (r *Repo) ListRentalPlans(ctx context.Context) ([]models.RentalPlan, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT id, name, period, base_price_usd, price_per_cpu, price_per_ram_gb, price_per_gpu, price_per_net_100mbps, created_at
+		FROM rental_plans
+		ORDER BY period, base_price_usd
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := make([]models.RentalPlan, 0)
+	for rows.Next() {
+		var item models.RentalPlan
+		if err := rows.Scan(
+			&item.ID,
+			&item.Name,
+			&item.Period,
+			&item.BasePriceUSD,
+			&item.PricePerCPU,
+			&item.PricePerRAMGB,
+			&item.PricePerGPU,
+			&item.PricePerNet100,
+			&item.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, item)
+	}
+	return items, nil
+}
+
+func (r *Repo) GetRentalPlan(ctx context.Context, planID string) (models.RentalPlan, error) {
+	var item models.RentalPlan
+	err := r.db.QueryRow(ctx, `
+		SELECT id, name, period, base_price_usd, price_per_cpu, price_per_ram_gb, price_per_gpu, price_per_net_100mbps, created_at
+		FROM rental_plans
+		WHERE id = $1
+	`, planID).Scan(
+		&item.ID,
+		&item.Name,
+		&item.Period,
+		&item.BasePriceUSD,
+		&item.PricePerCPU,
+		&item.PricePerRAMGB,
+		&item.PricePerGPU,
+		&item.PricePerNet100,
+		&item.CreatedAt,
+	)
+	return item, err
+}
+
+func (r *Repo) CreateServerOrder(ctx context.Context, order models.ServerOrder) (models.ServerOrder, error) {
+	order.ID = uuid.NewString()
+	err := r.db.QueryRow(ctx, `
+		INSERT INTO server_orders (id, user_id, plan_id, os_name, network_mbps, cpu_cores, ram_gb, gpu_units, period, estimated_price_usd, status)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+		RETURNING created_at
+	`, order.ID, order.UserID, order.PlanID, order.OSName, order.NetworkMbps, order.CPUCores, order.RAMGB, order.GPUUnits, order.Period, order.EstimatedPrice, order.Status).Scan(&order.CreatedAt)
+	return order, err
+}
+
+func (r *Repo) ListServerOrders(ctx context.Context, userID string) ([]models.ServerOrder, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT id, user_id, plan_id, os_name, network_mbps, cpu_cores, ram_gb, gpu_units, period, estimated_price_usd, status, created_at
+		FROM server_orders
+		WHERE user_id = $1
+		ORDER BY created_at DESC
+	`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := make([]models.ServerOrder, 0)
+	for rows.Next() {
+		var item models.ServerOrder
+		if err := rows.Scan(
+			&item.ID,
+			&item.UserID,
+			&item.PlanID,
+			&item.OSName,
+			&item.NetworkMbps,
+			&item.CPUCores,
+			&item.RAMGB,
+			&item.GPUUnits,
+			&item.Period,
+			&item.EstimatedPrice,
+			&item.Status,
+			&item.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, item)
+	}
+	return items, nil
+}
+
+func (r *Repo) seedRentalPlans(ctx context.Context) error {
+	var count int
+	if err := r.db.QueryRow(ctx, `SELECT COUNT(*) FROM rental_plans`).Scan(&count); err != nil {
+		return err
+	}
+	if count > 0 {
+		return nil
+	}
+	seed := []models.RentalPlan{
+		{Name: "GPU Часовой Старт", Period: "hourly", BasePriceUSD: 0.25, PricePerCPU: 0.03, PricePerRAMGB: 0.01, PricePerGPU: 0.40, PricePerNet100: 0.02},
+		{Name: "GPU Часовой Pro", Period: "hourly", BasePriceUSD: 0.45, PricePerCPU: 0.04, PricePerRAMGB: 0.015, PricePerGPU: 0.65, PricePerNet100: 0.025},
+		{Name: "GPU Месячный Старт", Period: "monthly", BasePriceUSD: 120, PricePerCPU: 9, PricePerRAMGB: 3, PricePerGPU: 180, PricePerNet100: 8},
+		{Name: "GPU Месячный Pro", Period: "monthly", BasePriceUSD: 220, PricePerCPU: 11, PricePerRAMGB: 4, PricePerGPU: 260, PricePerNet100: 12},
+	}
+	for _, item := range seed {
+		_, err := r.db.Exec(ctx, `
+			INSERT INTO rental_plans (id, name, period, base_price_usd, price_per_cpu, price_per_ram_gb, price_per_gpu, price_per_net_100mbps)
+			VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+		`, uuid.NewString(), item.Name, item.Period, item.BasePriceUSD, item.PricePerCPU, item.PricePerRAMGB, item.PricePerGPU, item.PricePerNet100)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }

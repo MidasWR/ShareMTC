@@ -58,9 +58,9 @@ export function CoreDashboardPanel() {
         .slice(-14)
         .map(([day, revenue]) => ({ day: day.slice(5), revenue: Number(revenue.toFixed(2)) }));
       setSeries(chartData);
-      push("info", "Core dashboard refreshed");
+      push("info", "Дашборд платформы обновлён");
     } catch (error) {
-      push("error", error instanceof Error ? error.message : "Core dashboard load failed");
+      push("error", error instanceof Error ? error.message : "Ошибка загрузки дашборда платформы");
     } finally {
       setLoading(false);
     }
@@ -69,23 +69,23 @@ export function CoreDashboardPanel() {
   return (
     <section className="section-stack">
       <PageSectionHeader
-        title="Core Dashboard"
-        description="Platform-wide health, utilization, and revenue trend in one operational view."
+        title="Дашборд платформы"
+        description="Единый срез по здоровью системы, утилизации ресурсов и динамике выручки."
         actions={
           <Button variant="secondary" onClick={refresh} loading={loading}>
-            Refresh dashboard
+            Обновить дашборд
           </Button>
         }
       />
 
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <MetricTile label="Providers online ratio" value={onlineRatio} />
-        <MetricTile label="Running allocations" value={`${resourceStats.running_allocations}`} />
-        <MetricTile label="Current CPU committed" value={`${resourceStats.cpu_cores_running}`} />
-        <MetricTile label="Revenue total" value={`$${billingStats.total_revenue_usd.toFixed(2)}`} />
+        <MetricTile label="Доля онлайн провайдеров" value={onlineRatio} />
+        <MetricTile label="Активные аллокации" value={`${resourceStats.running_allocations}`} />
+        <MetricTile label="Задействованные CPU" value={`${resourceStats.cpu_cores_running}`} />
+        <MetricTile label="Суммарная выручка" value={`$${billingStats.total_revenue_usd.toFixed(2)}`} />
       </div>
 
-      <Card title="Revenue trend (14 days)" description="Daily total accrual stream from billing events.">
+      <Card title="Тренд выручки (14 дней)" description="Ежедневный поток начислений из биллинга.">
         {loading ? <SkeletonBlock lines={4} /> : null}
         {!loading ? (
           <div className="h-64 w-full">

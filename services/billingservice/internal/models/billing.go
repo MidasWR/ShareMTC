@@ -40,3 +40,30 @@ type BillingStats struct {
 	TotalBonusUSD   float64 `json:"total_bonus_usd"`
 	TotalRevenueUSD float64 `json:"total_revenue_usd"`
 }
+
+type RentalPlan struct {
+	ID             string    `json:"id"`
+	Name           string    `json:"name"`
+	Period         string    `json:"period"`
+	BasePriceUSD   float64   `json:"base_price_usd"`
+	PricePerCPU    float64   `json:"price_per_cpu"`
+	PricePerRAMGB  float64   `json:"price_per_ram_gb"`
+	PricePerGPU    float64   `json:"price_per_gpu"`
+	PricePerNet100 float64   `json:"price_per_net_100mbps"`
+	CreatedAt      time.Time `json:"created_at"`
+}
+
+type ServerOrder struct {
+	ID             string    `json:"id"`
+	UserID         string    `json:"user_id"`
+	PlanID         string    `json:"plan_id"`
+	OSName         string    `json:"os_name"`
+	NetworkMbps    int       `json:"network_mbps"`
+	CPUCores       int       `json:"cpu_cores"`
+	RAMGB          int       `json:"ram_gb"`
+	GPUUnits       int       `json:"gpu_units"`
+	Period         string    `json:"period"`
+	EstimatedPrice float64   `json:"estimated_price_usd"`
+	Status         string    `json:"status"`
+	CreatedAt      time.Time `json:"created_at"`
+}

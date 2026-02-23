@@ -7,6 +7,7 @@ import (
 
 	"github.com/MidasWR/ShareMTC/services/billingservice/internal/models"
 	"github.com/MidasWR/ShareMTC/services/billingservice/internal/service"
+	sdkauth "github.com/MidasWR/ShareMTC/services/sdk/auth"
 	"github.com/MidasWR/ShareMTC/services/sdk/httpx"
 )
 
@@ -92,4 +93,61 @@ func (h *Handler) Stats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.JSON(w, http.StatusOK, stats)
+}
+
+func (h *Handler) ListRentalPlans(w http.ResponseWriter, r *http.Request) {
+	items, err := h.svc.ListRentalPlans(r.Context())
+	if err != nil {
+		httpx.Error(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	httpx.JSON(w, http.StatusOK, items)
+}
+
+func (h *Handler) EstimateServerOrder(w http.ResponseWriter, r *http.Request) {
+	var req models.ServerOrder
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid json")
+		return
+	}
+	result, err := h.svc.EstimateServerOrder(r.Context(), req)
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	httpx.JSON(w, http.StatusOK, result)
+}
+
+func (h *Handler) CreateServerOrder(w http.ResponseWriter, r *http.Request) {
+	claims := sdkauth.ClaimsFromContext(r.Context())
+	if claims == nil {
+		httpx.Error(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	var req models.ServerOrder
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid json")
+		return
+	}
+	req.UserID = claims.UserID
+	order, err := h.svc.CreateServerOrder(r.Context(), req)
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	httpx.JSON(w, http.StatusCreated, order)
+}
+
+func (h *Handler) ListServerOrders(w http.ResponseWriter, r *http.Request) {
+	claims := sdkauth.ClaimsFromContext(r.Context())
+	if claims == nil {
+		httpx.Error(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	orders, err := h.svc.ListServerOrders(r.Context(), claims.UserID)
+	if err != nil {
+		httpx.Error(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	httpx.JSON(w, http.StatusOK, orders)
 }

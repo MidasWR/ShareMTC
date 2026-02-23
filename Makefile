@@ -10,6 +10,9 @@ DIST_DIR ?= dist
 INFRA_CHART_ASSET := $(DIST_DIR)/host-infra-$(TAG).tgz
 SERVICES_CHART_ASSET := $(DIST_DIR)/host-services-$(TAG).tgz
 INSTALLER_ASSET := $(DIST_DIR)/host-installer
+HOSTAGENT_LINUX_ASSET := $(DIST_DIR)/hostagent-linux-amd64
+HOSTAGENT_DARWIN_ASSET := $(DIST_DIR)/hostagent-darwin-amd64
+HOSTAGENT_WINDOWS_ASSET := $(DIST_DIR)/hostagent-windows-amd64.exe
 
 SERVICES := authservice adminservice resourceservice billingservice hostagent frontend
 
@@ -25,9 +28,9 @@ comma := ,
 SKIP_ITEMS := $(strip $(subst $(comma),$(space),$(SKIP)))
 has_skip = $(filter $(1),$(SKIP_ITEMS))
 
-.PHONY: release auto-commit-push guard-tag clean-dist test build-images chart-package package-installer verify-assets github-release
+.PHONY: release auto-commit-push guard-tag clean-dist test build-images chart-package package-installer build-agent-binaries verify-assets github-release
 
-release: auto-commit-push guard-tag clean-dist test build-images chart-package package-installer verify-assets github-release
+release: auto-commit-push guard-tag clean-dist test build-images chart-package package-installer build-agent-binaries verify-assets github-release
 
 auto-commit-push:
 	@if [ "$(AUTO_COMMIT_PUSH)" != "1" ]; then \
@@ -96,10 +99,22 @@ package-installer:
 		chmod +x "$(INSTALLER_ASSET)"; \
 	fi
 
+build-agent-binaries:
+	@if [ "$(call has_skip,6)" = "6" ]; then \
+		echo "Skipping hostagent binaries build"; \
+	else \
+		CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o "$(HOSTAGENT_LINUX_ASSET)" ./services/hostagent/cmd && \
+		CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -o "$(HOSTAGENT_DARWIN_ASSET)" ./services/hostagent/cmd && \
+		CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o "$(HOSTAGENT_WINDOWS_ASSET)" ./services/hostagent/cmd; \
+	fi
+
 verify-assets:
 	@test -f "$(INSTALLER_ASSET)" || (echo "Missing installer asset: $(INSTALLER_ASSET)"; exit 1)
 	@test -f "$(INFRA_CHART_ASSET)" || (echo "Missing infra chart asset: $(INFRA_CHART_ASSET)"; exit 1)
 	@test -f "$(SERVICES_CHART_ASSET)" || (echo "Missing services chart asset: $(SERVICES_CHART_ASSET)"; exit 1)
+	@test -f "$(HOSTAGENT_LINUX_ASSET)" || (echo "Missing hostagent asset: $(HOSTAGENT_LINUX_ASSET)"; exit 1)
+	@test -f "$(HOSTAGENT_DARWIN_ASSET)" || (echo "Missing hostagent asset: $(HOSTAGENT_DARWIN_ASSET)"; exit 1)
+	@test -f "$(HOSTAGENT_WINDOWS_ASSET)" || (echo "Missing hostagent asset: $(HOSTAGENT_WINDOWS_ASSET)"; exit 1)
 
 github-release:
 	@if [ "$(call has_skip,5)" = "5" ]; then \
@@ -107,9 +122,9 @@ github-release:
 	else \
 		if gh release view "$(TAG)" --repo "$(REPO)" >/dev/null 2>&1; then \
 			echo "Release $(TAG) exists: overwrite assets"; \
-			gh release upload "$(TAG)" "$(INSTALLER_ASSET)" "$(INFRA_CHART_ASSET)" "$(SERVICES_CHART_ASSET)" --repo "$(REPO)" --clobber && \
+			gh release upload "$(TAG)" "$(INSTALLER_ASSET)" "$(INFRA_CHART_ASSET)" "$(SERVICES_CHART_ASSET)" "$(HOSTAGENT_LINUX_ASSET)" "$(HOSTAGENT_DARWIN_ASSET)" "$(HOSTAGENT_WINDOWS_ASSET)" --repo "$(REPO)" --clobber && \
 			gh release edit "$(TAG)" --repo "$(REPO)" --title "$(TAG)" --notes "Release $(TAG)"; \
 		else \
-			gh release create "$(TAG)" "$(INSTALLER_ASSET)" "$(INFRA_CHART_ASSET)" "$(SERVICES_CHART_ASSET)" --repo "$(REPO)" --title "$(TAG)" --notes "Release $(TAG)"; \
+			gh release create "$(TAG)" "$(INSTALLER_ASSET)" "$(INFRA_CHART_ASSET)" "$(SERVICES_CHART_ASSET)" "$(HOSTAGENT_LINUX_ASSET)" "$(HOSTAGENT_DARWIN_ASSET)" "$(HOSTAGENT_WINDOWS_ASSET)" --repo "$(REPO)" --title "$(TAG)" --notes "Release $(TAG)"; \
 		fi; \
 	fi

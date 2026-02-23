@@ -45,6 +45,10 @@ func main() {
 		api.Post("/plans", handler.CreatePlan)
 		api.Post("/usage", handler.ProcessUsage)
 		api.Get("/accruals", handler.ListAccruals)
+		api.Get("/rental/plans", handler.ListRentalPlans)
+		api.Post("/rental/estimate", handler.EstimateServerOrder)
+		api.Post("/rental/orders", handler.CreateServerOrder)
+		api.Get("/rental/orders", handler.ListServerOrders)
 		api.Group(func(admin chi.Router) {
 			admin.Use(sdkauth.RequireAnyRole("admin", "super-admin", "ops-admin"))
 			admin.Get("/admin/accruals", handler.ListAllAccruals)
