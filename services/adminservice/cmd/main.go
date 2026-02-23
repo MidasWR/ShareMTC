@@ -32,9 +32,7 @@ func main() {
 	defer pool.Close()
 
 	repo := storage.NewProviderRepo(pool)
-	if err := repo.Migrate(context.Background()); err != nil {
-		logger.Fatal().Err(err).Msg("migration failed")
-	}
+	logger.Info().Msg("database migrations are managed externally by Atlas CRD")
 
 	svc := service.NewProviderService(repo)
 	installCommand := fmt.Sprintf("curl -fsSL https://raw.githubusercontent.com/%s/%s/installer/hostagent-node-installer.sh | sudo bash", cfg.GitHubRepo, cfg.ReleaseTag)
