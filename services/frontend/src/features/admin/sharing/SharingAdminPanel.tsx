@@ -9,12 +9,10 @@ import { SkeletonBlock } from "../../../design/patterns/SkeletonBlock";
 import { Button } from "../../../design/primitives/Button";
 import { Card } from "../../../design/primitives/Card";
 import { Input } from "../../../design/primitives/Input";
+import { API_BASE } from "../../../config/apiBase";
 import { fetchJSON } from "../../../lib/http";
 import { Allocation, Provider, UsageAccrual } from "../../../types/api";
 
-const ADMIN_BASE = import.meta.env.VITE_ADMIN_BASE_URL ?? "http://localhost:8082";
-const RESOURCE_BASE = import.meta.env.VITE_RESOURCE_BASE_URL ?? "http://localhost:8083";
-const BILLING_BASE = import.meta.env.VITE_BILLING_BASE_URL ?? "http://localhost:8084";
 
 type SharingRow = {
   provider_id: string;
@@ -37,12 +35,12 @@ export function SharingAdminPanel() {
     setLoading(true);
     setError("");
     try {
-      const providers = await fetchJSON<Provider[]>(`${ADMIN_BASE}/v1/admin/providers/`);
+      const providers = await fetchJSON<Provider[]>(`${API_BASE.admin}/v1/admin/providers/`);
       const nextRows = await Promise.all(
         providers.map(async (provider) => {
           const [allocations, accruals] = await Promise.all([
-            fetchJSON<Allocation[]>(`${RESOURCE_BASE}/v1/resources/allocations?provider_id=${encodeURIComponent(provider.id)}`),
-            fetchJSON<UsageAccrual[]>(`${BILLING_BASE}/v1/billing/accruals?provider_id=${encodeURIComponent(provider.id)}`)
+            fetchJSON<Allocation[]>(`${API_BASE.resource}/v1/resources/allocations?provider_id=${encodeURIComponent(provider.id)}`),
+            fetchJSON<UsageAccrual[]>(`${API_BASE.billing}/v1/billing/accruals?provider_id=${encodeURIComponent(provider.id)}`)
           ]);
           const activeAllocations = allocations.filter((item) => !item.released_at).length;
           const totalRevenue = accruals.reduce((sum, item) => sum + item.total_usd, 0);

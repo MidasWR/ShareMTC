@@ -7,9 +7,9 @@ import { Button } from "../../../design/primitives/Button";
 import { Card } from "../../../design/primitives/Card";
 import { Input } from "../../../design/primitives/Input";
 import { Select } from "../../../design/primitives/Select";
+import { API_BASE } from "../../../config/apiBase";
 import { fetchJSON } from "../../../lib/http";
 
-const RESOURCE_BASE = import.meta.env.VITE_RESOURCE_BASE_URL ?? "http://localhost:8083";
 
 const installCommands = {
   linux: "sudo RESOURCE_API_URL=http://<platform-host-ip> ./installer/hostagent-node-installer.sh",
@@ -45,7 +45,7 @@ export function AgentOnboardingPanel() {
     setLoading(true);
     setError("");
     try {
-      await fetchJSON<{ status: string }>(`${RESOURCE_BASE}/v1/resources/heartbeat`, {
+      await fetchJSON<{ status: string }>(`${API_BASE.resource}/v1/resources/heartbeat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

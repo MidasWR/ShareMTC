@@ -17,10 +17,10 @@ import { Button } from "../../../design/primitives/Button";
 import { Card } from "../../../design/primitives/Card";
 import { Input } from "../../../design/primitives/Input";
 import { Select } from "../../../design/primitives/Select";
+import { API_BASE } from "../../../config/apiBase";
 import { fetchJSON } from "../../../lib/http";
 import { Provider } from "../../../types/api";
 
-const ADMIN_BASE = import.meta.env.VITE_ADMIN_BASE_URL ?? "http://localhost:8082";
 
 type NewServerForm = {
   display_name: string;
@@ -52,7 +52,7 @@ export function AdminServersPanel() {
     setLoading(true);
     setError("");
     try {
-      const list = await fetchJSON<Provider[]>(`${ADMIN_BASE}/v1/admin/providers/`);
+      const list = await fetchJSON<Provider[]>(`${API_BASE.admin}/v1/admin/providers/`);
       setProviders(list);
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Failed to load servers");
@@ -70,7 +70,7 @@ export function AdminServersPanel() {
     }
     setCreating(true);
     try {
-      await fetchJSON<Provider>(`${ADMIN_BASE}/v1/admin/providers/`, {
+      await fetchJSON<Provider>(`${API_BASE.admin}/v1/admin/providers/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

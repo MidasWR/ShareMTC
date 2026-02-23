@@ -17,11 +17,10 @@ import { Button } from "../design/primitives/Button";
 import { Card } from "../design/primitives/Card";
 import { Input } from "../design/primitives/Input";
 import { Select } from "../design/primitives/Select";
+import { API_BASE } from "../config/apiBase";
 import { fetchJSON } from "../lib/http";
 import { Allocation } from "../types/api";
 import { TableColumn } from "../design/components/Table";
-
-const RESOURCE_BASE = import.meta.env.VITE_RESOURCE_BASE_URL ?? "http://localhost:8083";
 
 export function HostPanel() {
   const [providerID, setProviderID] = useState("");
@@ -106,7 +105,7 @@ export function HostPanel() {
     }
     setLoading(true);
     try {
-      const list = await fetchJSON<Allocation[]>(`${RESOURCE_BASE}/v1/resources/allocations?provider_id=${encodeURIComponent(providerID.trim())}`);
+      const list = await fetchJSON<Allocation[]>(`${API_BASE.resource}/v1/resources/allocations?provider_id=${encodeURIComponent(providerID.trim())}`);
       setAllocations(list);
       setStatusText(`Loaded ${list.length} allocations`);
     } catch (requestError) {
@@ -126,7 +125,7 @@ export function HostPanel() {
     }
     setLoading(true);
     try {
-      const created = await fetchJSON<Allocation>(`${RESOURCE_BASE}/v1/resources/allocate`, {
+      const created = await fetchJSON<Allocation>(`${API_BASE.resource}/v1/resources/allocate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -152,7 +151,7 @@ export function HostPanel() {
   async function releaseAllocation(allocationID: string) {
     setLoading(true);
     try {
-      await fetchJSON<{ status: string }>(`${RESOURCE_BASE}/v1/resources/release/${allocationID}`, {
+      await fetchJSON<{ status: string }>(`${API_BASE.resource}/v1/resources/release/${allocationID}`, {
         method: "POST"
       });
       setStatusText(`Released allocation ${allocationID}`);
@@ -175,7 +174,7 @@ export function HostPanel() {
     }
     setLoading(true);
     try {
-      await fetchJSON<{ status: string }>(`${RESOURCE_BASE}/v1/resources/heartbeat`, {
+      await fetchJSON<{ status: string }>(`${API_BASE.resource}/v1/resources/heartbeat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

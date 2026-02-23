@@ -4,10 +4,9 @@ import { Button } from "../design/primitives/Button";
 import { Card } from "../design/primitives/Card";
 import { Input } from "../design/primitives/Input";
 import { InlineAlert } from "../design/patterns/InlineAlert";
+import { API_BASE } from "../config/apiBase";
 import { setSession } from "../lib/auth";
 import { fetchJSON } from "../lib/http";
-
-const AUTH_BASE = import.meta.env.VITE_AUTH_BASE_URL ?? "http://localhost:8081";
 
 type AuthPanelProps = {
   onAuthenticated?: () => void;
@@ -41,7 +40,7 @@ export function AuthPanel({ onAuthenticated }: AuthPanelProps) {
     setError("");
     setLoading(path);
     try {
-      const json = await fetchJSON<{ token: string; user: { id: string; email: string; role: string } }>(`${AUTH_BASE}/v1/auth/${path}`, {
+      const json = await fetchJSON<{ token: string; user: { id: string; email: string; role: string } }>(`${API_BASE.auth}/v1/auth/${path}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password })
@@ -65,7 +64,7 @@ export function AuthPanel({ onAuthenticated }: AuthPanelProps) {
     setError("");
     setLoading("login");
     try {
-      const json = await fetchJSON<{ token: string; user: { id: string; email: string; role: string } }>(`${AUTH_BASE}/v1/auth/login`, {
+      const json = await fetchJSON<{ token: string; user: { id: string; email: string; role: string } }>(`${API_BASE.auth}/v1/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password })
@@ -108,7 +107,7 @@ export function AuthPanel({ onAuthenticated }: AuthPanelProps) {
           </Button>
           <a
             className="focus-ring inline-flex h-10 w-full items-center justify-center rounded-md border border-border bg-elevated text-sm font-medium text-textPrimary hover:bg-slate-700/40"
-            href={`${AUTH_BASE}/v1/auth/google/start`}
+            href={`${API_BASE.auth}/v1/auth/google/start`}
           >
             Continue with Google
           </a>

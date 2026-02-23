@@ -14,11 +14,10 @@ import { Button } from "../design/primitives/Button";
 import { Card } from "../design/primitives/Card";
 import { Input } from "../design/primitives/Input";
 import { Select } from "../design/primitives/Select";
+import { API_BASE } from "../config/apiBase";
 import { fetchJSON } from "../lib/http";
 import { UsageAccrual } from "../types/api";
 import { TableColumn } from "../design/components/Table";
-
-const BILLING_BASE = import.meta.env.VITE_BILLING_BASE_URL ?? "http://localhost:8084";
 
 export function BillingPanel() {
   const [providerID, setProviderID] = useState("");
@@ -80,7 +79,7 @@ export function BillingPanel() {
     setLoading(true);
     setError("");
     try {
-      const preview = await fetchJSON<{ total_usd: number; vip_bonus_usd: number }>(`${BILLING_BASE}/v1/billing/usage`, {
+      const preview = await fetchJSON<{ total_usd: number; vip_bonus_usd: number }>(`${API_BASE.billing}/v1/billing/usage`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -113,7 +112,7 @@ export function BillingPanel() {
     setLoading(true);
     setError("");
     try {
-      const rows = await fetchJSON<UsageAccrual[]>(`${BILLING_BASE}/v1/billing/accruals?provider_id=${encodeURIComponent(providerID)}`);
+      const rows = await fetchJSON<UsageAccrual[]>(`${API_BASE.billing}/v1/billing/accruals?provider_id=${encodeURIComponent(providerID)}`);
       setAccruals(rows);
       setStatusMessage(`Loaded ${rows.length} accrual rows`);
       push("info", `Loaded ${rows.length} accruals`);

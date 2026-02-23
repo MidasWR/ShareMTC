@@ -10,11 +10,10 @@ import { StatusBadge } from "../../../design/patterns/StatusBadge";
 import { Button } from "../../../design/primitives/Button";
 import { Card } from "../../../design/primitives/Card";
 import { Input } from "../../../design/primitives/Input";
+import { API_BASE } from "../../../config/apiBase";
 import { fetchJSON } from "../../../lib/http";
 import { Allocation, UsageAccrual } from "../../../types/api";
 
-const RESOURCE_BASE = import.meta.env.VITE_RESOURCE_BASE_URL ?? "http://localhost:8083";
-const BILLING_BASE = import.meta.env.VITE_BILLING_BASE_URL ?? "http://localhost:8084";
 
 export function ProviderDashboardPanel() {
   const [providerID, setProviderID] = useState("");
@@ -36,8 +35,8 @@ export function ProviderDashboardPanel() {
     setError("");
     try {
       const [alloc, billing] = await Promise.all([
-        fetchJSON<Allocation[]>(`${RESOURCE_BASE}/v1/resources/allocations?provider_id=${encodeURIComponent(providerID.trim())}`),
-        fetchJSON<UsageAccrual[]>(`${BILLING_BASE}/v1/billing/accruals?provider_id=${encodeURIComponent(providerID.trim())}`)
+        fetchJSON<Allocation[]>(`${API_BASE.resource}/v1/resources/allocations?provider_id=${encodeURIComponent(providerID.trim())}`),
+        fetchJSON<UsageAccrual[]>(`${API_BASE.billing}/v1/billing/accruals?provider_id=${encodeURIComponent(providerID.trim())}`)
       ]);
       setAllocations(alloc);
       setAccruals(billing);

@@ -14,11 +14,11 @@ import { Button } from "../design/primitives/Button";
 import { Card } from "../design/primitives/Card";
 import { Input } from "../design/primitives/Input";
 import { Select } from "../design/primitives/Select";
+import { API_BASE } from "../config/apiBase";
 import { fetchJSON } from "../lib/http";
 import { Provider } from "../types/api";
 import { TableColumn } from "../design/components/Table";
 
-const ADMIN_BASE = import.meta.env.VITE_ADMIN_BASE_URL ?? "http://localhost:8082";
 
 export function AdminPanel() {
   const [providers, setProviders] = useState<Provider[]>([]);
@@ -35,7 +35,7 @@ export function AdminPanel() {
     setLoading(true);
     setError("");
     try {
-      const list = await fetchJSON<Provider[]>(`${ADMIN_BASE}/v1/admin/providers/`);
+      const list = await fetchJSON<Provider[]>(`${API_BASE.admin}/v1/admin/providers/`);
       setProviders(list);
       push("info", `Providers synced: ${list.length}`);
     } catch (requestError) {
