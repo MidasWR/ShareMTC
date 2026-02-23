@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { SiNvidia, SiUbuntu } from "react-icons/si";
-import { FaMemory, FaMicrochip, FaNetworkWired } from "react-icons/fa6";
+import { SiNvidia, SiUbuntu, SiPytorch, SiDocker } from "react-icons/si";
+import { FaMemory, FaMicrochip, FaNetworkWired, FaCube } from "react-icons/fa6";
 import { listPodCatalog, listPodTemplates } from "../admin/api/adminApi";
 import { PodCatalogItem, PodTemplate } from "../../types/api";
 import { Card } from "../../design/primitives/Card";
@@ -13,7 +13,9 @@ import { useToast } from "../../design/components/Toast";
 const mockTemplates: PodTemplate[] = [
   { id: "tmpl-1", name: "PyTorch 2.0 (CUDA 11.8)", description: "Standard image for ML training", gpu_class: "all", code: "pytorch-2.0" },
   { id: "tmpl-2", name: "Stable Diffusion WebUI", description: "Pre-installed SD WebUI", gpu_class: "high-end", code: "sd-webui" },
-  { id: "tmpl-3", name: "vLLM / LLM Inference", description: "Optimized for large language models", gpu_class: "high-end", code: "vllm" }
+  { id: "tmpl-3", name: "vLLM / LLM Inference", description: "Optimized for large language models", gpu_class: "high-end", code: "vllm" },
+  { id: "tmpl-4", name: "Docker Compose", description: "Standard container runtime environment", gpu_class: "none", code: "docker" },
+  { id: "tmpl-5", name: "Kubernetes Node", description: "K8s worker node setup", gpu_class: "none", code: "k8s-node" }
 ];
 
 const mockPods: PodCatalogItem[] = [
@@ -48,34 +50,19 @@ const mockPods: PodCatalogItem[] = [
     template_ids: ["tmpl-1", "tmpl-3"]
   },
   {
-    id: "pod-3",
-    code: "rtx-3090",
-    name: "RTX 3090 Standard",
-    description: "Balanced choice for standard deep learning tasks.",
-    gpu_model: "RTX 3090",
-    gpu_vram_gb: 24,
-    cpu_cores: 12,
-    ram_gb: 48,
-    network_mbps: 1000,
-    hourly_price_usd: 0.35,
-    monthly_price_usd: 210,
-    os_name: "Ubuntu 20.04",
-    template_ids: ["tmpl-1", "tmpl-2"]
-  },
-  {
-    id: "pod-4",
-    code: "h100-80gb",
-    name: "NVIDIA H100 Hopper",
-    description: "State of the art hardware for ultimate performance.",
-    gpu_model: "H100",
-    gpu_vram_gb: 80,
+    id: "pod-5",
+    code: "epyc-cpu-node",
+    name: "AMD EPYC Compute Node",
+    description: "High-density CPU instance for backend services.",
+    gpu_model: "None",
+    gpu_vram_gb: 0,
     cpu_cores: 64,
     ram_gb: 256,
-    network_mbps: 10000,
-    hourly_price_usd: 3.5,
-    monthly_price_usd: 2100,
+    network_mbps: 5000,
+    hourly_price_usd: 0.8,
+    monthly_price_usd: 400,
     os_name: "Ubuntu 22.04",
-    template_ids: ["tmpl-1", "tmpl-3"]
+    template_ids: ["tmpl-4", "tmpl-5"]
   }
 ];
 
@@ -97,7 +84,7 @@ export function PodsCatalogPanel() {
         setPods(podRows);
         setTemplates(templateRows);
       } catch (error) {
-        push("error", error instanceof Error ? error.message : "Не удалось загрузить каталог");
+        push("error", error instanceof Error ? error.message : "Failed to load catalog");
       }
     }
     load();
@@ -124,56 +111,68 @@ export function PodsCatalogPanel() {
   return (
     <section className="section-stack">
       <PageSectionHeader
-        title="Каталог GPU Pods"
-        description="Выбор конкретных GPU pods (30+ позиций) и готовых шаблонов запуска."
+        title="GPU & CPU Pods Catalog"
+        description="Select computing resources and runtime templates (PyTorch, vLLM, Docker)."
       />
-      <Card title="Фильтры каталога" description="Подберите Pod под вашу задачу инференса или обучения.">
+      <Card title="Catalog Filters" description="Find the right instance for inference or training.">
         <div className="grid gap-3 md:grid-cols-3">
-          <Input label="Поиск" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="GPU, ОС, название pod" />
+          <Input label="Search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="GPU, OS, pod name" />
           <Select
-            label="Шаблон"
+            label="Template"
             value={templateFilter}
             onChange={(event) => setTemplateFilter(event.target.value)}
             options={[
-              { value: "all", label: "Все шаблоны" },
+              { value: "all", label: "All templates" },
               ...templates.map((item) => ({ value: item.id, label: item.name }))
             ]}
           />
           <Select
-            label="Сортировка"
+            label="Sort by"
             value={sortBy}
             onChange={(event) => setSortBy(event.target.value as "price_hour" | "price_month" | "vram")}
             options={[
-              { value: "price_hour", label: "Цена/час (по возрастанию)" },
-              { value: "price_month", label: "Цена/месяц (по возрастанию)" },
-              { value: "vram", label: "VRAM (по убыванию)" }
+              { value: "price_hour", label: "Price/hour (asc)" },
+              { value: "price_month", label: "Price/month (asc)" },
+              { value: "vram", label: "VRAM (desc)" }
             ]}
           />
         </div>
       </Card>
 
       <div className="grid gap-3 lg:grid-cols-2">
-        {filtered.map((item) => (
-          <Card key={item.id} title={item.name} description={item.description}>
-            <div className="grid gap-2 text-sm text-textSecondary">
-              <div className="flex items-center gap-2"><SiNvidia className="text-success" /> {item.gpu_model} ({item.gpu_vram_gb} GB VRAM)</div>
-              <div className="flex items-center gap-2"><FaMicrochip /> CPU: {item.cpu_cores}</div>
-              <div className="flex items-center gap-2"><FaMemory /> RAM: {item.ram_gb} GB</div>
-              <div className="flex items-center gap-2"><FaNetworkWired /> Сеть: {item.network_mbps} Mbps</div>
-              <div className="flex items-center gap-2"><SiUbuntu /> ОС: {item.os_name}</div>
-            </div>
-            <div className="mt-3 flex items-center justify-between rounded-md border border-border bg-elevated px-3 py-2">
-              <div className="text-xs text-textMuted">Цена</div>
-              <div className="text-right text-sm">
-                <div>${item.hourly_price_usd.toFixed(2)}/час</div>
-                <div className="text-textSecondary">${item.monthly_price_usd.toFixed(2)}/месяц</div>
+        {filtered.map((item) => {
+          const hasGPU = item.gpu_model && item.gpu_model !== "None";
+          return (
+            <Card key={item.id} title={item.name} description={item.description}>
+              <div className="grid gap-2 text-sm text-textSecondary">
+                <div className="flex items-center gap-2">
+                  {hasGPU ? <SiNvidia className="text-success" /> : <FaMicrochip className="text-info" />}
+                  {hasGPU ? `${item.gpu_model} (${item.gpu_vram_gb} GB VRAM)` : "No GPU (CPU only)"}
+                </div>
+                <div className="flex items-center gap-2"><FaMicrochip /> CPU: {item.cpu_cores} cores</div>
+                <div className="flex items-center gap-2"><FaMemory /> RAM: {item.ram_gb} GB</div>
+                <div className="flex items-center gap-2"><FaNetworkWired /> Network: {item.network_mbps} Mbps</div>
+                <div className="flex items-center gap-2"><SiUbuntu /> OS: {item.os_name}</div>
+                <div className="flex items-center gap-2 mt-2 pt-2 border-t border-border">
+                  <span className="text-xs text-textMuted mr-1">Supported:</span>
+                  {item.template_ids?.includes("tmpl-1") && <SiPytorch title="PyTorch" className="text-orange-500 text-lg" />}
+                  {item.template_ids?.includes("tmpl-4") && <SiDocker title="Docker" className="text-blue-500 text-lg" />}
+                  {item.template_ids?.includes("tmpl-5") && <FaCube title="Kubernetes" className="text-blue-400 text-lg" />}
+                </div>
               </div>
-            </div>
-            <div className="mt-3 flex justify-end">
-              <Button>Арендовать этот Pod</Button>
-            </div>
-          </Card>
-        ))}
+              <div className="mt-3 flex items-center justify-between rounded-md border border-border bg-elevated px-3 py-2">
+                <div className="text-xs text-textMuted">Price</div>
+                <div className="text-right text-sm">
+                  <div>${item.hourly_price_usd.toFixed(2)}/hr</div>
+                  <div className="text-textSecondary">${item.monthly_price_usd.toFixed(2)}/mo</div>
+                </div>
+              </div>
+              <div className="mt-3 flex justify-end">
+                <Button>Rent this Pod</Button>
+              </div>
+            </Card>
+          );
+        })}
       </div>
     </section>
   );

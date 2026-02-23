@@ -3,6 +3,7 @@ import { deletePodCatalog, listPodCatalog, listPodTemplates, upsertPodCatalog, u
 import { PodCatalogItem, PodTemplate } from "../../../types/api";
 import { Card } from "../../../design/primitives/Card";
 import { Input } from "../../../design/primitives/Input";
+import { Select } from "../../../design/primitives/Select";
 import { Button } from "../../../design/primitives/Button";
 import { Table } from "../../../design/components/Table";
 import { EmptyState } from "../../../design/patterns/EmptyState";
@@ -13,6 +14,7 @@ export function AdminPodsPanel() {
   const [templates, setTemplates] = useState<PodTemplate[]>([]);
   const [podName, setPodName] = useState("");
   const [templateName, setTemplateName] = useState("");
+  const [templateClass, setTemplateClass] = useState("all");
   const { push } = useToast();
 
   async function refresh() {
@@ -21,7 +23,7 @@ export function AdminPodsPanel() {
       setPods(podRows);
       setTemplates(templateRows);
     } catch (error) {
-      push("error", error instanceof Error ? error.message : "Ошибка загрузки каталога");
+      push("error", error instanceof Error ? error.message : "Failed to load catalog");
     }
   }
 
@@ -37,14 +39,14 @@ export function AdminPodsPanel() {
         id: "",
         code: `tmpl-${Date.now()}`,
         name: templateName.trim(),
-        description: "Шаблон GPU workload",
-        gpu_class: "custom"
+        description: "Custom workload template",
+        gpu_class: templateClass
       });
       setTemplateName("");
       await refresh();
-      push("success", "Шаблон добавлен");
+      push("success", "Template added");
     } catch (error) {
-      push("error", error instanceof Error ? error.message : "Ошибка добавления шаблона");
+      push("error", error instanceof Error ? error.message : "Error adding template");
     }
   }
 
@@ -56,7 +58,7 @@ export function AdminPodsPanel() {
         id: "",
         code: `pod-${Date.now()}`,
         name: podName.trim(),
-        description: "Пользовательский GPU pod",
+        description: "Custom instance",
         gpu_model: "NVIDIA RTX 4090",
         gpu_vram_gb: 24,
         cpu_cores: 16,
@@ -69,9 +71,9 @@ export function AdminPodsPanel() {
       });
       setPodName("");
       await refresh();
-      push("success", "Pod добавлен в каталог");
+      push("success", "Instance added to catalog");
     } catch (error) {
-      push("error", error instanceof Error ? error.message : "Ошибка добавления pod");
+      push("error", error instanceof Error ? error.message : "Error adding instance");
     }
   }
 
@@ -79,38 +81,48 @@ export function AdminPodsPanel() {
     try {
       await deletePodCatalog(id);
       await refresh();
-      push("info", "Pod удален");
+      push("info", "Instance removed");
     } catch (error) {
-      push("error", error instanceof Error ? error.message : "Ошибка удаления pod");
+      push("error", error instanceof Error ? error.message : "Error removing instance");
     }
   }
 
   return (
     <section className="section-stack">
-      <Card title="Управление шаблонами" description="CRUD шаблонов GPU workloads для pods каталога.">
-        <form className="flex gap-2" onSubmit={createTemplate}>
-          <Input label="Новый шаблон" value={templateName} onChange={(event) => setTemplateName(event.target.value)} />
-          <Button className="mt-7" type="submit">Добавить шаблон</Button>
+      <Card title="Manage Templates" description="CRUD operations for environment templates.">
+        <form className="grid gap-3 md:grid-cols-3 items-end" onSubmit={createTemplate}>
+          <Input label="New Template Name" value={templateName} onChange={(event) => setTemplateName(event.target.value)} />
+          <Select 
+            label="Template Type" 
+            value={templateClass} 
+            onChange={(e) => setTemplateClass(e.target.value)}
+            options={[
+              { value: "all", label: "General GPU" },
+              { value: "high-end", label: "High-End LLM" },
+              { value: "none", label: "CPU Only (Docker)" }
+            ]}
+          />
+          <Button type="submit" variant="secondary">Add Template</Button>
         </form>
       </Card>
 
-      <Card title="Управление Pods каталогом" description="Добавление и удаление позиций каталога через админку.">
+      <Card title="Manage Catalog Instances" description="Add or remove hardware instances from catalog.">
         <form className="flex gap-2" onSubmit={createPod}>
-          <Input label="Название pod" value={podName} onChange={(event) => setPodName(event.target.value)} />
-          <Button className="mt-7" type="submit">Добавить Pod</Button>
+          <Input label="Instance Name" value={podName} onChange={(event) => setPodName(event.target.value)} />
+          <Button className="mt-7" type="submit" variant="secondary">Add Instance</Button>
         </form>
         <div className="mt-4">
           <Table
-            ariaLabel="Админский каталог pods"
+            ariaLabel="Admin Catalog"
             rowKey={(row) => row.id}
             items={pods}
-            emptyState={<EmptyState title="Каталог пуст" description="Добавьте первый pod." />}
+            emptyState={<EmptyState title="Catalog is empty" description="Add the first instance." />}
             columns={[
-              { key: "name", header: "Pod", render: (row) => row.name },
+              { key: "name", header: "Instance", render: (row) => row.name },
               { key: "gpu", header: "GPU", render: (row) => row.gpu_model },
-              { key: "price", header: "$/час", render: (row) => row.hourly_price_usd.toFixed(2) },
-              { key: "templates", header: "Шаблоны", render: (row) => `${row.template_ids?.length ?? 0}` },
-              { key: "actions", header: "Действия", render: (row) => <Button variant="ghost" size="sm" onClick={() => removePod(row.id)}>Удалить</Button> }
+              { key: "price", header: "$/hr", render: (row) => row.hourly_price_usd.toFixed(2) },
+              { key: "templates", header: "Templates", render: (row) => `${row.template_ids?.length ?? 0}` },
+              { key: "actions", header: "Actions", render: (row) => <Button variant="ghost" size="sm" onClick={() => removePod(row.id)}>Delete</Button> }
             ]}
           />
         </div>

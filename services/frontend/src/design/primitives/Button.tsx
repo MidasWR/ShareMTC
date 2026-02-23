@@ -1,7 +1,7 @@
 import { ButtonHTMLAttributes, ReactNode } from "react";
 import { cx } from "../utils/cx";
 
-type Variant = "primary" | "secondary" | "ghost" | "destructive";
+type Variant = "primary" | "secondary" | "ghost" | "destructive" | "info" | "warning";
 type Size = "sm" | "md";
 
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
@@ -15,7 +15,9 @@ const variantClasses: Record<Variant, string> = {
   primary: "bg-brand text-canvas shadow-[0_0_15px_rgba(0,255,65,0.4)] hover:shadow-[0_0_25px_rgba(0,255,65,0.6)] hover:bg-brandHover",
   secondary: "bg-transparent text-textPrimary border border-border hover:border-brand hover:shadow-[0_0_10px_rgba(0,255,65,0.2)] hover:text-brand",
   ghost: "bg-transparent text-textSecondary hover:text-brand hover:bg-brand/10",
-  destructive: "bg-danger text-white hover:bg-red-500 shadow-[0_0_15px_rgba(239,68,68,0.4)] hover:shadow-[0_0_25px_rgba(239,68,68,0.6)]"
+  destructive: "bg-danger text-white hover:bg-red-500 shadow-[0_0_15px_rgba(239,68,68,0.4)] hover:shadow-[0_0_25px_rgba(239,68,68,0.6)]",
+  info: "bg-info text-white hover:bg-sky-400 shadow-[0_0_15px_rgba(56,189,248,0.4)] hover:shadow-[0_0_25px_rgba(56,189,248,0.6)]",
+  warning: "bg-warning text-white hover:bg-yellow-400 shadow-[0_0_15px_rgba(245,158,11,0.4)] hover:shadow-[0_0_25px_rgba(245,158,11,0.6)]"
 };
 
 const sizeClasses: Record<Size, string> = {
