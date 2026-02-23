@@ -9,6 +9,7 @@ const translations = {
       provider: "Provider",
       admin: "Administration",
       ops: "Operations",
+      shortcuts: "Shortcuts",
       settings: "Settings",
       logout: "Log out"
     },
@@ -37,6 +38,7 @@ const translations = {
       provider: "Провайдер",
       admin: "Администрирование",
       ops: "Операции",
+      shortcuts: "Горячие клавиши",
       settings: "Настройки",
       logout: "Выйти"
     },

@@ -21,7 +21,14 @@ export function AppShell({ tab, enabledMenu, onNavigate, onShortcuts, onLogout, 
       >
         Skip to content
       </a>
-      <SidebarNav tab={tab} groups={["core", "provider", "admin", "ops"]} enabledMenu={enabledMenu} onNavigate={onNavigate} onLogout={onLogout} />
+      <SidebarNav
+        tab={tab}
+        groups={["core", "provider", "admin", "ops"]}
+        enabledMenu={enabledMenu}
+        onNavigate={onNavigate}
+        onLogout={onLogout}
+        onShortcuts={onShortcuts}
+      />
       <main id="content" className="page-container section-stack" tabIndex={-1}>
         {children}
       </main>
