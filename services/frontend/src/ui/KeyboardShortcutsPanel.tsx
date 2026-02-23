@@ -7,7 +7,7 @@ type KeyboardShortcutsPanelProps = {
 
 const shortcuts = [
   { key: "?", action: "Open shortcuts panel" },
-  { key: "Alt+1..Alt+6", action: "Jump to sections (overview to auth)" },
+  { key: "Alt+1..Alt+6", action: "Jump to primary sections (role-aware)" },
   { key: "Esc", action: "Close modal/drawer" },
   { key: "Tab / Shift+Tab", action: "Move between controls" },
   { key: "Arrow Left/Right", action: "Switch tabs in segmented controls" }

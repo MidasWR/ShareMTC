@@ -3,11 +3,16 @@ import { useToast } from "../design/components/Toast";
 import { Button } from "../design/primitives/Button";
 import { Card } from "../design/primitives/Card";
 import { Input } from "../design/primitives/Input";
+import { setSession } from "../lib/auth";
 import { fetchJSON } from "../lib/http";
 
 const AUTH_BASE = import.meta.env.VITE_AUTH_BASE_URL ?? "http://localhost:8081";
 
-export function AuthPanel() {
+type AuthPanelProps = {
+  onAuthenticated?: () => void;
+};
+
+export function AuthPanel({ onAuthenticated }: AuthPanelProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState<"" | "register" | "login">("");
@@ -35,12 +40,13 @@ export function AuthPanel() {
     setError("");
     setLoading(path);
     try {
-      const json = await fetchJSON<{ token: string; user: { email: string } }>(`${AUTH_BASE}/v1/auth/${path}`, {
+      const json = await fetchJSON<{ token: string; user: { id: string; email: string; role: string } }>(`${AUTH_BASE}/v1/auth/${path}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password })
       });
-      localStorage.setItem("host_token", json.token);
+      setSession(json.token, json.user);
+      onAuthenticated?.();
       push("success", `Authenticated as ${json.user.email}`);
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Request failed");
@@ -58,12 +64,13 @@ export function AuthPanel() {
     setError("");
     setLoading("login");
     try {
-      const json = await fetchJSON<{ token: string; user: { email: string } }>(`${AUTH_BASE}/v1/auth/login`, {
+      const json = await fetchJSON<{ token: string; user: { id: string; email: string; role: string } }>(`${AUTH_BASE}/v1/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password })
       });
-      localStorage.setItem("host_token", json.token);
+      setSession(json.token, json.user);
+      onAuthenticated?.();
       push("success", `Authenticated as ${json.user.email}`);
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Request failed");
