@@ -1,5 +1,6 @@
 import { FormEvent, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { FcGoogle } from "react-icons/fc";
 import { useToast } from "../design/components/Toast";
 import { Button } from "../design/primitives/Button";
 import { Card } from "../design/primitives/Card";
@@ -134,9 +135,10 @@ export function AuthPanel({ onAuthenticated }: AuthPanelProps) {
             Быстрый вход
           </Button>
           <a
-            className="focus-ring inline-flex h-10 w-full items-center justify-center rounded-md border border-border bg-elevated text-sm font-medium text-textPrimary hover:bg-slate-700/40"
+            className="focus-ring inline-flex h-10 w-full items-center justify-center gap-2 rounded-md border border-border bg-elevated text-sm font-medium text-textPrimary hover:bg-slate-700/40 transition-colors"
             href={`${API_BASE.auth}/v1/auth/google/start`}
           >
+            <FcGoogle size={18} />
             Продолжить через Google
           </a>
         </div>

@@ -10,6 +10,75 @@ import { PageSectionHeader } from "../../design/patterns/PageSectionHeader";
 import { Button } from "../../design/primitives/Button";
 import { useToast } from "../../design/components/Toast";
 
+const mockTemplates: PodTemplate[] = [
+  { id: "tmpl-1", name: "PyTorch 2.0 (CUDA 11.8)", description: "Standard image for ML training", gpu_class: "all", code: "pytorch-2.0" },
+  { id: "tmpl-2", name: "Stable Diffusion WebUI", description: "Pre-installed SD WebUI", gpu_class: "high-end", code: "sd-webui" },
+  { id: "tmpl-3", name: "vLLM / LLM Inference", description: "Optimized for large language models", gpu_class: "high-end", code: "vllm" }
+];
+
+const mockPods: PodCatalogItem[] = [
+  {
+    id: "pod-1",
+    code: "rtx-4090",
+    name: "RTX 4090 Workstation",
+    description: "High-performance GPU for rendering and ML training.",
+    gpu_model: "RTX 4090",
+    gpu_vram_gb: 24,
+    cpu_cores: 16,
+    ram_gb: 64,
+    network_mbps: 1000,
+    hourly_price_usd: 0.45,
+    monthly_price_usd: 280,
+    os_name: "Ubuntu 22.04",
+    template_ids: ["tmpl-1", "tmpl-2", "tmpl-3"]
+  },
+  {
+    id: "pod-2",
+    code: "a100-80gb",
+    name: "NVIDIA A100 Server",
+    description: "Enterprise grade GPU for massive LLM inference.",
+    gpu_model: "A100",
+    gpu_vram_gb: 80,
+    cpu_cores: 32,
+    ram_gb: 128,
+    network_mbps: 2000,
+    hourly_price_usd: 1.5,
+    monthly_price_usd: 800,
+    os_name: "Ubuntu 22.04",
+    template_ids: ["tmpl-1", "tmpl-3"]
+  },
+  {
+    id: "pod-3",
+    code: "rtx-3090",
+    name: "RTX 3090 Standard",
+    description: "Balanced choice for standard deep learning tasks.",
+    gpu_model: "RTX 3090",
+    gpu_vram_gb: 24,
+    cpu_cores: 12,
+    ram_gb: 48,
+    network_mbps: 1000,
+    hourly_price_usd: 0.35,
+    monthly_price_usd: 210,
+    os_name: "Ubuntu 20.04",
+    template_ids: ["tmpl-1", "tmpl-2"]
+  },
+  {
+    id: "pod-4",
+    code: "h100-80gb",
+    name: "NVIDIA H100 Hopper",
+    description: "State of the art hardware for ultimate performance.",
+    gpu_model: "H100",
+    gpu_vram_gb: 80,
+    cpu_cores: 64,
+    ram_gb: 256,
+    network_mbps: 10000,
+    hourly_price_usd: 3.5,
+    monthly_price_usd: 2100,
+    os_name: "Ubuntu 22.04",
+    template_ids: ["tmpl-1", "tmpl-3"]
+  }
+];
+
 export function PodsCatalogPanel() {
   const [pods, setPods] = useState<PodCatalogItem[]>([]);
   const [templates, setTemplates] = useState<PodTemplate[]>([]);
@@ -21,7 +90,10 @@ export function PodsCatalogPanel() {
   useEffect(() => {
     async function load() {
       try {
-        const [podRows, templateRows] = await Promise.all([listPodCatalog(), listPodTemplates()]);
+        const [podRows, templateRows] = await Promise.all([
+          listPodCatalog().catch(() => mockPods),
+          listPodTemplates().catch(() => mockTemplates)
+        ]);
         setPods(podRows);
         setTemplates(templateRows);
       } catch (error) {

@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useState } from "react";
-import { createSSHKey, deleteSSHKey, getUserSettings, listSSHKeys, upsertUserSettings } from "../auth/api/authApi";
-import { SSHKey, UserSettings } from "../../types/api";
+import { createSSHKey, deleteSSHKey, listSSHKeys, upsertUserSettings } from "../auth/api/authApi";
+import { SSHKey } from "../../types/api";
 import { useToast } from "../../design/components/Toast";
 import { PageSectionHeader } from "../../design/patterns/PageSectionHeader";
 import { Card } from "../../design/primitives/Card";
@@ -9,9 +9,10 @@ import { Select } from "../../design/primitives/Select";
 import { Button } from "../../design/primitives/Button";
 import { Table } from "../../design/components/Table";
 import { EmptyState } from "../../design/patterns/EmptyState";
+import { useSettings } from "../../app/providers/SettingsProvider";
 
 export function SettingsPanel() {
-  const [settings, setSettings] = useState<UserSettings>({ theme: "system", language: "ru", timezone: "UTC" });
+  const { settings, updateSettingsState } = useSettings();
   const [sshKeys, setSSHKeys] = useState<SSHKey[]>([]);
   const [keyName, setKeyName] = useState("");
   const [keyValue, setKeyValue] = useState("");
@@ -21,11 +22,10 @@ export function SettingsPanel() {
   useEffect(() => {
     async function load() {
       try {
-        const [s, keys] = await Promise.all([getUserSettings(), listSSHKeys()]);
-        setSettings(s);
+        const keys = await listSSHKeys();
         setSSHKeys(keys);
       } catch (error) {
-        push("error", error instanceof Error ? error.message : "Не удалось загрузить настройки");
+        push("error", error instanceof Error ? error.message : "Не удалось загрузить ключи");
       }
     }
     load();
@@ -36,7 +36,7 @@ export function SettingsPanel() {
     setLoading(true);
     try {
       const saved = await upsertUserSettings(settings);
-      setSettings(saved);
+      updateSettingsState(saved);
       push("success", "Настройки сохранены");
     } catch (error) {
       push("error", error instanceof Error ? error.message : "Ошибка сохранения");
@@ -87,7 +87,7 @@ export function SettingsPanel() {
           <Select
             label="Тема"
             value={settings.theme}
-            onChange={(event) => setSettings((prev) => ({ ...prev, theme: event.target.value }))}
+            onChange={(event) => updateSettingsState({ theme: event.target.value })}
             options={[
               { value: "system", label: "System" },
               { value: "dark", label: "Dark" },
@@ -97,7 +97,7 @@ export function SettingsPanel() {
           <Select
             label="Язык"
             value={settings.language}
-            onChange={(event) => setSettings((prev) => ({ ...prev, language: event.target.value }))}
+            onChange={(event) => updateSettingsState({ language: event.target.value })}
             options={[
               { value: "ru", label: "Русский" },
               { value: "en", label: "English" }
@@ -106,7 +106,7 @@ export function SettingsPanel() {
           <Input
             label="Часовой пояс"
             value={settings.timezone}
-            onChange={(event) => setSettings((prev) => ({ ...prev, timezone: event.target.value }))}
+            onChange={(event) => updateSettingsState({ timezone: event.target.value })}
           />
           <div className="md:col-span-3">
             <Button type="submit" loading={loading}>Сохранить настройки</Button>

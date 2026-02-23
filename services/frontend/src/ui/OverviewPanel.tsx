@@ -10,14 +10,25 @@ export function OverviewPanel() {
         description="Быстрая ориентация по сценариям аренды, шеринга и администрирования."
       />
 
-      <Card title="Сводка платформы" description="Ключевые контуры работы GPU Pods и вычислительного маркетплейса.">
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <MetricTile label="Контур аренды" value="Выбор -> Запуск -> Завершение" hint="Жизненный цикл pod/сервера" />
-          <MetricTile label="Контур провайдера" value="Подключение -> Heartbeat" hint="Состояние и доступность нод" />
-          <MetricTile label="Контур биллинга" value="Использование -> Начисление" hint="Почасовой и помесячный режим" />
-          <MetricTile label="Контур админа" value="Аудит и контроль" hint="Управление рисками и доступом" />
-        </div>
-      </Card>
+      <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+        <MetricTile label="Контур аренды" value="Pods" hint="Выбор -> Запуск -> Завершение" />
+        <MetricTile label="Контур провайдера" value="Nodes" hint="Подключение -> Heartbeat" />
+        <MetricTile label="Контур биллинга" value="Finance" hint="Использование -> Начисление" />
+        <MetricTile label="Контур админа" value="Audit" hint="Управление рисками и доступом" />
+      </div>
+      
+      <div className="grid gap-6 md:grid-cols-2 mt-6">
+        <Card title="Активность" description="Последние действия в системе">
+          <div className="text-sm text-textSecondary h-32 flex items-center justify-center font-mono">
+            Нет недавней активности
+          </div>
+        </Card>
+        <Card title="Статус серверов" description="Доступность инфраструктуры">
+          <div className="text-sm text-textSecondary h-32 flex items-center justify-center font-mono">
+            Все системы работают штатно
+          </div>
+        </Card>
+      </div>
     </section>
   );
 }

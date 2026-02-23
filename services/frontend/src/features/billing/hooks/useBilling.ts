@@ -13,7 +13,7 @@ export function useBilling() {
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState<"newest" | "total">("newest");
-  const [visibleColumns, setVisibleColumns] = useState<string[]>(["id", "usage", "amount", "bonus", "total", "created"]);
+  const [visibleColumns, setVisibleColumns] = useState<string[]>(["id", "usage", "amount", "bonus", "total", "payment", "created"]);
   const { push } = useToast();
 
   const totalAccrued = useMemo(() => accruals.reduce((sum, item) => sum + item.total_usd, 0), [accruals]);
