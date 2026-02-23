@@ -47,6 +47,17 @@ cd services/frontend
 npm run build
 ```
 
+Run smoke e2e checks:
+
+```bash
+cd services/frontend
+npx playwright install chromium
+npm run build
+npm run preview -- --host 127.0.0.1 --port 4173
+# in another terminal:
+npm run test:e2e
+```
+
 Run local dev:
 
 ```bash
@@ -161,6 +172,7 @@ All service names are controlled through `values.yaml` `dns` fields.
 - Frontend refactor progress:
   - `reports/2_frontend_ui_system_refactor.md`
   - `reports/3_frontend_pr_breakdown.md`
+  - `reports/4_frontend_scale_roadmap.md`
 
 ## Current Limitations
 
