@@ -3,9 +3,51 @@
 @tailwind utilities;
 
 body {
-  @apply bg-panel text-slate-100 min-h-screen;
+  @apply bg-canvas text-textPrimary min-h-screen antialiased;
+}
+
+#root {
+  @apply min-h-screen;
+}
+
+* {
+  scrollbar-color: #475569 #111827;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: #111827;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: #475569;
+  border-radius: 999px;
 }
 
 .glass {
-  @apply bg-card/80 border border-slate-700 rounded-xl shadow-xl;
+  @apply bg-surface border border-border rounded-lg shadow-md;
+}
+
+.focus-ring {
+  @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-canvas;
+}
+
+.page-shell {
+  @apply min-h-screen lg:grid lg:grid-cols-[250px_minmax(0,1fr)];
+}
+
+.page-container {
+  @apply mx-auto w-full max-w-[1280px] px-4 py-4 md:px-6 md:py-6 lg:px-8 lg:py-8;
+}
+
+.section-stack {
+  @apply space-y-4 md:space-y-6;
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
 }

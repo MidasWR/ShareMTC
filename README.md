@@ -16,8 +16,43 @@ ShareMTC is a provider marketplace for VM and Pod capacity where users can both 
 - `services/resourceservice` - host heartbeats, free resource state, allocation and release with cgroups v2 limits.
 - `services/billingservice` - plans, usage ingestion, accrual history, VIP network bonus logic.
 - `services/hostagent` - host-side metrics collector for user PCs; can publish to Kafka and/or directly to `resourceservice` heartbeat API.
-- `services/frontend` - TypeScript + Tailwind control panel (auth/admin/host/vip).
+- `services/frontend` - TypeScript + Tailwind control plane UI with design-system-first architecture.
 - `services/sdk` - shared logger, DB, JWT, HTTP utilities.
+
+## Frontend UI Architecture
+
+`services/frontend` is organized around reusable design primitives and domain screens.
+
+### Frontend structure
+
+- `src/design/tokens|primitives|components|patterns` - design system layers.
+- `src/lib` - shared request helpers and low-level utilities.
+- `src/types` - API-facing frontend types.
+- `src/ui` - screen composition and control-plane sections.
+
+### UX principles currently implemented
+
+- Contract-safe refactor: API routes and data models are preserved.
+- Single primary CTA in page header with role-oriented section navigation.
+- Explicit screen states: loading, empty, error, and success feedback.
+- Data-heavy consistency: search, filter, sort, density, pagination, column visibility.
+- Accessibility baseline: focus rings, skip link, overlay keyboard close, table semantics.
+
+### Frontend quality checks
+
+Run frontend build:
+
+```bash
+cd services/frontend
+npm run build
+```
+
+Run local dev:
+
+```bash
+cd services/frontend
+npm run dev
+```
 
 ## Architecture Notes
 
@@ -123,6 +158,9 @@ All service names are controlled through `values.yaml` `dns` fields.
 
 - Architecture and iteration tracking live in `reports/`.
 - Notion MCP can be used to maintain synchronized project documentation.
+- Frontend refactor progress:
+  - `reports/2_frontend_ui_system_refactor.md`
+  - `reports/3_frontend_pr_breakdown.md`
 
 ## Current Limitations
 

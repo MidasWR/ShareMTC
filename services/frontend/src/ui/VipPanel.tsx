@@ -6,17 +6,19 @@ const tiers = [
 
 export function VipPanel() {
   return (
-    <section className="glass p-6 space-y-4">
-      <h2 className="text-xl font-semibold">VIP System</h2>
-      <p className="text-slate-300">
-        The platform rewards both compute buyers and hardware providers with faster queue and revenue multipliers for high quality network.
-      </p>
-      <div className="grid md:grid-cols-3 gap-4">
+    <section className="section-stack">
+      <header className="space-y-1">
+        <h2 className="text-xl font-semibold">VIP policy</h2>
+        <p className="text-sm text-textSecondary">
+          Network-quality tiers apply predictable bonus multipliers to usage accruals for providers.
+        </p>
+      </header>
+      <div className="grid gap-3 md:grid-cols-3">
         {tiers.map((tier) => (
-          <article key={tier.name} className="rounded-lg border border-violet-400/30 bg-violet-500/10 p-4">
-            <h3 className="font-semibold text-lg">{tier.name}</h3>
-            <p className="text-sm text-slate-300">{tier.threshold}</p>
-            <p className="text-sm text-accentLight">{tier.bonus}</p>
+          <article key={tier.name} className="rounded-md border border-border bg-surface p-4">
+            <h3 className="text-base font-semibold">{tier.name}</h3>
+            <p className="mt-1 text-sm text-textSecondary">{tier.threshold}</p>
+            <p className="mt-2 text-sm text-brand">{tier.bonus}</p>
           </article>
         ))}
       </div>
