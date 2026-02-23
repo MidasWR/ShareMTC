@@ -12,6 +12,7 @@ import { Card } from "../../../design/primitives/Card";
 import { Input } from "../../../design/primitives/Input";
 import { Allocation, UsageAccrual } from "../../../types/api";
 import { loadProviderDashboard } from "../api/providerApi";
+import { listHealthChecks, listMetrics } from "../../resources/api/resourcesApi";
 
 
 export function ProviderDashboardPanel() {
@@ -21,6 +22,8 @@ export function ProviderDashboardPanel() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [metrics, setMetrics] = useState({ allocation_total: 0, allocation_running: 0, accrual_total_usd: 0, accrual_vip_bonus_usd: 0 });
+  const [healthCount, setHealthCount] = useState(0);
+  const [metricCount, setMetricCount] = useState(0);
   const { push } = useToast();
 
   const runningCount = useMemo(() => allocations.filter((item) => !item.released_at).length, [allocations]);
@@ -28,7 +31,7 @@ export function ProviderDashboardPanel() {
 
   async function refresh() {
     if (!providerID.trim()) {
-      push("error", "Требуется Provider ID");
+      push("error", "Provider ID is required");
       return;
     }
     setLoading(true);
@@ -38,10 +41,16 @@ export function ProviderDashboardPanel() {
       setAllocations(data.allocations);
       setAccruals(data.accruals);
       setMetrics(data.metrics);
-      push("info", "Данные провайдера синхронизированы");
+      const [healthRows, metricRows] = await Promise.all([
+        listHealthChecks({ resource_type: "vm", limit: 200 }),
+        listMetrics({ resource_type: "vm", limit: 200 })
+      ]);
+      setHealthCount(healthRows.length);
+      setMetricCount(metricRows.length);
+      push("info", "Provider data synchronized");
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Ошибка обновления дашборда");
-      push("error", requestError instanceof Error ? requestError.message : "Ошибка обновления дашборда");
+      setError(requestError instanceof Error ? requestError.message : "Failed to refresh provider dashboard");
+      push("error", requestError instanceof Error ? requestError.message : "Failed to refresh provider dashboard");
     } finally {
       setLoading(false);
     }
@@ -50,40 +59,40 @@ export function ProviderDashboardPanel() {
   return (
     <section className="section-stack">
       <PageSectionHeader
-        title="Дашборд провайдера"
-        description="Утилизация, доходность и состояние активных аллокаций для shared-ресурсов."
+        title="Provider Dashboard"
+        description="Utilization, revenue, and health of active shared-resource allocations."
       />
 
-      <Card title="Выбор провайдера" description="Загрузка дашборда по конкретному Provider ID.">
+      <Card title="Provider Selector" description="Load dashboard data by provider ID.">
         <div className="grid gap-3 md:grid-cols-[2fr_auto]">
-          <Input label="Provider ID" value={providerID} onChange={(event) => setProviderID(event.target.value)} placeholder="UUID провайдера" />
+          <Input label="Provider ID" value={providerID} onChange={(event) => setProviderID(event.target.value)} placeholder="Provider UUID" />
           <Button className="md:mt-7" onClick={refresh} loading={loading}>
-            Загрузить дашборд
+            Load dashboard
           </Button>
         </div>
         {!loading && error ? <div className="mt-4"><InlineAlert kind="error">{error}</InlineAlert></div> : null}
         <div className="mt-4 grid gap-3 md:grid-cols-4">
-          <MetricTile label="Всего аллокаций" value={`${allocations.length}`} />
-          <MetricTile label="Активные аллокации" value={`${metrics.allocation_running || runningCount}`} />
-          <MetricTile label="Общая выручка" value={`$${totalRevenue.toFixed(2)}`} />
-          <MetricTile label="Состояние" value={metrics.allocation_running > 0 ? "активно" : "idle"} />
+          <MetricTile label="Total allocations" value={`${allocations.length}`} />
+          <MetricTile label="Running allocations" value={`${metrics.allocation_running || runningCount}`} />
+          <MetricTile label="Total revenue" value={`$${totalRevenue.toFixed(2)}`} />
+          <MetricTile label="Health/Metrics" value={`${healthCount}/${metricCount}`} />
         </div>
       </Card>
 
-      <Card title="Лента аллокаций" description="Текущие и исторические аллокации ресурсов.">
+      <Card title="Allocation Feed" description="Current and historical resource allocations.">
         {loading ? <SkeletonBlock lines={5} /> : null}
         <Table
           dense
-          ariaLabel="Таблица аллокаций провайдера"
+          ariaLabel="Provider allocation table"
           rowKey={(item) => item.id}
           items={!loading ? allocations : []}
-          emptyState={<EmptyState title="Аллокаций пока нет" description="Начните шеринг ресурсов, чтобы увидеть утилизацию." />}
+          emptyState={<EmptyState title="No allocations yet" description="Start sharing resources to see utilization." />}
           columns={[
-            { key: "id", header: "ID аллокации", render: (item) => <span className="font-mono text-xs">{item.id}</span> },
+            { key: "id", header: "Allocation ID", render: (item) => <span className="font-mono text-xs">{item.id}</span> },
             { key: "cpu", header: "CPU", render: (item) => <span className="tabular-nums">{item.cpu_cores}</span> },
-            { key: "ram", header: "RAM МБ", render: (item) => <span className="tabular-nums">{item.ram_mb}</span> },
+            { key: "ram", header: "RAM MB", render: (item) => <span className="tabular-nums">{item.ram_mb}</span> },
             { key: "gpu", header: "GPU", render: (item) => <span className="tabular-nums">{item.gpu_units}</span> },
-            { key: "status", header: "Статус", render: (item) => <StatusBadge status={item.released_at ? "stopped" : "running"} /> }
+            { key: "status", header: "Status", render: (item) => <StatusBadge status={item.released_at ? "stopped" : "running"} /> }
           ]}
         />
       </Card>

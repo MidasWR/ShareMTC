@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/MidasWR/ShareMTC/services/resourceservice/internal/models"
@@ -37,6 +38,88 @@ func (r *Repo) Migrate(ctx context.Context) error {
 			started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 			released_at TIMESTAMPTZ
 		);
+		CREATE TABLE IF NOT EXISTS vm_templates (
+			id TEXT PRIMARY KEY,
+			code TEXT UNIQUE NOT NULL,
+			name TEXT NOT NULL,
+			description TEXT NOT NULL,
+			os_name TEXT NOT NULL,
+			cpu_cores INTEGER NOT NULL,
+			ram_mb INTEGER NOT NULL,
+			gpu_units INTEGER NOT NULL,
+			network_mbps INTEGER NOT NULL,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+		);
+		CREATE TABLE IF NOT EXISTS vms (
+			id TEXT PRIMARY KEY,
+			user_id TEXT NOT NULL,
+			provider_id TEXT NOT NULL,
+			name TEXT NOT NULL,
+			template TEXT NOT NULL,
+			os_name TEXT NOT NULL,
+			ip_address TEXT NOT NULL,
+			cpu_cores INTEGER NOT NULL,
+			ram_mb INTEGER NOT NULL,
+			gpu_units INTEGER NOT NULL,
+			network_mbps INTEGER NOT NULL,
+			status TEXT NOT NULL,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+			updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+		);
+		CREATE INDEX IF NOT EXISTS idx_vms_user_id ON vms(user_id);
+		CREATE INDEX IF NOT EXISTS idx_vms_status ON vms(status);
+		CREATE TABLE IF NOT EXISTS shared_vms (
+			id TEXT PRIMARY KEY,
+			vm_id TEXT NOT NULL REFERENCES vms(id) ON DELETE CASCADE,
+			owner_user_id TEXT NOT NULL,
+			shared_with TEXT NOT NULL,
+			access_level TEXT NOT NULL,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+		);
+		CREATE INDEX IF NOT EXISTS idx_shared_vms_owner ON shared_vms(owner_user_id);
+		CREATE TABLE IF NOT EXISTS shared_pods (
+			id TEXT PRIMARY KEY,
+			pod_code TEXT NOT NULL,
+			owner_user_id TEXT NOT NULL,
+			shared_with TEXT NOT NULL,
+			access_level TEXT NOT NULL,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+		);
+		CREATE INDEX IF NOT EXISTS idx_shared_pods_owner ON shared_pods(owner_user_id);
+		CREATE TABLE IF NOT EXISTS health_checks (
+			id TEXT PRIMARY KEY,
+			resource_type TEXT NOT NULL,
+			resource_id TEXT NOT NULL,
+			check_type TEXT NOT NULL,
+			status TEXT NOT NULL,
+			details TEXT NOT NULL,
+			checked_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+		);
+		CREATE INDEX IF NOT EXISTS idx_health_checks_resource ON health_checks(resource_type, resource_id, checked_at DESC);
+		CREATE TABLE IF NOT EXISTS metric_points (
+			id TEXT PRIMARY KEY,
+			resource_type TEXT NOT NULL,
+			resource_id TEXT NOT NULL,
+			metric_type TEXT NOT NULL,
+			value DOUBLE PRECISION NOT NULL,
+			captured_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+		);
+		CREATE INDEX IF NOT EXISTS idx_metric_points_rt ON metric_points(resource_type, resource_id, metric_type, captured_at DESC);
+		CREATE TABLE IF NOT EXISTS kubernetes_clusters (
+			id TEXT PRIMARY KEY,
+			user_id TEXT NOT NULL,
+			name TEXT NOT NULL,
+			provider_id TEXT NOT NULL,
+			node_count INTEGER NOT NULL,
+			node_type TEXT NOT NULL,
+			k8s_version TEXT NOT NULL,
+			endpoint TEXT NOT NULL,
+			kubeconfig TEXT NOT NULL,
+			status TEXT NOT NULL,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+			updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+		);
+		CREATE INDEX IF NOT EXISTS idx_k8s_clusters_user ON kubernetes_clusters(user_id, updated_at DESC);
 	`)
 	return err
 }
@@ -150,4 +233,375 @@ func (r *Repo) Stats(ctx context.Context) (models.ResourceStats, error) {
 		&stats.GPUUnitsRunning,
 	)
 	return stats, err
+}
+
+func (r *Repo) UpsertVMTemplate(ctx context.Context, tpl models.VMTemplate) (models.VMTemplate, error) {
+	if tpl.ID == "" {
+		tpl.ID = uuid.NewString()
+	}
+	err := r.db.QueryRow(ctx, `
+		INSERT INTO vm_templates (id, code, name, description, os_name, cpu_cores, ram_mb, gpu_units, network_mbps)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		ON CONFLICT (code) DO UPDATE SET
+			name = EXCLUDED.name,
+			description = EXCLUDED.description,
+			os_name = EXCLUDED.os_name,
+			cpu_cores = EXCLUDED.cpu_cores,
+			ram_mb = EXCLUDED.ram_mb,
+			gpu_units = EXCLUDED.gpu_units,
+			network_mbps = EXCLUDED.network_mbps
+		RETURNING id, created_at
+	`, tpl.ID, tpl.Code, tpl.Name, tpl.Description, tpl.OSName, tpl.CPUCores, tpl.RAMMB, tpl.GPUUnits, tpl.NetworkMbps).Scan(&tpl.ID, &tpl.CreatedAt)
+	return tpl, err
+}
+
+func (r *Repo) ListVMTemplates(ctx context.Context) ([]models.VMTemplate, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT id, code, name, description, os_name, cpu_cores, ram_mb, gpu_units, network_mbps, created_at
+		FROM vm_templates
+		ORDER BY created_at DESC
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make([]models.VMTemplate, 0)
+	for rows.Next() {
+		var item models.VMTemplate
+		if err := rows.Scan(&item.ID, &item.Code, &item.Name, &item.Description, &item.OSName, &item.CPUCores, &item.RAMMB, &item.GPUUnits, &item.NetworkMbps, &item.CreatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, item)
+	}
+	return out, nil
+}
+
+func (r *Repo) CreateVM(ctx context.Context, vm models.VM) (models.VM, error) {
+	if vm.ID == "" {
+		vm.ID = uuid.NewString()
+	}
+	err := r.db.QueryRow(ctx, `
+		INSERT INTO vms (id, user_id, provider_id, name, template, os_name, ip_address, cpu_cores, ram_mb, gpu_units, network_mbps, status)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+		RETURNING created_at, updated_at
+	`, vm.ID, vm.UserID, vm.ProviderID, vm.Name, vm.Template, vm.OSName, vm.IPAddress, vm.CPUCores, vm.RAMMB, vm.GPUUnits, vm.NetworkMbps, vm.Status).Scan(&vm.CreatedAt, &vm.UpdatedAt)
+	return vm, err
+}
+
+func (r *Repo) GetVM(ctx context.Context, vmID string) (models.VM, error) {
+	var out models.VM
+	err := r.db.QueryRow(ctx, `
+		SELECT id, user_id, provider_id, name, template, os_name, ip_address, cpu_cores, ram_mb, gpu_units, network_mbps, status, created_at, updated_at
+		FROM vms
+		WHERE id = $1
+	`, vmID).Scan(
+		&out.ID, &out.UserID, &out.ProviderID, &out.Name, &out.Template, &out.OSName, &out.IPAddress, &out.CPUCores, &out.RAMMB, &out.GPUUnits, &out.NetworkMbps, &out.Status, &out.CreatedAt, &out.UpdatedAt,
+	)
+	return out, err
+}
+
+func (r *Repo) ListVMs(ctx context.Context, userID string, status string, search string) ([]models.VM, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT id, user_id, provider_id, name, template, os_name, ip_address, cpu_cores, ram_mb, gpu_units, network_mbps, status, created_at, updated_at
+		FROM vms
+		WHERE user_id = $1
+		  AND ($2 = '' OR status = $2)
+		  AND ($3 = '' OR LOWER(name) LIKE '%' || LOWER($3) || '%' OR LOWER(id) LIKE '%' || LOWER($3) || '%')
+		ORDER BY updated_at DESC
+	`, userID, status, search)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make([]models.VM, 0)
+	for rows.Next() {
+		var item models.VM
+		if err := rows.Scan(&item.ID, &item.UserID, &item.ProviderID, &item.Name, &item.Template, &item.OSName, &item.IPAddress, &item.CPUCores, &item.RAMMB, &item.GPUUnits, &item.NetworkMbps, &item.Status, &item.CreatedAt, &item.UpdatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, item)
+	}
+	return out, nil
+}
+
+func (r *Repo) UpdateVMStatus(ctx context.Context, vmID string, status models.VMStatus) error {
+	_, err := r.db.Exec(ctx, `
+		UPDATE vms
+		SET status = $2, updated_at = NOW()
+		WHERE id = $1
+	`, vmID, status)
+	return err
+}
+
+func (r *Repo) CreateSharedVM(ctx context.Context, item models.SharedVM) (models.SharedVM, error) {
+	if item.ID == "" {
+		item.ID = uuid.NewString()
+	}
+	err := r.db.QueryRow(ctx, `
+		INSERT INTO shared_vms (id, vm_id, owner_user_id, shared_with, access_level)
+		VALUES ($1, $2, $3, $4, $5)
+		RETURNING created_at
+	`, item.ID, item.VMID, item.OwnerUserID, joinCSV(item.SharedWith), item.AccessLevel).Scan(&item.CreatedAt)
+	return item, err
+}
+
+func (r *Repo) ListSharedVMs(ctx context.Context, userID string) ([]models.SharedVM, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT id, vm_id, owner_user_id, shared_with, access_level, created_at
+		FROM shared_vms
+		WHERE owner_user_id = $1 OR shared_with LIKE '%' || $1 || '%'
+		ORDER BY created_at DESC
+	`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make([]models.SharedVM, 0)
+	for rows.Next() {
+		var item models.SharedVM
+		var sharedWith string
+		if err := rows.Scan(&item.ID, &item.VMID, &item.OwnerUserID, &sharedWith, &item.AccessLevel, &item.CreatedAt); err != nil {
+			return nil, err
+		}
+		item.SharedWith = splitCSV(sharedWith)
+		out = append(out, item)
+	}
+	return out, nil
+}
+
+func (r *Repo) CreateSharedPod(ctx context.Context, item models.SharedPod) (models.SharedPod, error) {
+	if item.ID == "" {
+		item.ID = uuid.NewString()
+	}
+	err := r.db.QueryRow(ctx, `
+		INSERT INTO shared_pods (id, pod_code, owner_user_id, shared_with, access_level)
+		VALUES ($1, $2, $3, $4, $5)
+		RETURNING created_at
+	`, item.ID, item.PodCode, item.OwnerUserID, joinCSV(item.SharedWith), item.AccessLevel).Scan(&item.CreatedAt)
+	return item, err
+}
+
+func (r *Repo) ListSharedPods(ctx context.Context, userID string) ([]models.SharedPod, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT id, pod_code, owner_user_id, shared_with, access_level, created_at
+		FROM shared_pods
+		WHERE owner_user_id = $1 OR shared_with LIKE '%' || $1 || '%'
+		ORDER BY created_at DESC
+	`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make([]models.SharedPod, 0)
+	for rows.Next() {
+		var item models.SharedPod
+		var sharedWith string
+		if err := rows.Scan(&item.ID, &item.PodCode, &item.OwnerUserID, &sharedWith, &item.AccessLevel, &item.CreatedAt); err != nil {
+			return nil, err
+		}
+		item.SharedWith = splitCSV(sharedWith)
+		out = append(out, item)
+	}
+	return out, nil
+}
+
+func (r *Repo) CreateHealthCheck(ctx context.Context, item models.HealthCheck) (models.HealthCheck, error) {
+	if item.ID == "" {
+		item.ID = uuid.NewString()
+	}
+	err := r.db.QueryRow(ctx, `
+		INSERT INTO health_checks (id, resource_type, resource_id, check_type, status, details, checked_at)
+		VALUES ($1, $2, $3, $4, $5, $6, COALESCE($7, NOW()))
+		RETURNING checked_at
+	`, item.ID, item.ResourceType, item.ResourceID, item.CheckType, item.Status, item.Details, nullableTime(item.CheckedAt)).Scan(&item.CheckedAt)
+	return item, err
+}
+
+func (r *Repo) ListHealthChecks(ctx context.Context, resourceType string, resourceID string, limit int) ([]models.HealthCheck, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT id, resource_type, resource_id, check_type, status, details, checked_at
+		FROM health_checks
+		WHERE ($1 = '' OR resource_type = $1)
+		  AND ($2 = '' OR resource_id = $2)
+		ORDER BY checked_at DESC
+		LIMIT $3
+	`, resourceType, resourceID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make([]models.HealthCheck, 0)
+	for rows.Next() {
+		var item models.HealthCheck
+		if err := rows.Scan(&item.ID, &item.ResourceType, &item.ResourceID, &item.CheckType, &item.Status, &item.Details, &item.CheckedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, item)
+	}
+	return out, nil
+}
+
+func (r *Repo) CreateMetricPoint(ctx context.Context, item models.MetricPoint) (models.MetricPoint, error) {
+	if item.ID == "" {
+		item.ID = uuid.NewString()
+	}
+	err := r.db.QueryRow(ctx, `
+		INSERT INTO metric_points (id, resource_type, resource_id, metric_type, value, captured_at)
+		VALUES ($1, $2, $3, $4, $5, COALESCE($6, NOW()))
+		RETURNING captured_at
+	`, item.ID, item.ResourceType, item.ResourceID, item.MetricType, item.Value, nullableTime(item.CapturedAt)).Scan(&item.CapturedAt)
+	return item, err
+}
+
+func (r *Repo) ListMetricPoints(ctx context.Context, resourceType string, resourceID string, metricType string, from time.Time, to time.Time, limit int) ([]models.MetricPoint, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT id, resource_type, resource_id, metric_type, value, captured_at
+		FROM metric_points
+		WHERE ($1 = '' OR resource_type = $1)
+		  AND ($2 = '' OR resource_id = $2)
+		  AND ($3 = '' OR metric_type = $3)
+		  AND ($4 IS NULL OR captured_at >= $4)
+		  AND ($5 IS NULL OR captured_at <= $5)
+		ORDER BY captured_at DESC
+		LIMIT $6
+	`, resourceType, resourceID, metricType, nullableTime(from), nullableTime(to), limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make([]models.MetricPoint, 0)
+	for rows.Next() {
+		var item models.MetricPoint
+		if err := rows.Scan(&item.ID, &item.ResourceType, &item.ResourceID, &item.MetricType, &item.Value, &item.CapturedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, item)
+	}
+	return out, nil
+}
+
+func (r *Repo) MetricSummaries(ctx context.Context, limit int) ([]models.MetricSummary, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT
+			resource_type,
+			resource_id,
+			metric_type,
+			COUNT(*) AS samples,
+			COALESCE(MIN(value), 0) AS min_value,
+			COALESCE(MAX(value), 0) AS max_value,
+			COALESCE(AVG(value), 0) AS avg_value,
+			COALESCE((ARRAY_AGG(value ORDER BY captured_at DESC))[1], 0) AS last_value
+		FROM metric_points
+		GROUP BY resource_type, resource_id, metric_type
+		ORDER BY samples DESC
+		LIMIT $1
+	`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make([]models.MetricSummary, 0)
+	for rows.Next() {
+		var item models.MetricSummary
+		if err := rows.Scan(&item.ResourceType, &item.ResourceID, &item.MetricType, &item.Samples, &item.MinValue, &item.MaxValue, &item.AvgValue, &item.LastValue); err != nil {
+			return nil, err
+		}
+		out = append(out, item)
+	}
+	return out, nil
+}
+
+func (r *Repo) CreateKubernetesCluster(ctx context.Context, item models.KubernetesCluster) (models.KubernetesCluster, error) {
+	if item.ID == "" {
+		item.ID = uuid.NewString()
+	}
+	err := r.db.QueryRow(ctx, `
+		INSERT INTO kubernetes_clusters (id, user_id, name, provider_id, node_count, node_type, k8s_version, endpoint, kubeconfig, status)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+		RETURNING created_at, updated_at
+	`, item.ID, item.UserID, item.Name, item.ProviderID, item.NodeCount, item.NodeType, item.K8sVersion, item.Endpoint, item.Kubeconfig, item.Status).Scan(&item.CreatedAt, &item.UpdatedAt)
+	return item, err
+}
+
+func (r *Repo) GetKubernetesCluster(ctx context.Context, clusterID string) (models.KubernetesCluster, error) {
+	var out models.KubernetesCluster
+	err := r.db.QueryRow(ctx, `
+		SELECT id, user_id, name, provider_id, node_count, node_type, k8s_version, endpoint, kubeconfig, status, created_at, updated_at
+		FROM kubernetes_clusters
+		WHERE id = $1
+	`, clusterID).Scan(
+		&out.ID, &out.UserID, &out.Name, &out.ProviderID, &out.NodeCount, &out.NodeType, &out.K8sVersion, &out.Endpoint, &out.Kubeconfig, &out.Status, &out.CreatedAt, &out.UpdatedAt,
+	)
+	return out, err
+}
+
+func (r *Repo) ListKubernetesClusters(ctx context.Context, userID string) ([]models.KubernetesCluster, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT id, user_id, name, provider_id, node_count, node_type, k8s_version, endpoint, kubeconfig, status, created_at, updated_at
+		FROM kubernetes_clusters
+		WHERE user_id = $1
+		ORDER BY updated_at DESC
+	`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make([]models.KubernetesCluster, 0)
+	for rows.Next() {
+		var item models.KubernetesCluster
+		if err := rows.Scan(&item.ID, &item.UserID, &item.Name, &item.ProviderID, &item.NodeCount, &item.NodeType, &item.K8sVersion, &item.Endpoint, &item.Kubeconfig, &item.Status, &item.CreatedAt, &item.UpdatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, item)
+	}
+	return out, nil
+}
+
+func (r *Repo) UpdateKubernetesClusterStatus(ctx context.Context, clusterID string, status models.ClusterStatus) error {
+	_, err := r.db.Exec(ctx, `
+		UPDATE kubernetes_clusters
+		SET status = $2, updated_at = NOW()
+		WHERE id = $1
+	`, clusterID, status)
+	return err
+}
+
+func (r *Repo) DeleteKubernetesCluster(ctx context.Context, clusterID string) error {
+	_, err := r.db.Exec(ctx, `DELETE FROM kubernetes_clusters WHERE id = $1`, clusterID)
+	return err
+}
+
+func joinCSV(items []string) string {
+	cleaned := make([]string, 0, len(items))
+	for _, item := range items {
+		item = strings.TrimSpace(item)
+		if item == "" {
+			continue
+		}
+		cleaned = append(cleaned, item)
+	}
+	return strings.Join(cleaned, ",")
+}
+
+func splitCSV(raw string) []string {
+	if strings.TrimSpace(raw) == "" {
+		return []string{}
+	}
+	parts := strings.Split(raw, ",")
+	out := make([]string, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		out = append(out, part)
+	}
+	return out
+}
+
+func nullableTime(value time.Time) *time.Time {
+	if value.IsZero() {
+		return nil
+	}
+	return &value
 }

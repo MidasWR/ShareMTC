@@ -9,7 +9,7 @@ type SettingsContextType = {
 
 const defaultSettings: UserSettings = {
   theme: "dark",
-  language: "ru",
+  language: "en",
   timezone: "UTC"
 };
 

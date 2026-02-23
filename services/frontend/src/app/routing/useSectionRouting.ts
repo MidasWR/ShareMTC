@@ -16,7 +16,7 @@ export function useSectionRouting(isAdmin: boolean) {
       const item = menu.find((entry) => entry.id === fromURL);
       if (item && canAccess(item, isAdmin)) return fromURL;
     }
-    return "overview";
+    return "myTemplates";
   });
 
   function canAccessTab(nextTab: AppTab) {
@@ -50,7 +50,7 @@ export function useSectionRouting(isAdmin: boolean) {
 
   useEffect(() => {
     if (!canAccessTab(tab)) {
-      navigateToTab("overview", false);
+      navigateToTab("myTemplates", false);
     }
   }, [tab, enabledMenu]);
 

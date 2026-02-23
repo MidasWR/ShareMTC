@@ -2,6 +2,38 @@ import { cx } from "../../design/utils/cx";
 import { AppTab, NavGroup } from "./menu";
 import { useTranslation } from "../i18n";
 import { FaSignOutAlt, FaCog, FaChevronDown } from "react-icons/fa";
+import { IconType } from "react-icons";
+import {
+  FaCubes,
+  FaServer,
+  FaShareAlt,
+  FaChartLine,
+  FaMoneyBillWave,
+  FaCloud,
+  FaUsersCog,
+  FaShieldAlt,
+  FaRobot
+} from "react-icons/fa";
+
+const tabIcons: Record<AppTab, IconType> = {
+  myTemplates: FaCubes,
+  vm: FaServer,
+  sharedVm: FaShareAlt,
+  pods: FaServer,
+  sharedPods: FaShareAlt,
+  k8sClusters: FaCloud,
+  myServers: FaServer,
+  coreDashboard: FaChartLine,
+  billing: FaMoneyBillWave,
+  settings: FaCog,
+  providerDashboard: FaChartLine,
+  agentOnboarding: FaRobot,
+  adminAccess: FaShieldAlt,
+  adminDashboard: FaChartLine,
+  adminServers: FaUsersCog,
+  adminSharing: FaShareAlt,
+  vip: FaShieldAlt
+};
 
 type Props = {
   tab: AppTab;
@@ -33,7 +65,9 @@ export function SidebarNav({ tab, groups, enabledMenu, onNavigate, onLogout, onS
                 <FaChevronDown className="transition-transform group-open:rotate-180 opacity-50" />
               </summary>
               <div className="mt-2 space-y-1">
-                {items.map((item) => (
+                {items.map((item) => {
+                  const ItemIcon = tabIcons[item.id];
+                  return (
                   <button
                     key={item.id}
                     type="button"
@@ -46,9 +80,11 @@ export function SidebarNav({ tab, groups, enabledMenu, onNavigate, onLogout, onS
                     )}
                     aria-current={tab === item.id ? "page" : undefined}
                   >
+                    {ItemIcon ? <ItemIcon className="mr-2 opacity-80" /> : null}
                     {t.menu[item.id] || item.label}
                   </button>
-                ))}
+                  );
+                })}
               </div>
             </details>
           );

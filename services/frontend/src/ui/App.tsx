@@ -10,7 +10,6 @@ import { AgentOnboardingPanel } from "../features/agent/onboarding/AgentOnboardi
 import { AdminDashboardPanel } from "../features/dashboard/admin/AdminDashboardPanel";
 import { CoreDashboardPanel } from "../features/dashboard/core/CoreDashboardPanel";
 import { AdminConsolePanel } from "../features/admin/console/AdminConsolePanel";
-import { PodsCatalogPanel } from "../features/catalog/PodsCatalogPanel";
 import { ServerRentalPanel } from "../features/rental/ServerRentalPanel";
 import { SettingsPanel } from "../features/settings/SettingsPanel";
 import { AdminAccessPanel } from "../features/admin/access/AdminAccessPanel";
@@ -18,23 +17,30 @@ import { SharingAdminPanel } from "../features/admin/sharing/SharingAdminPanel";
 import { ProviderDashboardPanel } from "../features/provider/dashboard/ProviderDashboardPanel";
 import { HostPanel } from "./HostPanel";
 import { KeyboardShortcutsPanel } from "./KeyboardShortcutsPanel";
-import { OverviewPanel } from "./OverviewPanel";
 import { VipPanel } from "./VipPanel";
+import { MyTemplatesPanel } from "../features/resources/templates/MyTemplatesPanel";
+import { VMPanel } from "../features/resources/vm/VMPanel";
+import { SharedVMPanel } from "../features/resources/shared/SharedVMPanel";
+import { SharedPodsPanel } from "../features/resources/shared/SharedPodsPanel";
+import { K8sClustersPanel } from "../features/resources/k8s/K8sClustersPanel";
 
 export function App() {
   const { isAuthenticated, role, refreshSession, logout } = useSessionState();
   const canAdmin = role === "admin" || role === "super-admin" || role === "ops-admin";
   const { tab, enabledMenu, navigateToTab } = useSectionRouting(canAdmin);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
-  const activeLabel = menu.find((item) => item.id === tab)?.label ?? "Обзор";
+  const activeLabel = menu.find((item) => item.id === tab)?.label ?? "My Templates";
 
   const content = useMemo(() => {
-    if (tab === "overview") return <OverviewPanel />;
+    if (tab === "myTemplates") return <MyTemplatesPanel />;
+    if (tab === "vm") return <VMPanel />;
+    if (tab === "sharedVm") return <SharedVMPanel />;
+    if (tab === "sharedPods") return <SharedPodsPanel />;
+    if (tab === "k8sClusters") return <K8sClustersPanel />;
     if (tab === "coreDashboard") return <CoreDashboardPanel />;
-    if (tab === "podsCatalog") return <PodsCatalogPanel />;
     if (tab === "pods") return <HostPanel />;
     if (tab === "billing") return <BillingPanel />;
-    if (tab === "serverRental") return <ServerRentalPanel />;
+    if (tab === "myServers") return <ServerRentalPanel onNavigate={navigateToTab} />;
     if (tab === "settings") return <SettingsPanel />;
     if (tab === "providerDashboard") return <ProviderDashboardPanel />;
     if (tab === "agentOnboarding") return <AgentOnboardingPanel />;
@@ -48,7 +54,7 @@ export function App() {
   function handleLogout() {
     logout();
     setShortcutsOpen(false);
-    navigateToTab("overview", false);
+    navigateToTab("myTemplates", false);
   }
 
   useEffect(() => {
@@ -70,10 +76,10 @@ export function App() {
       }
       if (event.altKey) {
         const quickTabs: Record<string, AppTab> = {
-          "1": "overview",
+          "1": "myTemplates",
           "2": "pods",
-          "3": "podsCatalog",
-          "4": "serverRental",
+          "3": "vm",
+          "4": "myServers",
           "5": "settings",
           "6": canAdmin ? "adminServers" : "vip"
         };
@@ -103,7 +109,7 @@ export function App() {
         <main className="page-container section-stack flex min-h-screen max-w-5xl flex-col justify-center">
           <header className="text-center">
             <h1 className="text-2xl font-semibold">ShareMTC Control Plane</h1>
-            <p className="mt-2 text-sm text-textSecondary">Войдите, чтобы управлять pods, арендой серверов и админ-инфраструктурой.</p>
+            <p className="mt-2 text-sm text-textSecondary">Sign in to manage PODs, VMs, shared resources, and admin infrastructure.</p>
           </header>
           <AuthPanel onAuthenticated={refreshSession} />
         </main>

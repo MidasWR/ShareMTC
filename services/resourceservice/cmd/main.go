@@ -8,6 +8,7 @@ import (
 	"github.com/MidasWR/ShareMTC/services/resourceservice/config"
 	"github.com/MidasWR/ShareMTC/services/resourceservice/internal/adapter/cgroups"
 	httpadapter "github.com/MidasWR/ShareMTC/services/resourceservice/internal/adapter/http"
+	"github.com/MidasWR/ShareMTC/services/resourceservice/internal/adapter/orchestrator"
 	"github.com/MidasWR/ShareMTC/services/resourceservice/internal/adapter/storage"
 	"github.com/MidasWR/ShareMTC/services/resourceservice/internal/service"
 	sdkauth "github.com/MidasWR/ShareMTC/services/sdk/auth"
@@ -35,7 +36,7 @@ func main() {
 	if err := repo.Migrate(context.Background()); err != nil {
 		logger.Fatal().Err(err).Msg("migration failed")
 	}
-	svc := service.NewResourceService(repo, cgroups.NewV2Applier(""))
+	svc := service.NewResourceService(repo, cgroups.NewV2Applier(""), orchestrator.NewInternalRuntime())
 	handler := httpadapter.NewHandler(svc)
 
 	r := chi.NewRouter()
@@ -46,6 +47,28 @@ func main() {
 		api.Post("/allocate", handler.Allocate)
 		api.Post("/release/{allocationID}", handler.Release)
 		api.Get("/allocations", handler.List)
+		api.Post("/vm-templates", handler.UpsertVMTemplate)
+		api.Get("/vm-templates", handler.ListVMTemplates)
+		api.Post("/vms", handler.CreateVM)
+		api.Get("/vms", handler.ListVMs)
+		api.Get("/vms/{vmID}", handler.GetVM)
+		api.Post("/vms/{vmID}/start", handler.StartVM)
+		api.Post("/vms/{vmID}/stop", handler.StopVM)
+		api.Post("/vms/{vmID}/reboot", handler.RebootVM)
+		api.Post("/vms/{vmID}/terminate", handler.TerminateVM)
+		api.Post("/shared/vms", handler.ShareVM)
+		api.Get("/shared/vms", handler.ListSharedVMs)
+		api.Post("/shared/pods", handler.SharePod)
+		api.Get("/shared/pods", handler.ListSharedPods)
+		api.Post("/health-checks", handler.RecordHealthCheck)
+		api.Get("/health-checks", handler.ListHealthChecks)
+		api.Post("/metrics", handler.RecordMetric)
+		api.Get("/metrics", handler.ListMetrics)
+		api.Get("/metrics/summary", handler.MetricSummaries)
+		api.Post("/k8s/clusters", handler.CreateKubernetesCluster)
+		api.Get("/k8s/clusters", handler.ListKubernetesClusters)
+		api.Post("/k8s/clusters/{clusterID}/refresh", handler.RefreshKubernetesCluster)
+		api.Delete("/k8s/clusters/{clusterID}", handler.DeleteKubernetesCluster)
 		api.Group(func(admin chi.Router) {
 			admin.Use(sdkauth.RequireAnyRole("admin", "super-admin", "ops-admin"))
 			admin.Get("/admin/allocations", handler.ListAll)

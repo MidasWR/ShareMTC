@@ -19,7 +19,7 @@ ShareMTC is a compute marketplace and control plane where providers expose CPU/R
 
 - `services/authservice` - registration/login, Google OAuth, JWT issuance.
 - `services/adminservice` - provider catalog and admin analytics endpoints.
-- `services/resourceservice` - heartbeat ingest, allocation/release, resource analytics.
+- `services/resourceservice` - heartbeat ingest, allocation/release, VM lifecycle, shared resources, health checks, metrics, and internal K8s orchestration.
 - `services/billingservice` - plan management, usage processing, accrual analytics.
 - `services/hostagent` - host-side telemetry collector for donor/internal machines.
 - `services/frontend` - React + TypeScript control plane UI.
@@ -39,10 +39,14 @@ ShareMTC is a compute marketplace and control plane where providers expose CPU/R
 - `app/` - shell, navigation, section routing, session hooks.
 - `design/` - primitives/components/patterns for reusable UI building blocks.
 - `features/` - domain modules (`admin`, `resources`, `billing`, `provider`, `dashboard`).
-- `features/catalog` - каталог GPU Pods и шаблоны запуска.
-- `features/rental` - визард аренды серверов (hourly/monthly).
-- `features/settings` - персонализация и SSH-ключи.
-- `features/admin/access` - прямой вход `/admin`.
+- `features/catalog` - GPU POD catalog and launch templates.
+- `features/rental` - MyServers operations with search/refresh/create routing.
+- `features/resources/templates` - server install templates (FastPanel/aaPanel class).
+- `features/resources/vm` - VM lifecycle UI (create/start/stop/reboot/terminate).
+- `features/resources/shared` - shared VM and shared POD control panels.
+- `features/resources/k8s` - Kubernetes cluster management through internal orchestrator.
+- `features/settings` - personalization and SSH key management.
+- `features/admin/access` - direct `/admin` access panel.
 - `lib/` - auth-aware HTTP client and session helpers.
 - `ui/` - top-level sections bound to app navigation.
 - `types/` - API contracts for all frontend modules.
@@ -54,12 +58,12 @@ ShareMTC is a compute marketplace and control plane where providers expose CPU/R
 - **Admin Dashboard** - top revenue providers, global metrics, and risk feed.
 - **Admin Console** - tabbed admin module for overview/providers/allocations/billing/risk.
 
-### Rebrand and localization
+### Navigation and localization
 
-- Полный ребрендинг визуальной темы (новые цвета/поверхности/контраст).
-- Основной UI переведен на русский язык.
-- Добавлены микроанимации: auth-flow переключения, health-indicators, transitions.
-- Добавлены логотипы/иконки для ключевых сущностей (Ubuntu, NVIDIA, network, compute).
+- Core navigation now uses product tabs: `My Templates`, `VM`, `Shared VM`, `PODs`, `Shared PODs`, `Kubernetes Clusters`, `My Servers`.
+- `overview` was removed from Core and routing defaults to `myTemplates`.
+- Sidebar route icons were added for all core/admin/provider sections.
+- UI language defaults to English, and visible panel copy is aligned to EN.
 
 ### Security model
 
@@ -76,6 +80,11 @@ ShareMTC is a compute marketplace and control plane where providers expose CPU/R
 - `GET /v1/admin/providers/{providerID}/metrics`
 - `GET /v1/resources/admin/stats`
 - `GET /v1/resources/admin/allocations?limit=&offset=`
+- `GET /v1/resources/health-checks?resource_type=&resource_id=&limit=`
+- `POST /v1/resources/health-checks`
+- `GET /v1/resources/metrics?resource_type=&resource_id=&metric_type=&from=&to=&limit=`
+- `POST /v1/resources/metrics`
+- `GET /v1/resources/metrics/summary?limit=`
 - `GET /v1/billing/admin/stats`
 - `GET /v1/billing/admin/accruals?limit=&offset=`
 
@@ -98,6 +107,23 @@ ShareMTC is a compute marketplace and control plane where providers expose CPU/R
 - `POST /v1/billing/rental/estimate`
 - `POST /v1/billing/rental/orders`
 - `GET /v1/billing/rental/orders`
+- `GET /v1/resources/vm-templates`
+- `POST /v1/resources/vm-templates`
+- `POST /v1/resources/vms`
+- `GET /v1/resources/vms?status=&search=`
+- `GET /v1/resources/vms/{vmID}`
+- `POST /v1/resources/vms/{vmID}/start`
+- `POST /v1/resources/vms/{vmID}/stop`
+- `POST /v1/resources/vms/{vmID}/reboot`
+- `POST /v1/resources/vms/{vmID}/terminate`
+- `POST /v1/resources/shared/vms`
+- `GET /v1/resources/shared/vms`
+- `POST /v1/resources/shared/pods`
+- `GET /v1/resources/shared/pods`
+- `POST /v1/resources/k8s/clusters`
+- `GET /v1/resources/k8s/clusters`
+- `POST /v1/resources/k8s/clusters/{clusterID}/refresh`
+- `DELETE /v1/resources/k8s/clusters/{clusterID}`
 
 ## Local development
 
@@ -184,3 +210,4 @@ Latest upgrade reports:
 
 - `reports/4_frontend_admin_dashboards_upgrade.md`
 - `reports/6_full_rebrand_russian_marketplace.md`
+- `reports/7_core_vm_k8s_fullstack_iteration.md`

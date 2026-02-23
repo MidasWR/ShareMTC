@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { listAllAccruals, getBillingStats } from "../../billing/api/billingApi";
 import { getAdminStats } from "../../admin/api/adminApi";
-import { getResourceStats } from "../../resources/api/resourcesApi";
+import { getResourceStats, listHealthChecks, listMetricSummaries } from "../../resources/api/resourcesApi";
 import { useToast } from "../../../design/components/Toast";
 import { Card } from "../../../design/primitives/Card";
 import { Button } from "../../../design/primitives/Button";
@@ -27,6 +27,8 @@ export function CoreDashboardPanel() {
     gpu_units_running: 0
   });
   const [billingStats, setBillingStats] = useState({ accrual_count: 0, total_amount_usd: 0, total_bonus_usd: 0, total_revenue_usd: 0 });
+  const [healthSummary, setHealthSummary] = useState({ ok: 0, warning: 0, critical: 0 });
+  const [metricSummaryCount, setMetricSummaryCount] = useState(0);
   const [series, setSeries] = useState<ChartPoint[]>([]);
   const { push } = useToast();
 
@@ -38,15 +40,28 @@ export function CoreDashboardPanel() {
   async function refresh() {
     setLoading(true);
     try {
-      const [nextAdmin, nextResource, nextBilling, accrualRows] = await Promise.all([
+      const [nextAdmin, nextResource, nextBilling, accrualRows, healthRows, metricSummary] = await Promise.all([
         getAdminStats(),
         getResourceStats(),
         getBillingStats(),
-        listAllAccruals(200, 0)
+        listAllAccruals(200, 0),
+        listHealthChecks({ limit: 200 }),
+        listMetricSummaries(200)
       ]);
       setAdminStats(nextAdmin);
       setResourceStats(nextResource);
       setBillingStats(nextBilling);
+      setMetricSummaryCount(metricSummary.length);
+      const summary = healthRows.reduce(
+        (acc, row) => {
+          if (row.status === "critical") acc.critical += 1;
+          else if (row.status === "warning") acc.warning += 1;
+          else acc.ok += 1;
+          return acc;
+        },
+        { ok: 0, warning: 0, critical: 0 }
+      );
+      setHealthSummary(summary);
 
       const byDay = new Map<string, number>();
       for (const row of accrualRows) {
@@ -58,9 +73,9 @@ export function CoreDashboardPanel() {
         .slice(-14)
         .map(([day, revenue]) => ({ day: day.slice(5), revenue: Number(revenue.toFixed(2)) }));
       setSeries(chartData);
-      push("info", "Дашборд платформы обновлён");
+      push("info", "Core dashboard updated");
     } catch (error) {
-      push("error", error instanceof Error ? error.message : "Ошибка загрузки дашборда платформы");
+      push("error", error instanceof Error ? error.message : "Failed to load core dashboard");
     } finally {
       setLoading(false);
     }
@@ -69,23 +84,23 @@ export function CoreDashboardPanel() {
   return (
     <section className="section-stack">
       <PageSectionHeader
-        title="Дашборд платформы"
-        description="Единый срез по здоровью системы, утилизации ресурсов и динамике выручки."
+        title="Core Dashboard"
+        description="System health, resource utilization, and revenue trend in one operational view."
         actions={
           <Button variant="secondary" onClick={refresh} loading={loading}>
-            Обновить дашборд
+            Refresh dashboard
           </Button>
         }
       />
 
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <MetricTile label="Доля онлайн провайдеров" value={onlineRatio} />
-        <MetricTile label="Активные аллокации" value={`${resourceStats.running_allocations}`} />
-        <MetricTile label="Задействованные CPU" value={`${resourceStats.cpu_cores_running}`} />
-        <MetricTile label="Суммарная выручка" value={`$${billingStats.total_revenue_usd.toFixed(2)}`} />
+        <MetricTile label="Online provider ratio" value={onlineRatio} />
+        <MetricTile label="Running allocations" value={`${resourceStats.running_allocations}`} />
+        <MetricTile label="Health checks (critical)" value={`${healthSummary.critical}`} />
+        <MetricTile label="Metrics tracked" value={`${metricSummaryCount}`} />
       </div>
 
-      <Card title="Тренд выручки (14 дней)" description="Ежедневный поток начислений из биллинга.">
+      <Card title="Revenue Trend (14 days)" description="Daily accrual flow from billing.">
         {loading ? <SkeletonBlock lines={4} /> : null}
         {!loading ? (
           <div className="h-64 w-full">
@@ -100,6 +115,12 @@ export function CoreDashboardPanel() {
           </div>
         ) : null}
       </Card>
+
+      <div className="grid gap-3 md:grid-cols-3">
+        <MetricTile label="Health OK" value={`${healthSummary.ok}`} />
+        <MetricTile label="Health warning" value={`${healthSummary.warning}`} />
+        <MetricTile label="Total revenue" value={`$${billingStats.total_revenue_usd.toFixed(2)}`} />
+      </div>
     </section>
   );
 }

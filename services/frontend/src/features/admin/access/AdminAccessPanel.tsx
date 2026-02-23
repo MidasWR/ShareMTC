@@ -23,10 +23,10 @@ export function AdminAccessPanel({ onSuccess }: Props) {
     try {
       const response = await loginDirectAdmin(username, password);
       setSession(response.token, response.user);
-      push("success", "Доступ в /admin выдан");
+      push("success", "Admin access granted");
       onSuccess();
     } catch (error) {
-      push("error", error instanceof Error ? error.message : "Доступ запрещен");
+      push("error", error instanceof Error ? error.message : "Access denied");
     } finally {
       setLoading(false);
     }
@@ -35,14 +35,14 @@ export function AdminAccessPanel({ onSuccess }: Props) {
   return (
     <section className="section-stack">
       <PageSectionHeader
-        title="Прямой доступ в /admin"
-        description="Вход по ключу доступа admin/admin123 с журналированием попыток."
+        title="Direct /admin Access"
+        description="Sign in with admin credentials for privileged admin workflows."
       />
-      <Card title="Авторизация администратора" description="Данный способ доступа предназначен для админ-модуля.">
+      <Card title="Administrator Login" description="This login flow is dedicated to admin module access.">
         <form className="space-y-3" onSubmit={submit}>
-          <Input label="Логин" value={username} onChange={(event) => setUsername(event.target.value)} />
-          <Input label="Ключ доступа" type="password" value={password} onChange={(event) => setPassword(event.target.value)} />
-          <Button type="submit" loading={loading}>Войти в /admin</Button>
+          <Input label="Username" value={username} onChange={(event) => setUsername(event.target.value)} />
+          <Input label="Access key" type="password" value={password} onChange={(event) => setPassword(event.target.value)} />
+          <Button type="submit" loading={loading}>Enter /admin</Button>
         </form>
       </Card>
     </section>

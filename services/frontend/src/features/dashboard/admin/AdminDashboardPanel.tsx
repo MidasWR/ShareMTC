@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { listProviders } from "../../admin/api/adminApi";
 import { listAllAccruals, getBillingStats } from "../../billing/api/billingApi";
-import { listAllAllocations, getResourceStats } from "../../resources/api/resourcesApi";
+import { listAllAllocations, getResourceStats, listHealthChecks, listMetricSummaries } from "../../resources/api/resourcesApi";
 import { useToast } from "../../../design/components/Toast";
 import { Table } from "../../../design/components/Table";
 import { EmptyState } from "../../../design/patterns/EmptyState";
@@ -29,20 +29,26 @@ export function AdminDashboardPanel() {
   const [billingStats, setBillingStats] = useState({ accrual_count: 0, total_amount_usd: 0, total_bonus_usd: 0, total_revenue_usd: 0 });
   const [topProviders, setTopProviders] = useState<ProviderLoad[]>([]);
   const [riskRows, setRiskRows] = useState<Array<{ provider: string; issue: string; severity: string }>>([]);
+  const [healthRowsCount, setHealthRowsCount] = useState(0);
+  const [metricRowsCount, setMetricRowsCount] = useState(0);
   const { push } = useToast();
 
   async function refresh() {
     setLoading(true);
     try {
-      const [providers, allocations, accruals, nextResourceStats, nextBillingStats] = await Promise.all([
+      const [providers, allocations, accruals, nextResourceStats, nextBillingStats, healthRows, metricRows] = await Promise.all([
         listProviders(),
         listAllAllocations(500, 0),
         listAllAccruals(500, 0),
         getResourceStats(),
-        getBillingStats()
+        getBillingStats(),
+        listHealthChecks({ limit: 300 }),
+        listMetricSummaries(300)
       ]);
       setResourceStats(nextResourceStats);
       setBillingStats(nextBillingStats);
+      setHealthRowsCount(healthRows.length);
+      setMetricRowsCount(metricRows.length);
 
       const revenueByProvider = new Map<string, number>();
       for (const item of accruals) {
@@ -74,19 +80,19 @@ export function AdminDashboardPanel() {
         .map((provider) => {
           const running = runningByProvider.get(provider.id) ?? 0;
           if (!provider.online && running > 0) {
-            return { provider: provider.display_name, issue: "Провайдер offline при активных аллокациях", severity: "высокий" };
+            return { provider: provider.display_name, issue: "Provider offline with active allocations", severity: "high" };
           }
           if (provider.online && running === 0) {
-            return { provider: provider.display_name, issue: "Online, но без нагрузки", severity: "средний" };
+            return { provider: provider.display_name, issue: "Online but has zero running workload", severity: "medium" };
           }
           return null;
         })
         .filter((item): item is { provider: string; issue: string; severity: string } => item !== null)
         .slice(0, 12);
       setRiskRows(risks);
-      push("info", "Админ-дашборд обновлён");
+      push("info", "Admin dashboard updated");
     } catch (error) {
-      push("error", error instanceof Error ? error.message : "Ошибка загрузки админ-дашборда");
+      push("error", error instanceof Error ? error.message : "Failed to load admin dashboard");
     } finally {
       setLoading(false);
     }
@@ -95,22 +101,22 @@ export function AdminDashboardPanel() {
   return (
     <section className="section-stack">
       <PageSectionHeader
-        title="Админ-дашборд"
-        description="Операционный cockpit по supply, рискам и монетизации."
+        title="Admin Dashboard"
+        description="Operational cockpit for supply, risk, and monetization."
         actions={
           <Button variant="secondary" onClick={refresh} loading={loading}>
-            Обновить данные
+            Refresh data
           </Button>
         }
       />
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <MetricTile label="Активные аллокации" value={`${resourceStats.running_allocations}`} />
-        <MetricTile label="Задействовано GPU" value={`${resourceStats.gpu_units_running}`} />
-        <MetricTile label="События начислений" value={`${billingStats.accrual_count}`} />
-        <MetricTile label="Выручка" value={`$${billingStats.total_revenue_usd.toFixed(2)}`} />
+        <MetricTile label="Running allocations" value={`${resourceStats.running_allocations}`} />
+        <MetricTile label="GPU in use" value={`${resourceStats.gpu_units_running}`} />
+        <MetricTile label="Health records" value={`${healthRowsCount}`} />
+        <MetricTile label="Metric streams" value={`${metricRowsCount}`} />
       </div>
 
-      <Card title="Топ провайдеров по выручке" description="Лидеры по сумме начислений.">
+      <Card title="Top Providers by Revenue" description="Leaders by total accrual value.">
         <div className="h-64 w-full">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={topProviders}>
@@ -123,17 +129,17 @@ export function AdminDashboardPanel() {
         </div>
       </Card>
 
-      <Card title="Лента рисков" description="Аномалии по состоянию провайдеров, требующие действий.">
+      <Card title="Risk Feed" description="Provider anomalies that require operations actions.">
         <Table
           dense
-          ariaLabel="Лента рисков админа"
+          ariaLabel="Admin risk feed"
           rowKey={(row) => `${row.provider}-${row.issue}`}
           items={riskRows}
-          emptyState={<EmptyState title="Риски не обнаружены" description="Аномалий по провайдерам и аллокациям не найдено." />}
+          emptyState={<EmptyState title="No risks detected" description="No anomalies found for providers and allocations." />}
           columns={[
-            { key: "provider", header: "Провайдер", render: (row) => row.provider },
-            { key: "issue", header: "Проблема", render: (row) => row.issue },
-            { key: "severity", header: "Серьёзность", render: (row) => row.severity }
+            { key: "provider", header: "Provider", render: (row) => row.provider },
+            { key: "issue", header: "Issue", render: (row) => row.issue },
+            { key: "severity", header: "Severity", render: (row) => row.severity }
           ]}
         />
       </Card>

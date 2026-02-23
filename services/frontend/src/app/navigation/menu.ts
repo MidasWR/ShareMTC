@@ -1,12 +1,15 @@
 import { featureFlags } from "../../config/featureFlags";
 
 export type AppTab =
-  | "overview"
-  | "coreDashboard"
-  | "podsCatalog"
+  | "myTemplates"
+  | "vm"
+  | "sharedVm"
   | "pods"
+  | "sharedPods"
+  | "k8sClusters"
+  | "myServers"
+  | "coreDashboard"
   | "billing"
-  | "serverRental"
   | "settings"
   | "providerDashboard"
   | "agentOnboarding"
@@ -27,20 +30,23 @@ export type MenuItem = {
 };
 
 export const menu: MenuItem[] = [
-  { id: "overview", label: "Обзор", group: "core" },
-  { id: "coreDashboard", label: "Дашборд платформы", group: "core" },
-  { id: "podsCatalog", label: "Каталог GPU Pods", group: "core" },
-  { id: "pods", label: "Выделение Pods", group: "core" },
-  { id: "billing", label: "Биллинг", group: "core" },
-  { id: "serverRental", label: "Аренда серверов", group: "core" },
-  { id: "settings", label: "Настройки", group: "core" },
-  { id: "providerDashboard", label: "Дашборд провайдера", group: "provider", flag: "providerDashboard" },
-  { id: "agentOnboarding", label: "Подключение агента", group: "provider", flag: "agentOnboarding" },
-  { id: "adminAccess", label: "Вход в /admin", group: "admin" },
-  { id: "adminDashboard", label: "Админ-дашборд", group: "admin", requiresAdmin: true },
-  { id: "adminServers", label: "Админ-консоль", group: "admin", requiresAdmin: true, flag: "adminServers" },
-  { id: "adminSharing", label: "Шеринг-контроль", group: "admin", requiresAdmin: true, flag: "adminSharing" },
-  { id: "vip", label: "VIP политика", group: "ops" }
+  { id: "myTemplates", label: "My Templates", group: "core" },
+  { id: "vm", label: "VM", group: "core" },
+  { id: "sharedVm", label: "Shared VM", group: "core" },
+  { id: "pods", label: "PODs", group: "core" },
+  { id: "sharedPods", label: "Shared PODs", group: "core" },
+  { id: "k8sClusters", label: "Kubernetes Clusters", group: "core" },
+  { id: "myServers", label: "My Servers", group: "core" },
+  { id: "coreDashboard", label: "Core Dashboard", group: "core" },
+  { id: "billing", label: "Billing", group: "core" },
+  { id: "settings", label: "Settings", group: "core" },
+  { id: "providerDashboard", label: "Provider Dashboard", group: "provider", flag: "providerDashboard" },
+  { id: "agentOnboarding", label: "Agent Onboarding", group: "provider", flag: "agentOnboarding" },
+  { id: "adminAccess", label: "Admin Login", group: "admin" },
+  { id: "adminDashboard", label: "Admin Dashboard", group: "admin", requiresAdmin: true },
+  { id: "adminServers", label: "Admin Console", group: "admin", requiresAdmin: true, flag: "adminServers" },
+  { id: "adminSharing", label: "Sharing Control", group: "admin", requiresAdmin: true, flag: "adminSharing" },
+  { id: "vip", label: "VIP Policy", group: "ops" }
 ];
 
 export function isTab(value: string | null): value is AppTab {

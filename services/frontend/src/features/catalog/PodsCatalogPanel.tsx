@@ -10,81 +10,26 @@ import { PageSectionHeader } from "../../design/patterns/PageSectionHeader";
 import { Button } from "../../design/primitives/Button";
 import { useToast } from "../../design/components/Toast";
 
-const mockTemplates: PodTemplate[] = [
-  { id: "tmpl-1", name: "PyTorch 2.0 (CUDA 11.8)", description: "Standard image for ML training", gpu_class: "all", code: "pytorch-2.0" },
-  { id: "tmpl-2", name: "Stable Diffusion WebUI", description: "Pre-installed SD WebUI", gpu_class: "high-end", code: "sd-webui" },
-  { id: "tmpl-3", name: "vLLM / LLM Inference", description: "Optimized for large language models", gpu_class: "high-end", code: "vllm" },
-  { id: "tmpl-4", name: "Docker Compose", description: "Standard container runtime environment", gpu_class: "none", code: "docker" },
-  { id: "tmpl-5", name: "Kubernetes Node", description: "K8s worker node setup", gpu_class: "none", code: "k8s-node" }
-];
-
-const mockPods: PodCatalogItem[] = [
-  {
-    id: "pod-1",
-    code: "rtx-4090",
-    name: "RTX 4090 Workstation",
-    description: "High-performance GPU for rendering and ML training.",
-    gpu_model: "RTX 4090",
-    gpu_vram_gb: 24,
-    cpu_cores: 16,
-    ram_gb: 64,
-    network_mbps: 1000,
-    hourly_price_usd: 0.45,
-    monthly_price_usd: 280,
-    os_name: "Ubuntu 22.04",
-    template_ids: ["tmpl-1", "tmpl-2", "tmpl-3"]
-  },
-  {
-    id: "pod-2",
-    code: "a100-80gb",
-    name: "NVIDIA A100 Server",
-    description: "Enterprise grade GPU for massive LLM inference.",
-    gpu_model: "A100",
-    gpu_vram_gb: 80,
-    cpu_cores: 32,
-    ram_gb: 128,
-    network_mbps: 2000,
-    hourly_price_usd: 1.5,
-    monthly_price_usd: 800,
-    os_name: "Ubuntu 22.04",
-    template_ids: ["tmpl-1", "tmpl-3"]
-  },
-  {
-    id: "pod-5",
-    code: "epyc-cpu-node",
-    name: "AMD EPYC Compute Node",
-    description: "High-density CPU instance for backend services.",
-    gpu_model: "None",
-    gpu_vram_gb: 0,
-    cpu_cores: 64,
-    ram_gb: 256,
-    network_mbps: 5000,
-    hourly_price_usd: 0.8,
-    monthly_price_usd: 400,
-    os_name: "Ubuntu 22.04",
-    template_ids: ["tmpl-4", "tmpl-5"]
-  }
-];
-
 export function PodsCatalogPanel() {
   const [pods, setPods] = useState<PodCatalogItem[]>([]);
   const [templates, setTemplates] = useState<PodTemplate[]>([]);
   const [search, setSearch] = useState("");
   const [templateFilter, setTemplateFilter] = useState("all");
   const [sortBy, setSortBy] = useState<"price_hour" | "price_month" | "vram">("price_hour");
+  const [loading, setLoading] = useState(false);
   const { push } = useToast();
 
   useEffect(() => {
     async function load() {
+      setLoading(true);
       try {
-        const [podRows, templateRows] = await Promise.all([
-          listPodCatalog().catch(() => mockPods),
-          listPodTemplates().catch(() => mockTemplates)
-        ]);
+        const [podRows, templateRows] = await Promise.all([listPodCatalog(), listPodTemplates()]);
         setPods(podRows);
         setTemplates(templateRows);
       } catch (error) {
         push("error", error instanceof Error ? error.message : "Failed to load catalog");
+      } finally {
+        setLoading(false);
       }
     }
     load();
@@ -136,6 +81,9 @@ export function PodsCatalogPanel() {
               { value: "vram", label: "VRAM (desc)" }
             ]}
           />
+          <Button className="md:mt-7" variant="secondary" onClick={() => window.location.reload()} loading={loading}>
+            Reload
+          </Button>
         </div>
       </Card>
 

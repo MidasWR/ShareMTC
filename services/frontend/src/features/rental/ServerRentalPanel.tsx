@@ -9,10 +9,14 @@ import { Button } from "../../design/primitives/Button";
 import { useToast } from "../../design/components/Toast";
 import { Table } from "../../design/components/Table";
 import { EmptyState } from "../../design/patterns/EmptyState";
-import { Drawer } from "../../design/components/Drawer";
-import { FaTerminal, FaPlay, FaStop, FaRedo } from "react-icons/fa";
+import { listVMs } from "../resources/api/resourcesApi";
+import { AppTab } from "../../app/navigation/menu";
 
-export function ServerRentalPanel() {
+type Props = {
+  onNavigate: (tab: AppTab) => void;
+};
+
+export function ServerRentalPanel({ onNavigate }: Props) {
   const [plans, setPlans] = useState<RentalPlan[]>([]);
   const [orders, setOrders] = useState<ServerOrder[]>([]);
   const [form, setForm] = useState<ServerOrder>({
@@ -26,14 +30,14 @@ export function ServerRentalPanel() {
   });
   const [estimate, setEstimate] = useState<number>(0);
   const [loading, setLoading] = useState(false);
-  const [selectedOrder, setSelectedOrder] = useState<ServerOrder | null>(null);
-  const [serverState, setServerState] = useState<"running" | "stopped">("running");
+  const [search, setSearch] = useState("");
+  const [createTarget, setCreateTarget] = useState<AppTab>("vm");
   const { push } = useToast();
 
   const selectedPlan = useMemo(() => plans.find((item) => item.id === form.plan_id), [plans, form.plan_id]);
 
   useEffect(() => {
-    async function load() {
+    async function loadInitial() {
       try {
         const [planRows, orderRows] = await Promise.all([listRentalPlans(), listServerOrders()]);
         setPlans(planRows);
@@ -45,8 +49,21 @@ export function ServerRentalPanel() {
         push("error", error instanceof Error ? error.message : "Failed to load rental data");
       }
     }
-    load();
+    loadInitial();
   }, []);
+
+  async function refresh() {
+    setLoading(true);
+    try {
+      const [orderRows] = await Promise.all([listServerOrders(), listVMs({ search })]);
+      setOrders(orderRows);
+      push("info", "Server list refreshed");
+    } catch (error) {
+      push("error", error instanceof Error ? error.message : "Failed to refresh servers");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   async function handleEstimate(event: FormEvent) {
     event.preventDefault();
@@ -75,15 +92,11 @@ export function ServerRentalPanel() {
     }
   }
 
-  function handleServerAction(action: "start" | "stop" | "reboot") {
-    if (action === "stop") {
-      setServerState("stopped");
-      push("info", "Server stopped");
-    } else {
-      setServerState("running");
-      push("success", `Server ${action === "start" ? "started" : "rebooted"}`);
-    }
-  }
+  const filteredOrders = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return orders;
+    return orders.filter((row) => (row.id || "").toLowerCase().includes(q) || row.plan_id.toLowerCase().includes(q) || row.os_name.toLowerCase().includes(q));
+  }, [orders, search]);
 
   return (
     <section className="section-stack">
@@ -91,12 +104,36 @@ export function ServerRentalPanel() {
         title="My Servers"
         description="Manage your running instances, view logs, and configure new servers."
       />
+
+      <Card title="Controls" description="Search, refresh, and create resources from one entry point.">
+        <div className="grid gap-3 md:grid-cols-[2fr_auto_auto]">
+          <Input label="Search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="ID, plan, OS" />
+          <Button className="md:mt-7" variant="secondary" onClick={refresh} loading={loading}>
+            Refresh
+          </Button>
+          <div className="md:mt-7 flex items-center gap-2">
+            <Select
+              label="Create route"
+              value={createTarget}
+              onChange={(event) => setCreateTarget(event.target.value as AppTab)}
+              options={[
+                { value: "vm", label: "VM" },
+                { value: "sharedVm", label: "Shared VM" },
+                { value: "pods", label: "PODs" },
+                { value: "sharedPods", label: "Shared PODs" },
+                { value: "k8sClusters", label: "Kubernetes Cluster" }
+              ]}
+            />
+            <Button onClick={() => onNavigate(createTarget)}>Create</Button>
+          </div>
+        </div>
+      </Card>
       
       <Card title="Your Instances" description="Active and past server rentals.">
         <Table
           ariaLabel="Server history"
           rowKey={(row) => row.id ?? `${row.plan_id}-${row.created_at}`}
-          items={orders}
+          items={filteredOrders}
           emptyState={<EmptyState title="No active servers" description="Configure and deploy your first server below." />}
           columns={[
             { key: "plan", header: "Plan", render: (row) => <span className="font-medium">{row.plan_id}</span> },
@@ -108,11 +145,7 @@ export function ServerRentalPanel() {
                 {row.status ?? "running"}
               </span>
             ) },
-            { key: "actions", header: "Actions", render: (row) => (
-              <Button size="sm" variant="secondary" onClick={() => setSelectedOrder(row)}>
-                Manage
-              </Button>
-            )}
+            { key: "actions", header: "Actions", render: () => <span className="text-textMuted text-xs">Use VM/POD tabs</span> }
           ]}
         />
       </Card>
@@ -159,65 +192,6 @@ export function ServerRentalPanel() {
           </div>
         </form>
       </Card>
-
-      <Drawer open={!!selectedOrder} title="Server Console" onClose={() => setSelectedOrder(null)}>
-        {selectedOrder && (
-          <div className="space-y-6">
-            <div className="flex gap-2">
-              <Button size="sm" variant={serverState === "running" ? "secondary" : "primary"} onClick={() => handleServerAction("start")} disabled={serverState === "running"}>
-                <FaPlay className="mr-1" /> Start
-              </Button>
-              <Button size="sm" variant={serverState === "stopped" ? "secondary" : "warning"} onClick={() => handleServerAction("stop")} disabled={serverState === "stopped"}>
-                <FaStop className="mr-1" /> Stop
-              </Button>
-              <Button size="sm" variant="secondary" onClick={() => handleServerAction("reboot")} disabled={serverState === "stopped"}>
-                <FaRedo className="mr-1" /> Reboot
-              </Button>
-            </div>
-            
-            <div className="rounded-md border border-border bg-black p-4 font-mono text-xs overflow-x-auto shadow-[inset_0_0_15px_rgba(0,0,0,0.8)]">
-              <div className="flex items-center gap-2 mb-2 text-textMuted border-b border-[#222] pb-2">
-                <FaTerminal /> System Logs & Healthchecks
-              </div>
-              <div className={serverState === "running" ? "text-brand" : "text-textMuted"}>
-                {serverState === "running" ? (
-                  <>
-                    <p>[OK] Container network initialized (10.0.x.x)</p>
-                    <p>[OK] GPU Driver loaded (NVIDIA 535.104)</p>
-                    <p>[OK] SSH daemon listening on port 22</p>
-                    <p className="mt-2 text-textSecondary">System is healthy. All checks passed.</p>
-                    <p className="animate-pulse mt-2">Waiting for new incoming connections...</p>
-                  </>
-                ) : (
-                  <>
-                    <p>[INFO] Received stop signal</p>
-                    <p>[INFO] Unmounting volumes...</p>
-                    <p>[INFO] Container exited with code 0</p>
-                    <p className="mt-2">System halted.</p>
-                  </>
-                )}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="rounded border border-border p-3">
-                <div className="text-xs text-textMuted uppercase mb-1">CPU Usage</div>
-                <div className="text-lg font-mono">{serverState === "running" ? "12%" : "0%"}</div>
-                <div className="w-full bg-elevated h-1.5 mt-2 rounded overflow-hidden">
-                  <div className="bg-brand h-full transition-all" style={{ width: serverState === "running" ? "12%" : "0%" }}></div>
-                </div>
-              </div>
-              <div className="rounded border border-border p-3">
-                <div className="text-xs text-textMuted uppercase mb-1">RAM Usage</div>
-                <div className="text-lg font-mono">{serverState === "running" ? "4.2 GB" : "0 GB"}</div>
-                <div className="w-full bg-elevated h-1.5 mt-2 rounded overflow-hidden">
-                  <div className="bg-info h-full transition-all" style={{ width: serverState === "running" ? "24%" : "0%" }}></div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-      </Drawer>
     </section>
   );
 }

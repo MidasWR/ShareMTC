@@ -23,21 +23,21 @@ export function AuthPanel({ onAuthenticated }: AuthPanelProps) {
   const { push } = useToast();
 
   const emailError = useMemo(() => {
-    if (!email) return "Укажите email";
-    if (!email.includes("@")) return "Email должен содержать @";
+    if (!email) return "Email is required";
+    if (!email.includes("@")) return "Email must contain @";
     return "";
   }, [email]);
 
   const passwordError = useMemo(() => {
-    if (!password) return "Укажите пароль";
-    if (password.length < 8) return "Пароль должен быть не короче 8 символов";
+    if (!password) return "Password is required";
+    if (password.length < 8) return "Password must contain at least 8 characters";
     return "";
   }, [password]);
 
   async function submit(path: "register" | "login", e: FormEvent) {
     e.preventDefault();
     if (emailError || passwordError) {
-      setError("Исправьте ошибки в форме перед отправкой");
+      setError("Fix form errors before submitting");
       return;
     }
     setError("");
@@ -50,10 +50,10 @@ export function AuthPanel({ onAuthenticated }: AuthPanelProps) {
       });
       setSession(json.token, json.user);
       onAuthenticated?.();
-      push("success", `Вы вошли как ${json.user.email}`);
+      push("success", `Signed in as ${json.user.email}`);
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Ошибка запроса");
-      push("error", "Ошибка аутентификации");
+      setError(requestError instanceof Error ? requestError.message : "Request error");
+      push("error", "Authentication failed");
     } finally {
       setLoading("");
     }
@@ -61,7 +61,7 @@ export function AuthPanel({ onAuthenticated }: AuthPanelProps) {
 
   async function login() {
     if (emailError || passwordError) {
-      setError("Исправьте ошибки в форме перед отправкой");
+      setError("Fix form errors before submitting");
       return;
     }
     setError("");
@@ -74,10 +74,10 @@ export function AuthPanel({ onAuthenticated }: AuthPanelProps) {
       });
       setSession(json.token, json.user);
       onAuthenticated?.();
-      push("success", `Вы вошли как ${json.user.email}`);
+      push("success", `Signed in as ${json.user.email}`);
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Ошибка запроса");
-      push("error", "Ошибка аутентификации");
+      setError(requestError instanceof Error ? requestError.message : "Request error");
+      push("error", "Authentication failed");
     } finally {
       setLoading("");
     }
@@ -86,8 +86,8 @@ export function AuthPanel({ onAuthenticated }: AuthPanelProps) {
   return (
     <section className="mx-auto w-full max-w-xl">
       <Card
-        title="Доступ к платформе"
-        description="Авторизация и регистрация с плавным переключением между режимами."
+        title="Platform Access"
+        description="Sign in or register with smooth mode switching."
       >
         <div className="mb-4 inline-flex rounded-md border border-border p-1">
           <button
@@ -95,14 +95,14 @@ export function AuthPanel({ onAuthenticated }: AuthPanelProps) {
             className={`rounded px-3 py-1 text-sm ${mode === "login" ? "bg-brand text-white" : "text-textSecondary"}`}
             onClick={() => setMode("login")}
           >
-            Вход
+            Sign in
           </button>
           <button
             type="button"
             className={`rounded px-3 py-1 text-sm ${mode === "register" ? "bg-brand text-white" : "text-textSecondary"}`}
             onClick={() => setMode("register")}
           >
-            Регистрация
+            Register
           </button>
         </div>
         <AnimatePresence mode="wait">
@@ -116,8 +116,8 @@ export function AuthPanel({ onAuthenticated }: AuthPanelProps) {
             <form className="space-y-3" onSubmit={(e) => submit(mode, e)}>
               <Input label="Email" placeholder="name@example.com" value={email} onChange={(e) => setEmail(e.target.value)} error={email ? emailError : ""} />
               <Input
-                label="Пароль"
-                placeholder="Минимум 8 символов"
+                label="Password"
+                placeholder="Minimum 8 characters"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -125,21 +125,21 @@ export function AuthPanel({ onAuthenticated }: AuthPanelProps) {
               />
               {error ? <InlineAlert kind="error">{error}</InlineAlert> : null}
               <Button type="submit" className="w-full" loading={loading === mode}>
-                {mode === "login" ? "Войти по email" : "Создать аккаунт"}
+                {mode === "login" ? "Sign in with email" : "Create account"}
               </Button>
             </form>
           </motion.div>
         </AnimatePresence>
         <div className="mt-3 space-y-2">
           <Button variant="secondary" className="w-full" onClick={login} loading={loading === "login"}>
-            Быстрый вход
+            Quick sign in
           </Button>
           <a
             className="focus-ring inline-flex h-10 w-full items-center justify-center gap-2 rounded-md border border-border bg-elevated text-sm font-medium text-textPrimary hover:bg-slate-700/40 transition-colors"
             href={`${API_BASE.auth}/v1/auth/google/start`}
           >
             <FcGoogle size={18} />
-            Продолжить через Google
+            Continue with Google
           </a>
         </div>
       </Card>

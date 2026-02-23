@@ -122,6 +122,101 @@ export type UserSettings = {
   updated_at?: string;
 };
 
+export type VMStatus = "provisioning" | "running" | "stopped" | "terminated";
+
+export type VM = {
+  id?: string;
+  user_id?: string;
+  provider_id: string;
+  name: string;
+  template?: string;
+  os_name: string;
+  ip_address?: string;
+  cpu_cores: number;
+  ram_mb: number;
+  gpu_units: number;
+  network_mbps: number;
+  status?: VMStatus;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type VMTemplate = {
+  id?: string;
+  code: string;
+  name: string;
+  description: string;
+  os_name: string;
+  cpu_cores: number;
+  ram_mb: number;
+  gpu_units: number;
+  network_mbps: number;
+  created_at?: string;
+};
+
+export type SharedVM = {
+  id?: string;
+  vm_id: string;
+  owner_user_id?: string;
+  shared_with: string[];
+  access_level: "read" | "write" | "admin";
+  created_at?: string;
+};
+
+export type SharedPod = {
+  id?: string;
+  pod_code: string;
+  owner_user_id?: string;
+  shared_with: string[];
+  access_level: "read" | "write" | "admin";
+  created_at?: string;
+};
+
+export type HealthCheck = {
+  id?: string;
+  resource_type: string;
+  resource_id: string;
+  check_type: string;
+  status: "ok" | "warning" | "critical";
+  details: string;
+  checked_at?: string;
+};
+
+export type MetricPoint = {
+  id?: string;
+  resource_type: string;
+  resource_id: string;
+  metric_type: string;
+  value: number;
+  captured_at?: string;
+};
+
+export type MetricSummary = {
+  resource_type: string;
+  resource_id: string;
+  metric_type: string;
+  samples: number;
+  min_value: number;
+  max_value: number;
+  avg_value: number;
+  last_value: number;
+};
+
+export type KubernetesCluster = {
+  id?: string;
+  user_id?: string;
+  name: string;
+  provider_id: string;
+  node_count: number;
+  node_type: string;
+  k8s_version: string;
+  endpoint?: string;
+  kubeconfig?: string;
+  status?: "creating" | "running" | "deleting" | "deleted" | "failed" | "suspended";
+  created_at?: string;
+  updated_at?: string;
+};
+
 export type SSHKey = {
   id?: string;
   user_id?: string;

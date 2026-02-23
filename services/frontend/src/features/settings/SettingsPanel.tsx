@@ -25,7 +25,7 @@ export function SettingsPanel() {
         const keys = await listSSHKeys();
         setSSHKeys(keys);
       } catch (error) {
-        push("error", error instanceof Error ? error.message : "Не удалось загрузить ключи");
+        push("error", error instanceof Error ? error.message : "Failed to load keys");
       }
     }
     load();
@@ -37,9 +37,9 @@ export function SettingsPanel() {
     try {
       const saved = await upsertUserSettings(settings);
       updateSettingsState(saved);
-      push("success", "Настройки сохранены");
+      push("success", "Settings saved");
     } catch (error) {
-      push("error", error instanceof Error ? error.message : "Ошибка сохранения");
+      push("error", error instanceof Error ? error.message : "Failed to save settings");
     } finally {
       setLoading(false);
     }
@@ -48,18 +48,18 @@ export function SettingsPanel() {
   async function addSSHKey(event: FormEvent) {
     event.preventDefault();
     if (!keyValue.startsWith("ssh-")) {
-      push("error", "SSH ключ должен начинаться с ssh-rsa/ssh-ed25519");
+      push("error", "SSH key must start with ssh-rsa/ssh-ed25519");
       return;
     }
     setLoading(true);
     try {
-      const created = await createSSHKey({ name: keyName || "Основной ключ", public_key: keyValue.trim() });
+      const created = await createSSHKey({ name: keyName || "Primary key", public_key: keyValue.trim() });
       setSSHKeys((prev) => [created, ...prev]);
       setKeyName("");
       setKeyValue("");
-      push("success", "SSH ключ добавлен");
+      push("success", "SSH key added");
     } catch (error) {
-      push("error", error instanceof Error ? error.message : "Ошибка добавления SSH ключа");
+      push("error", error instanceof Error ? error.message : "Failed to add SSH key");
     } finally {
       setLoading(false);
     }
@@ -71,9 +71,9 @@ export function SettingsPanel() {
     try {
       await deleteSSHKey(id);
       setSSHKeys((prev) => prev.filter((item) => item.id !== id));
-      push("info", "SSH ключ удалён");
+      push("info", "SSH key removed");
     } catch (error) {
-      push("error", error instanceof Error ? error.message : "Ошибка удаления SSH ключа");
+      push("error", error instanceof Error ? error.message : "Failed to remove SSH key");
     } finally {
       setLoading(false);
     }
@@ -81,11 +81,11 @@ export function SettingsPanel() {
 
   return (
     <section className="section-stack">
-      <PageSectionHeader title="Персонализация и SSH доступ" description="Личные настройки интерфейса и управление публичными SSH ключами." />
-      <Card title="Персонализация" description="Тема, язык и часовой пояс рабочего пространства.">
+      <PageSectionHeader title="Personalization & SSH Access" description="User interface preferences and SSH public key management." />
+      <Card title="Personalization" description="Theme, language, and timezone settings.">
         <form className="grid gap-3 md:grid-cols-3" onSubmit={saveSettings}>
           <Select
-            label="Тема"
+            label="Theme"
             value={settings.theme}
             onChange={(event) => updateSettingsState({ theme: event.target.value })}
             options={[
@@ -95,42 +95,41 @@ export function SettingsPanel() {
             ]}
           />
           <Select
-            label="Язык"
+            label="Language"
             value={settings.language}
             onChange={(event) => updateSettingsState({ language: event.target.value })}
             options={[
-              { value: "ru", label: "Русский" },
               { value: "en", label: "English" }
             ]}
           />
           <Input
-            label="Часовой пояс"
+            label="Timezone"
             value={settings.timezone}
             onChange={(event) => updateSettingsState({ timezone: event.target.value })}
           />
           <div className="md:col-span-3">
-            <Button type="submit" loading={loading}>Сохранить настройки</Button>
+            <Button type="submit" loading={loading}>Save settings</Button>
           </div>
         </form>
       </Card>
 
-      <Card title="SSH ключи доступа" description="Публичные ключи для доступа к арендованным серверам и pods.">
+      <Card title="SSH Access Keys" description="Public keys used to access rented servers and PODs.">
         <form className="space-y-3" onSubmit={addSSHKey}>
-          <Input label="Имя ключа" value={keyName} onChange={(event) => setKeyName(event.target.value)} placeholder="Рабочий ноутбук" />
-          <Input label="Публичный SSH ключ" value={keyValue} onChange={(event) => setKeyValue(event.target.value)} placeholder="ssh-ed25519 AAAA..." />
-          <Button type="submit" loading={loading}>Добавить ключ</Button>
+          <Input label="Key name" value={keyName} onChange={(event) => setKeyName(event.target.value)} placeholder="Work laptop" />
+          <Input label="Public SSH key" value={keyValue} onChange={(event) => setKeyValue(event.target.value)} placeholder="ssh-ed25519 AAAA..." />
+          <Button type="submit" loading={loading}>Add key</Button>
         </form>
         <div className="mt-4">
           <Table
-            ariaLabel="SSH ключи пользователя"
+            ariaLabel="User SSH keys"
             rowKey={(row) => row.id ?? row.name}
             items={sshKeys}
-            emptyState={<EmptyState title="SSH ключей пока нет" description="Добавьте минимум один ключ для доступа к машинам." />}
+            emptyState={<EmptyState title="No SSH keys yet" description="Add at least one key to access machines." />}
             columns={[
-              { key: "name", header: "Имя", render: (row) => row.name },
-              { key: "key", header: "Ключ", render: (row) => <span className="font-mono text-xs">{row.public_key}</span> },
-              { key: "created", header: "Создан", render: (row) => (row.created_at ? new Date(row.created_at).toLocaleString() : "-") },
-              { key: "actions", header: "Действия", render: (row) => <Button variant="ghost" size="sm" onClick={() => removeSSHKey(row.id)}>Удалить</Button> }
+              { key: "name", header: "Name", render: (row) => row.name },
+              { key: "key", header: "Key", render: (row) => <span className="font-mono text-xs">{row.public_key}</span> },
+              { key: "created", header: "Created", render: (row) => (row.created_at ? new Date(row.created_at).toLocaleString() : "-") },
+              { key: "actions", header: "Actions", render: (row) => <Button variant="ghost" size="sm" onClick={() => removeSSHKey(row.id)}>Delete</Button> }
             ]}
           />
         </div>

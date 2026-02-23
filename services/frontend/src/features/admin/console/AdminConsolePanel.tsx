@@ -30,9 +30,9 @@ export function AdminConsolePanel() {
       const [allocRows, accrualRows] = await Promise.all([listAllAllocations(200, 0), listAllAccruals(200, 0)]);
       setAllocations(allocRows);
       setAccruals(accrualRows);
-      push("info", "Данные админ-консоли обновлены");
+      push("info", "Admin console data refreshed");
     } catch (error) {
-      push("error", error instanceof Error ? error.message : "Ошибка обновления админ-консоли");
+      push("error", error instanceof Error ? error.message : "Failed to refresh admin console");
     } finally {
       setLoading(false);
     }
@@ -43,7 +43,7 @@ export function AdminConsolePanel() {
       const payload = await getAgentInstallCommand();
       setInstallCommand(payload.command);
     } catch (error) {
-      push("error", error instanceof Error ? error.message : "Не удалось получить команду установки");
+      push("error", error instanceof Error ? error.message : "Failed to fetch install command");
     }
   }
 
@@ -56,7 +56,7 @@ export function AdminConsolePanel() {
       .filter(([, count]) => count > 5)
       .map(([providerID, count]) => ({
         provider_id: providerID,
-        issue: "Высокая нагрузка по активным аллокациям",
+        issue: "High load from active allocations",
         score: count
       }));
   }, [allocations]);
@@ -64,32 +64,32 @@ export function AdminConsolePanel() {
   return (
     <section className="section-stack">
       <PageSectionHeader
-        title="Админ-консоль"
-        description="Единый административный модуль: обзор, провайдеры, аллокации, биллинг и риск."
+        title="Admin Console"
+        description="Unified admin module: overview, providers, allocations, billing, and risk."
         actions={
           <div className="flex items-center gap-2">
             <Button variant="secondary" onClick={refreshInstallCommand}>
-              Обновить curl
+              Refresh curl
             </Button>
             <Button variant="secondary" onClick={refreshData} loading={loading}>
-              Обновить консоль
+              Refresh console
             </Button>
           </div>
         }
       />
-      <Card title="Установка агента (one-command)" description="Скопируйте команду для установки hostagent на хост-машину.">
+      <Card title="Agent Install (one-command)" description="Copy this command to install hostagent on a host machine.">
         <div className="rounded-md border border-border bg-elevated p-3 font-mono text-xs text-textSecondary">
-          {installCommand || "Нажмите «Обновить curl», чтобы получить актуальную команду."}
+          {installCommand || "Press 'Refresh curl' to fetch the latest command."}
         </div>
       </Card>
       <Tabs
         items={[
-          { id: "overview", label: "Обзор" },
-          { id: "providers", label: "Провайдеры" },
-          { id: "pods", label: "Каталог Pods" },
-          { id: "allocations", label: "Аллокации" },
-          { id: "billing", label: "Биллинг" },
-          { id: "risk", label: "Риски/шеринг" }
+          { id: "overview", label: "Overview" },
+          { id: "providers", label: "Providers" },
+          { id: "pods", label: "POD Catalog" },
+          { id: "allocations", label: "Allocations" },
+          { id: "billing", label: "Billing" },
+          { id: "risk", label: "Risk/Sharing" }
         ]}
         value={tab}
         onChange={(next) => setTab(next)}
@@ -101,56 +101,56 @@ export function AdminConsolePanel() {
       {tab === "risk" ? <SharingAdminPanel /> : null}
 
       {tab === "allocations" ? (
-        <Card title="Реестр аллокаций" description="Админский поток аллокаций по всем провайдерам.">
+        <Card title="Allocation Registry" description="Admin flow of allocations across all providers.">
           <Table
             dense
-            ariaLabel="Админские аллокации"
+            ariaLabel="Admin allocations"
             rowKey={(row) => row.id}
             items={allocations}
-            emptyState={<EmptyState title="Аллокации не найдены" description="Поток аллокаций пуст за выбранный период." />}
+            emptyState={<EmptyState title="No allocations found" description="Allocation stream is empty for the selected period." />}
             columns={[
-              { key: "id", header: "Аллокация", render: (row) => <span className="font-mono text-xs">{row.id}</span> },
-              { key: "provider", header: "Провайдер", render: (row) => <span className="font-mono text-xs">{row.provider_id}</span> },
+              { key: "id", header: "Allocation", render: (row) => <span className="font-mono text-xs">{row.id}</span> },
+              { key: "provider", header: "Provider", render: (row) => <span className="font-mono text-xs">{row.provider_id}</span> },
               { key: "cpu", header: "CPU", render: (row) => row.cpu_cores },
-              { key: "ram", header: "RAM МБ", render: (row) => row.ram_mb },
+              { key: "ram", header: "RAM MB", render: (row) => row.ram_mb },
               { key: "gpu", header: "GPU", render: (row) => row.gpu_units },
-              { key: "status", header: "Статус", render: (row) => (row.released_at ? "освобождён" : "активен") }
+              { key: "status", header: "Status", render: (row) => (row.released_at ? "released" : "active") }
             ]}
           />
         </Card>
       ) : null}
 
       {tab === "billing" ? (
-        <Card title="Реестр биллинга" description="Поток начислений для сверки и контроля выплат.">
+        <Card title="Billing Registry" description="Accrual stream for reconciliation and payout control.">
           <Table
             dense
-            ariaLabel="Админские начисления биллинга"
+            ariaLabel="Admin billing accruals"
             rowKey={(row) => row.id}
             items={accruals}
-            emptyState={<EmptyState title="Начисления не найдены" description="Поток биллинга пуст за выбранный период." />}
+            emptyState={<EmptyState title="No accruals found" description="Billing stream is empty for the selected period." />}
             columns={[
-              { key: "id", header: "Начисление", render: (row) => <span className="font-mono text-xs">{row.id}</span> },
-              { key: "provider", header: "Провайдер", render: (row) => <span className="font-mono text-xs">{row.provider_id}</span> },
-              { key: "bonus", header: "Бонус", render: (row) => `$${row.vip_bonus_usd.toFixed(2)}` },
-              { key: "total", header: "Итого", render: (row) => `$${row.total_usd.toFixed(2)}` },
-              { key: "created", header: "Создано", render: (row) => new Date(row.created_at).toLocaleString() }
+              { key: "id", header: "Accrual", render: (row) => <span className="font-mono text-xs">{row.id}</span> },
+              { key: "provider", header: "Provider", render: (row) => <span className="font-mono text-xs">{row.provider_id}</span> },
+              { key: "bonus", header: "Bonus", render: (row) => `$${row.vip_bonus_usd.toFixed(2)}` },
+              { key: "total", header: "Total", render: (row) => `$${row.total_usd.toFixed(2)}` },
+              { key: "created", header: "Created", render: (row) => new Date(row.created_at).toLocaleString() }
             ]}
           />
         </Card>
       ) : null}
 
       {tab === "risk" ? (
-        <Card title="Автоматические сигналы риска" description="Производные риски по паттернам утилизации.">
+        <Card title="Automated Risk Signals" description="Derived risks based on utilization patterns.">
           <Table
             dense
-            ariaLabel="Админские сигналы риска"
+            ariaLabel="Admin risk signals"
             rowKey={(row) => `${row.provider_id}-${row.issue}`}
             items={riskRows}
-            emptyState={<EmptyState title="Риски не обнаружены" description="Провайдеры под высокой нагрузкой не выявлены." />}
+            emptyState={<EmptyState title="No risks detected" description="No providers with high-load pattern were found." />}
             columns={[
-              { key: "provider", header: "Провайдер", render: (row) => row.provider_id },
-              { key: "issue", header: "Проблема", render: (row) => row.issue },
-              { key: "score", header: "Скор", render: (row) => row.score }
+              { key: "provider", header: "Provider", render: (row) => row.provider_id },
+              { key: "issue", header: "Issue", render: (row) => row.issue },
+              { key: "score", header: "Score", render: (row) => row.score }
             ]}
           />
         </Card>

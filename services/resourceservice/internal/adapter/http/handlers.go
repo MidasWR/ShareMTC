@@ -4,9 +4,12 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"strings"
+	"time"
 
 	"github.com/MidasWR/ShareMTC/services/resourceservice/internal/models"
 	"github.com/MidasWR/ShareMTC/services/resourceservice/internal/service"
+	sdkauth "github.com/MidasWR/ShareMTC/services/sdk/auth"
 	"github.com/MidasWR/ShareMTC/services/sdk/httpx"
 	"github.com/go-chi/chi/v5"
 )
@@ -78,18 +81,8 @@ func (h *Handler) Health(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (h *Handler) ListAll(w http.ResponseWriter, r *http.Request) {
-	limit := 50
-	offset := 0
-	if raw := r.URL.Query().Get("limit"); raw != "" {
-		if parsed, err := strconv.Atoi(raw); err == nil && parsed > 0 {
-			limit = parsed
-		}
-	}
-	if raw := r.URL.Query().Get("offset"); raw != "" {
-		if parsed, err := strconv.Atoi(raw); err == nil && parsed >= 0 {
-			offset = parsed
-		}
-	}
+	limit := intQuery(r, "limit", 50)
+	offset := intQuery(r, "offset", 0)
 	items, err := h.svc.ListAll(r.Context(), limit, offset)
 	if err != nil {
 		httpx.Error(w, http.StatusInternalServerError, err.Error())
@@ -105,4 +98,341 @@ func (h *Handler) Stats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.JSON(w, http.StatusOK, stats)
+}
+
+func (h *Handler) UpsertVMTemplate(w http.ResponseWriter, r *http.Request) {
+	var req models.VMTemplate
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid json")
+		return
+	}
+	item, err := h.svc.UpsertVMTemplate(r.Context(), req)
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	httpx.JSON(w, http.StatusCreated, item)
+}
+
+func (h *Handler) ListVMTemplates(w http.ResponseWriter, r *http.Request) {
+	items, err := h.svc.ListVMTemplates(r.Context())
+	if err != nil {
+		httpx.Error(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	httpx.JSON(w, http.StatusOK, items)
+}
+
+func (h *Handler) CreateVM(w http.ResponseWriter, r *http.Request) {
+	claims := sdkauth.ClaimsFromContext(r.Context())
+	if claims == nil {
+		httpx.Error(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	var req models.VM
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid json")
+		return
+	}
+	req.UserID = claims.UserID
+	vm, err := h.svc.CreateVM(r.Context(), req)
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	httpx.JSON(w, http.StatusCreated, vm)
+}
+
+func (h *Handler) ListVMs(w http.ResponseWriter, r *http.Request) {
+	claims := sdkauth.ClaimsFromContext(r.Context())
+	if claims == nil {
+		httpx.Error(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	status := r.URL.Query().Get("status")
+	search := r.URL.Query().Get("search")
+	items, err := h.svc.ListVMs(r.Context(), claims.UserID, status, search)
+	if err != nil {
+		httpx.Error(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	httpx.JSON(w, http.StatusOK, items)
+}
+
+func (h *Handler) GetVM(w http.ResponseWriter, r *http.Request) {
+	vmID := chi.URLParam(r, "vmID")
+	if vmID == "" {
+		httpx.Error(w, http.StatusBadRequest, "vmID is required")
+		return
+	}
+	item, err := h.svc.GetVM(r.Context(), vmID)
+	if err != nil {
+		httpx.Error(w, http.StatusNotFound, err.Error())
+		return
+	}
+	httpx.JSON(w, http.StatusOK, item)
+}
+
+func (h *Handler) StartVM(w http.ResponseWriter, r *http.Request) {
+	vmID := chi.URLParam(r, "vmID")
+	item, err := h.svc.StartVM(r.Context(), vmID)
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	httpx.JSON(w, http.StatusOK, item)
+}
+
+func (h *Handler) StopVM(w http.ResponseWriter, r *http.Request) {
+	vmID := chi.URLParam(r, "vmID")
+	item, err := h.svc.StopVM(r.Context(), vmID)
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	httpx.JSON(w, http.StatusOK, item)
+}
+
+func (h *Handler) RebootVM(w http.ResponseWriter, r *http.Request) {
+	vmID := chi.URLParam(r, "vmID")
+	item, err := h.svc.RebootVM(r.Context(), vmID)
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	httpx.JSON(w, http.StatusOK, item)
+}
+
+func (h *Handler) TerminateVM(w http.ResponseWriter, r *http.Request) {
+	vmID := chi.URLParam(r, "vmID")
+	item, err := h.svc.TerminateVM(r.Context(), vmID)
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	httpx.JSON(w, http.StatusOK, item)
+}
+
+type shareRequest struct {
+	VMID        string                    `json:"vm_id"`
+	PodCode     string                    `json:"pod_code"`
+	SharedWith  []string                  `json:"shared_with"`
+	AccessLevel models.SharedAccessLevel  `json:"access_level"`
+}
+
+func (h *Handler) ShareVM(w http.ResponseWriter, r *http.Request) {
+	claims := sdkauth.ClaimsFromContext(r.Context())
+	if claims == nil {
+		httpx.Error(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	var req shareRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid json")
+		return
+	}
+	item, err := h.svc.ShareVM(r.Context(), models.SharedVM{
+		VMID:        req.VMID,
+		OwnerUserID: claims.UserID,
+		SharedWith:  req.SharedWith,
+		AccessLevel: req.AccessLevel,
+	})
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	httpx.JSON(w, http.StatusCreated, item)
+}
+
+func (h *Handler) ListSharedVMs(w http.ResponseWriter, r *http.Request) {
+	claims := sdkauth.ClaimsFromContext(r.Context())
+	if claims == nil {
+		httpx.Error(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	items, err := h.svc.ListSharedVMs(r.Context(), claims.UserID)
+	if err != nil {
+		httpx.Error(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	httpx.JSON(w, http.StatusOK, items)
+}
+
+func (h *Handler) SharePod(w http.ResponseWriter, r *http.Request) {
+	claims := sdkauth.ClaimsFromContext(r.Context())
+	if claims == nil {
+		httpx.Error(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	var req shareRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid json")
+		return
+	}
+	item, err := h.svc.SharePod(r.Context(), models.SharedPod{
+		PodCode:     req.PodCode,
+		OwnerUserID: claims.UserID,
+		SharedWith:  req.SharedWith,
+		AccessLevel: req.AccessLevel,
+	})
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	httpx.JSON(w, http.StatusCreated, item)
+}
+
+func (h *Handler) ListSharedPods(w http.ResponseWriter, r *http.Request) {
+	claims := sdkauth.ClaimsFromContext(r.Context())
+	if claims == nil {
+		httpx.Error(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	items, err := h.svc.ListSharedPods(r.Context(), claims.UserID)
+	if err != nil {
+		httpx.Error(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	httpx.JSON(w, http.StatusOK, items)
+}
+
+func (h *Handler) RecordHealthCheck(w http.ResponseWriter, r *http.Request) {
+	var req models.HealthCheck
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid json")
+		return
+	}
+	item, err := h.svc.RecordHealthCheck(r.Context(), req)
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	httpx.JSON(w, http.StatusCreated, item)
+}
+
+func (h *Handler) ListHealthChecks(w http.ResponseWriter, r *http.Request) {
+	resourceType := r.URL.Query().Get("resource_type")
+	resourceID := r.URL.Query().Get("resource_id")
+	limit := intQuery(r, "limit", 100)
+	items, err := h.svc.ListHealthChecks(r.Context(), resourceType, resourceID, limit)
+	if err != nil {
+		httpx.Error(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	httpx.JSON(w, http.StatusOK, items)
+}
+
+func (h *Handler) RecordMetric(w http.ResponseWriter, r *http.Request) {
+	var req models.MetricPoint
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid json")
+		return
+	}
+	item, err := h.svc.RecordMetric(r.Context(), req)
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	httpx.JSON(w, http.StatusCreated, item)
+}
+
+func (h *Handler) ListMetrics(w http.ResponseWriter, r *http.Request) {
+	resourceType := r.URL.Query().Get("resource_type")
+	resourceID := r.URL.Query().Get("resource_id")
+	metricType := r.URL.Query().Get("metric_type")
+	limit := intQuery(r, "limit", 500)
+	from := parseTimeQuery(r.URL.Query().Get("from"))
+	to := parseTimeQuery(r.URL.Query().Get("to"))
+	items, err := h.svc.ListMetrics(r.Context(), resourceType, resourceID, metricType, from, to, limit)
+	if err != nil {
+		httpx.Error(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	httpx.JSON(w, http.StatusOK, items)
+}
+
+func (h *Handler) MetricSummaries(w http.ResponseWriter, r *http.Request) {
+	limit := intQuery(r, "limit", 100)
+	items, err := h.svc.MetricSummaries(r.Context(), limit)
+	if err != nil {
+		httpx.Error(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	httpx.JSON(w, http.StatusOK, items)
+}
+
+func (h *Handler) CreateKubernetesCluster(w http.ResponseWriter, r *http.Request) {
+	claims := sdkauth.ClaimsFromContext(r.Context())
+	if claims == nil {
+		httpx.Error(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	var req models.KubernetesCluster
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid json")
+		return
+	}
+	req.UserID = claims.UserID
+	item, err := h.svc.CreateKubernetesCluster(r.Context(), req)
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	httpx.JSON(w, http.StatusCreated, item)
+}
+
+func (h *Handler) ListKubernetesClusters(w http.ResponseWriter, r *http.Request) {
+	claims := sdkauth.ClaimsFromContext(r.Context())
+	if claims == nil {
+		httpx.Error(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	items, err := h.svc.ListKubernetesClusters(r.Context(), claims.UserID)
+	if err != nil {
+		httpx.Error(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	httpx.JSON(w, http.StatusOK, items)
+}
+
+func (h *Handler) RefreshKubernetesCluster(w http.ResponseWriter, r *http.Request) {
+	clusterID := chi.URLParam(r, "clusterID")
+	item, err := h.svc.RefreshKubernetesCluster(r.Context(), clusterID)
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	httpx.JSON(w, http.StatusOK, item)
+}
+
+func (h *Handler) DeleteKubernetesCluster(w http.ResponseWriter, r *http.Request) {
+	clusterID := chi.URLParam(r, "clusterID")
+	if err := h.svc.DeleteKubernetesCluster(r.Context(), clusterID); err != nil {
+		httpx.Error(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	httpx.JSON(w, http.StatusOK, map[string]string{"status": "deleted"})
+}
+
+func intQuery(r *http.Request, key string, fallback int) int {
+	raw := strings.TrimSpace(r.URL.Query().Get(key))
+	if raw == "" {
+		return fallback
+	}
+	value, err := strconv.Atoi(raw)
+	if err != nil {
+		return fallback
+	}
+	return value
+}
+
+func parseTimeQuery(raw string) time.Time {
+	if strings.TrimSpace(raw) == "" {
+		return time.Time{}
+	}
+	parsed, err := time.Parse(time.RFC3339, raw)
+	if err != nil {
+		return time.Time{}
+	}
+	return parsed
 }
