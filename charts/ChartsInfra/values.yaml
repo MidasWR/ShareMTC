@@ -18,6 +18,24 @@ envoy:
   dns: envoy-gateway
   gatewayClassName: envoy
 
+services:
+  namespace: host
+  auth:
+    name: authservice
+    port: 8081
+  admin:
+    name: adminservice
+    port: 8082
+  resource:
+    name: resourceservice
+    port: 8083
+  billing:
+    name: billingservice
+    port: 8084
+  frontend:
+    name: frontend-service
+    port: 80
+
 prometheus:
   dns: prometheus
 

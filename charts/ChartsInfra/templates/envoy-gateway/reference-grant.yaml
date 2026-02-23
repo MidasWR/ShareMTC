@@ -1,0 +1,15 @@
+{{- if ne .Values.services.namespace .Values.global.namespace }}
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: ReferenceGrant
+metadata:
+  name: gateway-backend-reference-grant
+  namespace: {{ .Values.services.namespace }}
+spec:
+  from:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      namespace: {{ .Values.global.namespace }}
+  to:
+    - group: ""
+      kind: Service
+{{- end }}

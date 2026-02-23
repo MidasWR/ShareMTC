@@ -27,29 +27,33 @@ spec:
             type: PathPrefix
             value: /v1/auth
       backendRefs:
-        - name: authservice
-          port: 8081
+        - name: {{ .Values.services.auth.name }}
+          namespace: {{ .Values.services.namespace }}
+          port: {{ .Values.services.auth.port }}
     - matches:
         - path:
             type: PathPrefix
             value: /v1/admin
       backendRefs:
-        - name: adminservice
-          port: 8082
+        - name: {{ .Values.services.admin.name }}
+          namespace: {{ .Values.services.namespace }}
+          port: {{ .Values.services.admin.port }}
     - matches:
         - path:
             type: PathPrefix
             value: /v1/resources
       backendRefs:
-        - name: resourceservice
-          port: 8083
+        - name: {{ .Values.services.resource.name }}
+          namespace: {{ .Values.services.namespace }}
+          port: {{ .Values.services.resource.port }}
     - matches:
         - path:
             type: PathPrefix
             value: /v1/billing
       backendRefs:
-        - name: billingservice
-          port: 8084
+        - name: {{ .Values.services.billing.name }}
+          namespace: {{ .Values.services.namespace }}
+          port: {{ .Values.services.billing.port }}
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
@@ -65,5 +69,6 @@ spec:
             type: PathPrefix
             value: /
       backendRefs:
-        - name: frontend-service
-          port: 80
+        - name: {{ .Values.services.frontend.name }}
+          namespace: {{ .Values.services.namespace }}
+          port: {{ .Values.services.frontend.port }}

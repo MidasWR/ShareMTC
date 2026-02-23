@@ -12,26 +12,30 @@ spec:
             type: Exact
             value: /healthz/auth
       backendRefs:
-        - name: authservice
-          port: 8081
+        - name: {{ .Values.services.auth.name }}
+          namespace: {{ .Values.services.namespace }}
+          port: {{ .Values.services.auth.port }}
     - matches:
         - path:
             type: Exact
             value: /healthz/admin
       backendRefs:
-        - name: adminservice
-          port: 8082
+        - name: {{ .Values.services.admin.name }}
+          namespace: {{ .Values.services.namespace }}
+          port: {{ .Values.services.admin.port }}
     - matches:
         - path:
             type: Exact
             value: /healthz/resources
       backendRefs:
-        - name: resourceservice
-          port: 8083
+        - name: {{ .Values.services.resource.name }}
+          namespace: {{ .Values.services.namespace }}
+          port: {{ .Values.services.resource.port }}
     - matches:
         - path:
             type: Exact
             value: /healthz/billing
       backendRefs:
-        - name: billingservice
-          port: 8084
+        - name: {{ .Values.services.billing.name }}
+          namespace: {{ .Values.services.namespace }}
+          port: {{ .Values.services.billing.port }}
