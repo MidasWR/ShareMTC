@@ -64,6 +64,7 @@ atlas:
     credentialsSecretName: host.host-db.credentials.postgresql.acid.zalan.do
     usernameKey: username
     passwordKey: password
+    devURLKey: uri
     database: host
     port: 5432
     sslmode: require

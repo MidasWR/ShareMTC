@@ -20,6 +20,10 @@ spec:
       secretKeyRef:
         name: {{ .Values.atlas.migration.credentialsSecretName }}
         key: {{ .Values.atlas.migration.passwordKey }}
+  devURLFrom:
+    secretKeyRef:
+      name: {{ .Values.atlas.migration.credentialsSecretName }}
+      key: {{ .Values.atlas.migration.devURLKey }}
 {{- if eq .Values.atlas.migration.mode "local" }}
   dir:
     configMapRef:
