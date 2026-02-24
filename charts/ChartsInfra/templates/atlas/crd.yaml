@@ -11,7 +11,7 @@ spec:
       key: {{ .Values.atlas.migration.urlSecretKey }}
 {{- if eq .Values.atlas.migration.mode "local" }}
   dir:
-    configMap:
+    configMapRef:
       name: {{ .Values.atlas.migration.configMapName | quote }}
 {{- else }}
   dir:

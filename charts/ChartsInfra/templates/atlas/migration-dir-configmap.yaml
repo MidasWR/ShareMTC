@@ -160,4 +160,7 @@ data:
     CREATE INDEX IF NOT EXISTS idx_health_checks_resource ON health_checks(resource_type, resource_id, checked_at DESC);
     CREATE INDEX IF NOT EXISTS idx_metric_points_rt ON metric_points(resource_type, resource_id, metric_type, captured_at DESC);
     CREATE INDEX IF NOT EXISTS idx_k8s_clusters_user ON kubernetes_clusters(user_id, updated_at DESC);
+  atlas.sum: |
+    h1:N3kxoBKo4KJeg1//ZWEI41zvbbEbMhYtpIyiXnd3+Kk=
+    202602240001_resourceservice_schema.sql h1:rZK4K2H2scDNuyBzKH4iiVFJ1CHnR/y8pqd2tFMDF9I=
 {{- end }}
