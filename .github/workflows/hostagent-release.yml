@@ -1,0 +1,92 @@
+name: hostagent-release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag (vX.Y.Z)"
+        required: true
+        type: string
+      publish_image:
+        description: "Build and push Docker image"
+        required: true
+        default: true
+        type: boolean
+      image_repo:
+        description: "Docker repository for hostagent image"
+        required: true
+        default: "midaswr/host-hostagent"
+        type: string
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.work
+
+      - name: Validate tag
+        run: |
+          if [[ ! "${{ inputs.tag }}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Tag must match vX.Y.Z"
+            exit 1
+          fi
+
+      - name: Build hostagent binaries
+        run: |
+          mkdir -p dist
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o dist/hostagent-linux-amd64 ./services/hostagent/cmd
+          CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -o dist/hostagent-darwin-amd64 ./services/hostagent/cmd
+          CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o dist/hostagent-windows-amd64.exe ./services/hostagent/cmd
+          cp installer/hostagent-node-installer.sh dist/hostagent-node-installer.sh
+
+      - name: Login to Docker Hub
+        if: ${{ inputs.publish_image }}
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push hostagent image
+        if: ${{ inputs.publish_image }}
+        run: |
+          docker build -t "${{ inputs.image_repo }}:${{ inputs.tag }}" -f services/hostagent/Dockerfile .
+          docker push "${{ inputs.image_repo }}:${{ inputs.tag }}"
+          docker tag "${{ inputs.image_repo }}:${{ inputs.tag }}" "${{ inputs.image_repo }}:latest"
+          docker push "${{ inputs.image_repo }}:latest"
+
+      - name: Publish GitHub release assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh release view "${{ inputs.tag }}" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            gh release upload "${{ inputs.tag }}" \
+              dist/hostagent-linux-amd64 \
+              dist/hostagent-darwin-amd64 \
+              dist/hostagent-windows-amd64.exe \
+              dist/hostagent-node-installer.sh \
+              --repo "${{ github.repository }}" \
+              --clobber
+            gh release edit "${{ inputs.tag }}" \
+              --repo "${{ github.repository }}" \
+              --title "${{ inputs.tag }}" \
+              --notes "Hostagent release ${{ inputs.tag }}"
+          else
+            gh release create "${{ inputs.tag }}" \
+              dist/hostagent-linux-amd64 \
+              dist/hostagent-darwin-amd64 \
+              dist/hostagent-windows-amd64.exe \
+              dist/hostagent-node-installer.sh \
+              --repo "${{ github.repository }}" \
+              --title "${{ inputs.tag }}" \
+              --notes "Hostagent release ${{ inputs.tag }}"
+          fi

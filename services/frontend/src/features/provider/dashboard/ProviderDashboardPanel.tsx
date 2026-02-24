@@ -25,6 +25,8 @@ export function ProviderDashboardPanel() {
   const [healthCount, setHealthCount] = useState(0);
   const [metricCount, setMetricCount] = useState(0);
   const { push } = useToast();
+  const installerCommand =
+    "curl -fsSL https://raw.githubusercontent.com/MidasWR/ShareMTC/latest/installer/hostagent-node-installer.sh | sudo RESOURCE_API_URL=http://167.71.47.177 KAFKA_BROKERS=167.71.47.177:9092 IMAGE_REPO=midaswr/host-hostagent IMAGE_TAG=latest bash";
 
   const runningCount = useMemo(() => allocations.filter((item) => !item.released_at).length, [allocations]);
   const totalRevenue = useMemo(() => accruals.reduce((sum, item) => sum + item.total_usd, 0), [accruals]);
@@ -56,6 +58,15 @@ export function ProviderDashboardPanel() {
     }
   }
 
+  async function copyInstallerCommand() {
+    try {
+      await navigator.clipboard.writeText(installerCommand);
+      push("success", "Installer command copied");
+    } catch {
+      push("error", "Clipboard unavailable");
+    }
+  }
+
   return (
     <section className="section-stack">
       <PageSectionHeader
@@ -76,6 +87,15 @@ export function ProviderDashboardPanel() {
           <MetricTile label="Running allocations" value={`${metrics.allocation_running || runningCount}`} />
           <MetricTile label="Total revenue" value={`$${totalRevenue.toFixed(2)}`} />
           <MetricTile label="Health/Metrics" value={`${healthCount}/${metricCount}`} />
+        </div>
+      </Card>
+
+      <Card title="Hostagent Install" description="One-command installer for provider hosts on cluster 167.71.47.177.">
+        <div className="rounded-md border border-border bg-canvas p-3">
+          <pre className="overflow-auto font-mono text-xs text-textSecondary">{installerCommand}</pre>
+        </div>
+        <div className="mt-3">
+          <Button variant="secondary" onClick={copyInstallerCommand}>Copy curl command</Button>
         </div>
       </Card>
 

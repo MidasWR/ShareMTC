@@ -1,6 +1,7 @@
 global:
   namespace: host
   tag: v1.0.0
+  githubRepo: MidasWR/ShareMTC
 
 postgres:
   host: host-db
@@ -20,6 +21,10 @@ admin:
   dns: adminservice
   image: midaswr/host-adminservice
   port: 8082
+  agentInstaller:
+    resourceApiURL: http://167.71.47.177
+    kafkaBrokers: 167.71.47.177:9092
+    imageRepo: midaswr/host-hostagent
 
 resource:
   dns: resourceservice

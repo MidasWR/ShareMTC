@@ -28,9 +28,11 @@ comma := ,
 SKIP_ITEMS := $(strip $(subst $(comma),$(space),$(SKIP)))
 has_skip = $(filter $(1),$(SKIP_ITEMS))
 
-.PHONY: release auto-commit-push guard-tag clean-dist test build-images chart-package package-installer build-agent-binaries verify-assets github-release
+.PHONY: release release-hostagent auto-commit-push guard-tag clean-dist test build-images build-hostagent-image chart-package package-installer build-agent-binaries verify-assets github-release github-release-hostagent
 
 release: auto-commit-push guard-tag clean-dist test build-images chart-package package-installer build-agent-binaries verify-assets github-release
+
+release-hostagent: guard-tag clean-dist package-installer build-hostagent-image build-agent-binaries github-release-hostagent
 
 auto-commit-push:
 	@if [ "$(AUTO_COMMIT_PUSH)" != "1" ]; then \
@@ -82,6 +84,16 @@ build-images:
 		done; \
 	fi
 
+build-hostagent-image:
+	@if [ "$(call has_skip,2)" = "2" ]; then \
+		echo "Skipping hostagent image build"; \
+	else \
+		docker build -t $(REGISTRY)/host-hostagent:$(TAG) -f services/hostagent/Dockerfile . && \
+		docker push $(REGISTRY)/host-hostagent:$(TAG) && \
+		docker tag $(REGISTRY)/host-hostagent:$(TAG) $(REGISTRY)/host-hostagent:latest && \
+		docker push $(REGISTRY)/host-hostagent:latest; \
+	fi
+
 chart-package:
 	@if [ "$(call has_skip,3)" = "3" ]; then \
 		echo "Skipping chart package"; \
@@ -126,5 +138,18 @@ github-release:
 			gh release edit "$(TAG)" --repo "$(REPO)" --title "$(TAG)" --notes "Release $(TAG)"; \
 		else \
 			gh release create "$(TAG)" "$(INSTALLER_ASSET)" "$(INFRA_CHART_ASSET)" "$(SERVICES_CHART_ASSET)" "$(HOSTAGENT_LINUX_ASSET)" "$(HOSTAGENT_DARWIN_ASSET)" "$(HOSTAGENT_WINDOWS_ASSET)" --repo "$(REPO)" --title "$(TAG)" --notes "Release $(TAG)"; \
+		fi; \
+	fi
+
+github-release-hostagent:
+	@if [ "$(call has_skip,5)" = "5" ]; then \
+		echo "Skipping GitHub release"; \
+	else \
+		if gh release view "$(TAG)" --repo "$(REPO)" >/dev/null 2>&1; then \
+			echo "Release $(TAG) exists: overwrite hostagent assets"; \
+			gh release upload "$(TAG)" "$(INSTALLER_ASSET)" "$(HOSTAGENT_LINUX_ASSET)" "$(HOSTAGENT_DARWIN_ASSET)" "$(HOSTAGENT_WINDOWS_ASSET)" --repo "$(REPO)" --clobber && \
+			gh release edit "$(TAG)" --repo "$(REPO)" --title "$(TAG)" --notes "Hostagent release $(TAG)"; \
+		else \
+			gh release create "$(TAG)" "$(INSTALLER_ASSET)" "$(HOSTAGENT_LINUX_ASSET)" "$(HOSTAGENT_DARWIN_ASSET)" "$(HOSTAGENT_WINDOWS_ASSET)" --repo "$(REPO)" --title "$(TAG)" --notes "Hostagent release $(TAG)"; \
 		fi; \
 	fi

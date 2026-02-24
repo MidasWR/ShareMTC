@@ -35,7 +35,15 @@ func main() {
 	logger.Info().Msg("database migrations are managed externally by Atlas CRD")
 
 	svc := service.NewProviderService(repo)
-	installCommand := fmt.Sprintf("curl -fsSL https://raw.githubusercontent.com/%s/%s/installer/hostagent-node-installer.sh | sudo bash", cfg.GitHubRepo, cfg.ReleaseTag)
+	installCommand := fmt.Sprintf(
+		"curl -fsSL https://raw.githubusercontent.com/%s/%s/installer/hostagent-node-installer.sh | sudo RESOURCE_API_URL=%s KAFKA_BROKERS=%s IMAGE_REPO=%s IMAGE_TAG=%s bash",
+		cfg.GitHubRepo,
+		cfg.ReleaseTag,
+		cfg.AgentResourceURL,
+		cfg.AgentKafkaBrokers,
+		cfg.AgentImageRepo,
+		cfg.ReleaseTag,
+	)
 	handler := httpadapter.NewHandler(svc, installCommand)
 	r := chi.NewRouter()
 	r.Get("/healthz", handler.Health)

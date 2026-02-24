@@ -27,6 +27,16 @@ spec:
               value: {{ .Values.postgres.database | quote }}
             - name: PGSSLMODE
               value: {{ .Values.postgres.sslmode | quote }}
+            - name: GITHUB_REPO
+              value: {{ .Values.global.githubRepo | default "MidasWR/ShareMTC" | quote }}
+            - name: RELEASE_TAG
+              value: {{ .Values.global.tag | quote }}
+            - name: AGENT_RESOURCE_API_URL
+              value: {{ .Values.admin.agentInstaller.resourceApiURL | quote }}
+            - name: AGENT_KAFKA_BROKERS
+              value: {{ .Values.admin.agentInstaller.kafkaBrokers | quote }}
+            - name: AGENT_IMAGE_REPO
+              value: {{ .Values.admin.agentInstaller.imageRepo | quote }}
             - name: PGUSER
               valueFrom:
                 secretKeyRef:
