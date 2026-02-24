@@ -17,6 +17,8 @@ import { FilterBar } from "../../design/components/FilterBar";
 import { ActionDropdown } from "../../design/components/ActionDropdown";
 import { listSharedOffers, reserveSharedOffer } from "../resources/api/resourcesApi";
 import { SharedInventoryOffer } from "../../types/api";
+import { buildVmSelectOptions, getLinkedVMID } from "./orderVmMapping";
+import { validateServerOrder } from "./rentalValidation";
 
 type Props = {
   onNavigate: (tab: AppTab) => void;
@@ -41,7 +43,9 @@ export function ServerRentalPanel({ onNavigate }: Props) {
   const [typeFilter, setTypeFilter] = useState<"" | "hourly" | "monthly">("");
   const [createTarget, setCreateTarget] = useState<AppTab>("vm");
   const [vmByOrder, setVmByOrder] = useState<Record<string, string>>({});
+  const [vmOptions, setVmOptions] = useState<Array<{ value: string; label: string }>>([]);
   const [sharedOffers, setSharedOffers] = useState<SharedInventoryOffer[]>([]);
+  const [lastRefreshedAt, setLastRefreshedAt] = useState<Date | null>(null);
   const { push } = useToast();
 
   const selectedPlan = useMemo(() => plans.find((item) => item.id === form.plan_id), [plans, form.plan_id]);
@@ -49,10 +53,17 @@ export function ServerRentalPanel({ onNavigate }: Props) {
   useEffect(() => {
     async function loadInitial() {
       try {
-        const [planRows, orderRows, offers] = await Promise.all([listRentalPlans(), listServerOrders(), listSharedOffers({ status: "active" })]);
+        const [planRows, orderRows, offers, vmRows] = await Promise.all([
+          listRentalPlans(),
+          listServerOrders(),
+          listSharedOffers({ status: "active" }),
+          listVMs()
+        ]);
         setPlans(planRows);
         setOrders(orderRows);
         setSharedOffers(offers);
+        setVmOptions(buildVmSelectOptions(vmRows));
+        setLastRefreshedAt(new Date());
         if (planRows.length && !form.plan_id) {
           setForm((prev) => ({ ...prev, plan_id: planRows[0].id, period: planRows[0].period }));
         }
@@ -66,9 +77,11 @@ export function ServerRentalPanel({ onNavigate }: Props) {
   async function refresh() {
     setLoading(true);
     try {
-      const [orderRows, offers] = await Promise.all([listServerOrders(), listSharedOffers({ status: "active" }), listVMs({ search })]);
+      const [orderRows, offers, vmRows] = await Promise.all([listServerOrders(), listSharedOffers({ status: "active" }), listVMs()]);
       setOrders(orderRows);
       setSharedOffers(offers);
+      setVmOptions(buildVmSelectOptions(vmRows));
+      setLastRefreshedAt(new Date());
       push("info", "Server list refreshed");
     } catch (error) {
       push("error", error instanceof Error ? error.message : "Failed to refresh servers");
@@ -78,9 +91,9 @@ export function ServerRentalPanel({ onNavigate }: Props) {
   }
 
   async function handleLifecycle(row: ServerOrder, action: "start" | "stop" | "reboot" | "terminate") {
-    const vmID = row.id ? vmByOrder[row.id] : undefined;
+    const vmID = getLinkedVMID(row, vmByOrder);
     if (!vmID) {
-      push("error", "No VM mapping found for this order");
+      push("error", "Link a VM ID to this order before lifecycle actions");
       return;
     }
     setLoading(true);
@@ -99,6 +112,11 @@ export function ServerRentalPanel({ onNavigate }: Props) {
 
   async function handleEstimate(event: FormEvent) {
     event.preventDefault();
+    const validationError = validateServerOrder(form);
+    if (validationError) {
+      push("error", validationError);
+      return;
+    }
     setLoading(true);
     try {
       const response = await estimateServerOrder(form);
@@ -111,18 +129,16 @@ export function ServerRentalPanel({ onNavigate }: Props) {
   }
 
   async function handleCreateOrder() {
+    const validationError = validateServerOrder(form);
+    if (validationError) {
+      push("error", validationError);
+      return;
+    }
     setLoading(true);
     try {
       const created = await createServerOrder(form);
       setOrders((prev) => [created, ...prev]);
       setEstimate(created.estimated_price_usd ?? estimate);
-      if (created.id) {
-        const allVms = await listVMs({ search: created.id });
-        const match = allVms.find((item) => item.name === created.id || item.template === created.plan_id);
-        if (match?.id) {
-          setVmByOrder((prev) => ({ ...prev, [created.id as string]: match.id as string }));
-        }
-      }
       push("success", "Server order created");
     } catch (error) {
       push("error", error instanceof Error ? error.message : "Failed to create order");
@@ -199,6 +215,9 @@ export function ServerRentalPanel({ onNavigate }: Props) {
           }
           actions={
             <>
+              <Badge variant={lastRefreshedAt ? "success" : "warning"}>
+                {lastRefreshedAt ? `Fresh: ${lastRefreshedAt.toLocaleTimeString()}` : "Data not loaded yet"}
+              </Badge>
               <Button variant="secondary" onClick={refresh} loading={loading}>
                 Refresh
               </Button>
@@ -241,17 +260,28 @@ export function ServerRentalPanel({ onNavigate }: Props) {
               key: "actions",
               header: "Actions",
               render: (row) => (
-                <ActionDropdown
-                  label="Actions"
-                  disabled={loading}
-                  options={[
-                    { value: "start", label: "Start" },
-                    { value: "stop", label: "Stop" },
-                    { value: "reboot", label: "Reboot" },
-                    { value: "terminate", label: "Terminate" }
-                  ]}
-                  onSelect={(action) => handleLifecycle(row, action as "start" | "stop" | "reboot" | "terminate")}
-                />
+                <div className="flex min-w-[280px] items-end gap-2">
+                  <Select
+                    label="Linked VM"
+                    value={(row.id && vmByOrder[row.id]) || ""}
+                    onChange={(event) => {
+                      if (!row.id) return;
+                      setVmByOrder((prev) => ({ ...prev, [row.id as string]: event.target.value }));
+                    }}
+                    options={[{ value: "", label: "Select VM" }, ...vmOptions]}
+                  />
+                  <ActionDropdown
+                    label="Actions"
+                    disabled={loading}
+                    options={[
+                      { value: "start", label: "Start" },
+                      { value: "stop", label: "Stop" },
+                      { value: "reboot", label: "Reboot" },
+                      { value: "terminate", label: "Terminate" }
+                    ]}
+                    onSelect={(action) => handleLifecycle(row, action as "start" | "stop" | "reboot" | "terminate")}
+                  />
+                </div>
               )
             }
           ]}
@@ -309,10 +339,38 @@ export function ServerRentalPanel({ onNavigate }: Props) {
               { value: "Debian 12", label: "Debian 12" }
             ]}
           />
-          <Input label="CPU Cores" value={`${form.cpu_cores}`} onChange={(event) => setForm((prev) => ({ ...prev, cpu_cores: Number(event.target.value) || 0 }))} />
-          <Input label="RAM (GB)" value={`${form.ram_gb}`} onChange={(event) => setForm((prev) => ({ ...prev, ram_gb: Number(event.target.value) || 0 }))} />
-          <Input label="GPU units" value={`${form.gpu_units}`} onChange={(event) => setForm((prev) => ({ ...prev, gpu_units: Number(event.target.value) || 0 }))} />
-          <Input label="Network (Mbps)" value={`${form.network_mbps}`} onChange={(event) => setForm((prev) => ({ ...prev, network_mbps: Number(event.target.value) || 0 }))} />
+          <Input
+            type="number"
+            min={1}
+            step={1}
+            label="CPU Cores"
+            value={`${form.cpu_cores}`}
+            onChange={(event) => setForm((prev) => ({ ...prev, cpu_cores: Number(event.target.value) || 0 }))}
+          />
+          <Input
+            type="number"
+            min={1}
+            step={1}
+            label="RAM (GB)"
+            value={`${form.ram_gb}`}
+            onChange={(event) => setForm((prev) => ({ ...prev, ram_gb: Number(event.target.value) || 0 }))}
+          />
+          <Input
+            type="number"
+            min={0}
+            step={1}
+            label="GPU units"
+            value={`${form.gpu_units}`}
+            onChange={(event) => setForm((prev) => ({ ...prev, gpu_units: Number(event.target.value) || 0 }))}
+          />
+          <Input
+            type="number"
+            min={1}
+            step={100}
+            label="Network (Mbps)"
+            value={`${form.network_mbps}`}
+            onChange={(event) => setForm((prev) => ({ ...prev, network_mbps: Number(event.target.value) || 0 }))}
+          />
           <div className="md:col-span-2 xl:col-span-3 flex flex-wrap items-center gap-2">
             <Button type="submit" loading={loading} variant="secondary">Estimate</Button>
             <Button type="button" onClick={handleCreateOrder} loading={loading}>

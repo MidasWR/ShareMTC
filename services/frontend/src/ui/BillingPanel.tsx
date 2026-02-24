@@ -29,6 +29,46 @@ export function BillingPanel() {
         <form className="grid gap-3 md:grid-cols-2 xl:grid-cols-[2fr_2fr_1fr_1fr]" onSubmit={state.previewUsage}>
           <Input label="Provider ID" value={state.providerID} onChange={(event) => state.setProviderID(event.target.value)} />
           <Input label="Plan ID" value={state.planID} onChange={(event) => state.setPlanID(event.target.value)} />
+          <Input
+            type="number"
+            min={1}
+            step={1}
+            label="CPU cores used"
+            value={`${state.cpuCoresUsed}`}
+            onChange={(event) => state.setCpuCoresUsed(Number(event.target.value) || 0)}
+          />
+          <Input
+            type="number"
+            min={1}
+            step={1}
+            label="RAM used (GB)"
+            value={`${state.ramGbUsed}`}
+            onChange={(event) => state.setRamGbUsed(Number(event.target.value) || 0)}
+          />
+          <Input
+            type="number"
+            min={0}
+            step={1}
+            label="GPU used"
+            value={`${state.gpuUsed}`}
+            onChange={(event) => state.setGpuUsed(Number(event.target.value) || 0)}
+          />
+          <Input
+            type="number"
+            min={1}
+            step={0.5}
+            label="Hours"
+            value={`${state.hoursUsed}`}
+            onChange={(event) => state.setHoursUsed(Number(event.target.value) || 0)}
+          />
+          <Input
+            type="number"
+            min={1}
+            step={100}
+            label="Network (Mbps)"
+            value={`${state.networkMbps}`}
+            onChange={(event) => state.setNetworkMbps(Number(event.target.value) || 0)}
+          />
           <Button type="submit" className="md:mt-7" loading={state.loading}>
             Process usage
           </Button>

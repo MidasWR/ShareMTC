@@ -10,6 +10,7 @@ import { Select } from "../../../design/primitives/Select";
 import { Textarea } from "../../../design/primitives/Textarea";
 import { listVMTemplates, upsertVMTemplate } from "../api/resourcesApi";
 import { VMTemplate } from "../../../types/api";
+import { validateTemplateInput } from "./templateValidation";
 
 export function MyTemplatesPanel() {
   const [rows, setRows] = useState<VMTemplate[]>([]);
@@ -22,6 +23,7 @@ export function MyTemplatesPanel() {
   const [sshPublicKey, setSSHPublicKey] = useState("");
   const [bootstrapScript, setBootstrapScript] = useState("#!/usr/bin/env bash; set -e; apt update");
   const [loading, setLoading] = useState(false);
+  const [formError, setFormError] = useState("");
   const { push } = useToast();
 
   async function refresh() {
@@ -41,6 +43,20 @@ export function MyTemplatesPanel() {
 
   async function submit(event: FormEvent) {
     event.preventDefault();
+    const validationError = validateTemplateInput({
+      code,
+      name,
+      osName,
+      envJSON,
+      sshPublicKey,
+      bootstrapScript
+    });
+    if (validationError) {
+      setFormError(validationError);
+      push("error", validationError);
+      return;
+    }
+    setFormError("");
     setLoading(true);
     try {
       await upsertVMTemplate({
@@ -74,10 +90,10 @@ export function MyTemplatesPanel() {
       <PageSectionHeader title="My Templates" description="Create and manage server installation templates." />
       <Card title="Template Builder" description="Create production-grade templates with ENV, SSH key, bootstrap code and logo.">
         <form className="grid items-end gap-3 md:grid-cols-2" onSubmit={submit}>
-          <Input label="Template Code" value={code} onChange={(event) => setCode(event.target.value)} />
-          <Input label="Template Name" value={name} onChange={(event) => setName(event.target.value)} />
+          <Input label="Template Code" value={code} onChange={(event) => setCode(event.target.value)} error={formError.includes("code") ? formError : ""} />
+          <Input label="Template Name" value={name} onChange={(event) => setName(event.target.value)} error={formError.includes("name") ? formError : ""} />
           <Input label="Logo URL" value={logoURL} onChange={(event) => setLogoURL(event.target.value)} />
-          <Input label="OS Name" value={osName} onChange={(event) => setOSName(event.target.value)} />
+          <Input label="OS Name" value={osName} onChange={(event) => setOSName(event.target.value)} error={formError.includes("OS") ? formError : ""} />
           <Select
             label="OS Family"
             value={osFamily}
@@ -88,9 +104,26 @@ export function MyTemplatesPanel() {
               { value: "bsd", label: "BSD" }
             ]}
           />
-          <Textarea label="ENV JSON" value={envJSON} onChange={(event) => setEnvJSON(event.target.value)} />
-          <Textarea label="SSH Public Key" value={sshPublicKey} onChange={(event) => setSSHPublicKey(event.target.value)} />
-          <Textarea label="Bootstrap Script" value={bootstrapScript} onChange={(event) => setBootstrapScript(event.target.value)} />
+          <Textarea
+            label="ENV JSON"
+            value={envJSON}
+            onChange={(event) => setEnvJSON(event.target.value)}
+            error={formError.includes("JSON") ? formError : ""}
+            helpText={'Valid JSON object, for example {"APP_ENV":"production"}'}
+          />
+          <Textarea
+            label="SSH Public Key"
+            value={sshPublicKey}
+            onChange={(event) => setSSHPublicKey(event.target.value)}
+            error={formError.includes("SSH") ? formError : ""}
+            helpText="Optional, but if present must start with ssh-"
+          />
+          <Textarea
+            label="Bootstrap Script"
+            value={bootstrapScript}
+            onChange={(event) => setBootstrapScript(event.target.value)}
+            error={formError.includes("Bootstrap") ? formError : ""}
+          />
           <Button loading={loading} type="submit">Save</Button>
         </form>
       </Card>

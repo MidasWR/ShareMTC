@@ -2,6 +2,7 @@ import { FormEvent, useMemo, useState } from "react";
 import { useToast } from "../../../design/components/Toast";
 import { UsageAccrual } from "../../../types/api";
 import { listAccruals, processUsage } from "../api/billingApi";
+import { toUsagePayload, validateUsageInput } from "../usagePayload";
 
 export function useBilling() {
   const [providerID, setProviderID] = useState("");
@@ -14,6 +15,11 @@ export function useBilling() {
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState<"newest" | "total">("newest");
   const [visibleColumns, setVisibleColumns] = useState<string[]>(["id", "usage", "amount", "bonus", "total", "payment", "created"]);
+  const [cpuCoresUsed, setCpuCoresUsed] = useState(2);
+  const [ramGbUsed, setRamGbUsed] = useState(4);
+  const [gpuUsed, setGpuUsed] = useState(1);
+  const [hoursUsed, setHoursUsed] = useState(1);
+  const [networkMbps, setNetworkMbps] = useState(700);
   const { push } = useToast();
 
   const totalAccrued = useMemo(() => accruals.reduce((sum, item) => sum + item.total_usd, 0), [accruals]);
@@ -31,23 +37,33 @@ export function useBilling() {
 
   async function previewUsage(event: FormEvent) {
     event.preventDefault();
-    if (!providerID || !planID) {
-      setError("Provider ID and plan ID are required");
-      push("error", "Provider ID and plan ID are required");
+    const validationError = validateUsageInput({
+      provider_id: providerID,
+      plan_id: planID,
+      cpu_cores_used: cpuCoresUsed,
+      ram_gb_used: ramGbUsed,
+      gpu_used: gpuUsed,
+      hours: hoursUsed,
+      network_mbps: networkMbps
+    });
+    if (validationError) {
+      setError(validationError);
+      push("error", validationError);
       return;
     }
     setLoading(true);
     setError("");
     try {
-      const preview = await processUsage({
+      const payload = toUsagePayload({
         provider_id: providerID,
         plan_id: planID,
-        cpu_cores_used: 2,
-        ram_gb_used: 4,
-        gpu_used: 1,
-        hours: 1,
-        network_mbps: 700
+        cpu_cores_used: cpuCoresUsed,
+        ram_gb_used: ramGbUsed,
+        gpu_used: gpuUsed,
+        hours: hoursUsed,
+        network_mbps: networkMbps
       });
+      const preview = await processUsage(payload);
       setCostPreview(`$${preview.total_usd.toFixed(2)} (bonus: $${preview.vip_bonus_usd.toFixed(2)})`);
       setStatusMessage("Usage processed and preview updated");
       push("success", "Usage accrual processed");
@@ -96,6 +112,16 @@ export function useBilling() {
     setSortBy,
     visibleColumns,
     setVisibleColumns,
+    cpuCoresUsed,
+    setCpuCoresUsed,
+    ramGbUsed,
+    setRamGbUsed,
+    gpuUsed,
+    setGpuUsed,
+    hoursUsed,
+    setHoursUsed,
+    networkMbps,
+    setNetworkMbps,
     totalAccrued,
     totalBonus,
     filteredAccruals,

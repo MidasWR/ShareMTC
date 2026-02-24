@@ -12,13 +12,17 @@ type Props = {
 };
 
 export function AdminAccessPanel({ onSuccess }: Props) {
-  const [username, setUsername] = useState("admin");
-  const [password, setPassword] = useState("admin123");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const { push } = useToast();
 
   async function submit(event: FormEvent) {
     event.preventDefault();
+    if (!username.trim() || !password.trim()) {
+      push("error", "Username and access key are required");
+      return;
+    }
     setLoading(true);
     try {
       const response = await loginDirectAdmin(username, password);

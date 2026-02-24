@@ -17,6 +17,12 @@ export function VMPanel() {
   const [search, setSearch] = useState("");
   const [providerID, setProviderID] = useState("provider-default");
   const [name, setName] = useState("vm-instance");
+  const [template, setTemplate] = useState("fastpanel");
+  const [osName, setOsName] = useState("Ubuntu 22.04");
+  const [cpuCores, setCpuCores] = useState(4);
+  const [ramMb, setRamMb] = useState(8192);
+  const [gpuUnits, setGpuUnits] = useState(1);
+  const [networkMbps, setNetworkMbps] = useState(500);
   const { push } = useToast();
 
   async function refresh() {
@@ -36,29 +42,37 @@ export function VMPanel() {
   }, []);
 
   async function createNewVM() {
+    if (!providerID.trim() || !name.trim()) {
+      push("error", "Provider ID and VM Name are required");
+      return;
+    }
+    if (cpuCores <= 0 || ramMb <= 0 || gpuUnits < 0 || networkMbps <= 0) {
+      push("error", "CPU, RAM and Network must be greater than 0; GPU cannot be negative");
+      return;
+    }
     setLoading(true);
     try {
       await createVM({
-        provider_id: providerID,
-        name,
-        template: "fastpanel",
-        os_name: "Ubuntu 22.04",
+        provider_id: providerID.trim(),
+        name: name.trim(),
+        template,
+        os_name: osName,
         region: "any",
         cloud_type: "secure",
-        cpu_cores: 4,
-        vcpu: 4,
-        ram_mb: 8192,
+        cpu_cores: cpuCores,
+        vcpu: cpuCores,
+        ram_mb: ramMb,
         system_ram_gb: 16,
-        gpu_units: 1,
+        gpu_units: gpuUnits,
         vram_gb: 24,
-        network_mbps: 500,
+        network_mbps: networkMbps,
         network_volume_supported: true,
         global_networking_supported: false,
         availability_tier: "medium",
         max_instances: 8
       });
       await refresh();
-      push("success", "VM created");
+      push("success", "VM created successfully");
     } catch (error) {
       push("error", error instanceof Error ? error.message : "Failed to create VM");
     } finally {
@@ -74,7 +88,7 @@ export function VMPanel() {
       if (action === "reboot") await rebootVM(vmID);
       if (action === "terminate") await terminateVM(vmID);
       await refresh();
-      push("info", `VM ${action} completed`);
+      push("success", `VM ${action} completed successfully`);
     } catch (error) {
       push("error", error instanceof Error ? error.message : `Failed to ${action} VM`);
     } finally {
@@ -85,10 +99,16 @@ export function VMPanel() {
   return (
     <section className="section-stack">
       <PageSectionHeader title="VM" description="Create, control, and inspect dedicated virtual machines." />
-      <Card title="Quick Create VM" description="Minimal create form with default FastPanel profile.">
-        <div className="grid items-end gap-3 md:grid-cols-[1fr_1fr_auto]">
+      <Card title="Quick Create VM" description="Create VM with visible baseline parameters before provisioning.">
+        <div className="grid items-end gap-3 md:grid-cols-2 xl:grid-cols-4">
           <Input label="Provider ID" value={providerID} onChange={(event) => setProviderID(event.target.value)} />
           <Input label="VM Name" value={name} onChange={(event) => setName(event.target.value)} />
+          <Input label="Template code" value={template} onChange={(event) => setTemplate(event.target.value)} />
+          <Input label="OS Name" value={osName} onChange={(event) => setOsName(event.target.value)} />
+          <Input type="number" min={1} step={1} label="CPU Cores" value={`${cpuCores}`} onChange={(event) => setCpuCores(Number(event.target.value) || 0)} />
+          <Input type="number" min={1} step={512} label="RAM (MB)" value={`${ramMb}`} onChange={(event) => setRamMb(Number(event.target.value) || 0)} />
+          <Input type="number" min={0} step={1} label="GPU Units" value={`${gpuUnits}`} onChange={(event) => setGpuUnits(Number(event.target.value) || 0)} />
+          <Input type="number" min={1} step={100} label="Network (Mbps)" value={`${networkMbps}`} onChange={(event) => setNetworkMbps(Number(event.target.value) || 0)} />
           <Button onClick={createNewVM} loading={loading}>Create</Button>
         </div>
       </Card>

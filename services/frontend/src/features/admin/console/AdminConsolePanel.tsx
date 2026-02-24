@@ -19,10 +19,13 @@ type AdminTab = "overview" | "providers" | "pods" | "allocations" | "billing" | 
 export function AdminConsolePanel() {
   const [tab, setTab] = useState<AdminTab>("overview");
   const [loading, setLoading] = useState(false);
+  const [commandLoading, setCommandLoading] = useState(false);
   const [allocations, setAllocations] = useState<Array<{ id: string; provider_id: string; cpu_cores: number; ram_mb: number; gpu_units: number; released_at?: string | null }>>([]);
   const [accruals, setAccruals] = useState<Array<{ id: string; provider_id: string; total_usd: number; vip_bonus_usd: number; created_at: string }>>([]);
   const [installCommand, setInstallCommand] = useState("");
   const [installerURL, setInstallerURL] = useState("");
+  const [lastDataRefreshAt, setLastDataRefreshAt] = useState<Date | null>(null);
+  const [lastCommandRefreshAt, setLastCommandRefreshAt] = useState<Date | null>(null);
   const { push } = useToast();
 
   async function refreshData() {
@@ -31,6 +34,7 @@ export function AdminConsolePanel() {
       const [allocRows, accrualRows] = await Promise.all([listAllAllocations(200, 0), listAllAccruals(200, 0)]);
       setAllocations(allocRows);
       setAccruals(accrualRows);
+      setLastDataRefreshAt(new Date());
       push("info", "Admin console data refreshed");
     } catch (error) {
       push("error", error instanceof Error ? error.message : "Failed to refresh admin console");
@@ -40,12 +44,16 @@ export function AdminConsolePanel() {
   }
 
   async function refreshInstallCommand() {
+    setCommandLoading(true);
     try {
       const payload = await getAgentInstallCommand();
       setInstallCommand(payload.command);
       setInstallerURL(payload.installer_url);
+      setLastCommandRefreshAt(new Date());
     } catch (error) {
       push("error", error instanceof Error ? error.message : "Failed to fetch install command");
+    } finally {
+      setCommandLoading(false);
     }
   }
 
@@ -75,6 +83,7 @@ export function AdminConsolePanel() {
         score: count
       }));
   }, [allocations]);
+  const highRiskCount = useMemo(() => riskRows.filter((row) => row.score > 10).length, [riskRows]);
 
   return (
     <section className="section-stack">
@@ -83,7 +92,7 @@ export function AdminConsolePanel() {
         description="Unified admin module: overview, providers, allocations, billing, and risk."
         actions={
           <div className="flex items-center gap-2">
-            <Button variant="secondary" onClick={refreshInstallCommand}>
+            <Button variant="secondary" onClick={refreshInstallCommand} loading={commandLoading}>
               Refresh curl
             </Button>
             <Button variant="secondary" onClick={refreshData} loading={loading}>
@@ -92,6 +101,19 @@ export function AdminConsolePanel() {
           </div>
         }
       />
+      <Card
+        title="Data Freshness"
+        description="Track recency of console datasets and installer command."
+      >
+        <div className="flex flex-wrap gap-2">
+          <span className="text-xs text-textSecondary">
+            Console data: {lastDataRefreshAt ? lastDataRefreshAt.toLocaleString() : "not refreshed yet"}
+          </span>
+          <span className="text-xs text-textSecondary">
+            Installer command: {lastCommandRefreshAt ? lastCommandRefreshAt.toLocaleString() : "not refreshed yet"}
+          </span>
+        </div>
+      </Card>
       <Card title="Agent Install (one-command)" description="Copy this command to install hostagent on a host machine.">
         <div className="rounded-md border border-border bg-elevated p-3 font-mono text-xs text-textSecondary">
           {installCommand || "Press 'Refresh curl' to fetch the latest command."}
@@ -122,7 +144,7 @@ export function AdminConsolePanel() {
           { id: "pods", label: "POD Catalog" },
           { id: "allocations", label: "Allocations" },
           { id: "billing", label: "Billing" },
-          { id: "risk", label: "Risk/Sharing" }
+          { id: "risk", label: "Risk & Sharing" }
         ]}
         value={tab}
         onChange={(next) => setTab(next)}
@@ -131,7 +153,24 @@ export function AdminConsolePanel() {
       {tab === "overview" ? <AdminDashboardPanel /> : null}
       {tab === "providers" ? <AdminServersPanel /> : null}
       {tab === "pods" ? <AdminPodsPanel /> : null}
-      {tab === "risk" ? <SharingAdminPanel /> : null}
+      {tab === "risk" ? (
+        <Card title="Risk and Sharing Summary" description="Unified view for risk posture and sharing moderation signals.">
+          <div className="grid gap-3 md:grid-cols-3">
+            <div className="rounded-md border border-border bg-elevated p-3 text-xs text-textSecondary">
+              Total risk signals: <span className="font-semibold text-textPrimary">{riskRows.length}</span>
+            </div>
+            <div className="rounded-md border border-border bg-elevated p-3 text-xs text-textSecondary">
+              High-load providers: <span className="font-semibold text-textPrimary">{highRiskCount}</span>
+            </div>
+            <div className="rounded-md border border-border bg-elevated p-3 text-xs text-textSecondary">
+              Sharing moderation source: <span className="font-semibold text-textPrimary">Admin Sharing panel</span>
+            </div>
+          </div>
+          <div className="mt-4">
+            <SharingAdminPanel />
+          </div>
+        </Card>
+      ) : null}
 
       {tab === "allocations" ? (
         <Card title="Allocation Registry" description="Admin flow of allocations across all providers.">
