@@ -61,8 +61,12 @@ atlas:
   dns: atlas
   migration:
     enabled: true
-    urlSecretName: host.host-db.credentials.postgresql.acid.zalan.do
-    urlSecretKey: uri
+    credentialsSecretName: host.host-db.credentials.postgresql.acid.zalan.do
+    usernameKey: username
+    passwordKey: password
+    database: host
+    port: 5432
+    sslmode: require
     mode: local
     configMapName: atlas-migration-dir
     remoteDirName: ""

@@ -5,10 +5,21 @@ metadata:
   name: host-atlas
   namespace: {{ .Values.global.namespace }}
 spec:
-  urlFrom:
-    secretKeyRef:
-      name: {{ .Values.atlas.migration.urlSecretName }}
-      key: {{ .Values.atlas.migration.urlSecretKey }}
+  credentials:
+    scheme: postgres
+    host: {{ printf "%s.%s.svc.cluster.local" .Values.postgres.dns .Values.global.namespace | quote }}
+    port: {{ .Values.atlas.migration.port }}
+    database: {{ .Values.atlas.migration.database | quote }}
+    parameters:
+      sslmode: {{ .Values.atlas.migration.sslmode | quote }}
+    userFrom:
+      secretKeyRef:
+        name: {{ .Values.atlas.migration.credentialsSecretName }}
+        key: {{ .Values.atlas.migration.usernameKey }}
+    passwordFrom:
+      secretKeyRef:
+        name: {{ .Values.atlas.migration.credentialsSecretName }}
+        key: {{ .Values.atlas.migration.passwordKey }}
 {{- if eq .Values.atlas.migration.mode "local" }}
   dir:
     configMapRef:
