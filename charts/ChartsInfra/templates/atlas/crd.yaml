@@ -5,6 +5,7 @@ metadata:
   name: host-atlas
   namespace: {{ .Values.global.namespace }}
 spec:
+  baseline: "202602240001"
   credentials:
     scheme: postgres
     host: {{ printf "%s.%s.svc.cluster.local" .Values.postgres.dns .Values.global.namespace | quote }}
