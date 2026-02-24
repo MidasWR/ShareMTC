@@ -74,6 +74,27 @@ ShareMTC is a compute marketplace and control plane where providers expose CPU/R
   - dense operational tables with status chips and quick actions.
 - This UX is backed by real API filters (no placeholder controls).
 
+### Frontend UX quality bar (core flows)
+
+The current UX baseline for core scenarios is evaluated with three axes:
+
+- **Severity (S):** how badly the issue blocks task completion (`S0` blocker, `S1` major friction, `S2` polish).
+- **Frequency (F):** how often users encounter it in normal usage (`F3` frequent, `F2` regular, `F1` edge-case).
+- **Business impact (B):** effect on conversion, trust, and operational speed (`B3` high, `B2` medium, `B1` low).
+
+Priority is assigned using `S/F/B` together, with `S0` always in Wave 1.
+
+### Current UX roadmap focus (4 core flows)
+
+- **Resources -> VM/POD lifecycle:** reduce hidden defaults, tighten form validation, and make lifecycle feedback deterministic.
+- **Server rental -> estimate/order/manage:** remove weak order-to-VM mapping and enforce transparent post-order status progression.
+- **Admin operations (access/servers/sharing):** remove insecure defaults and clarify high-risk actions through explicit state and copy.
+- **Billing and usage control:** remove hardcoded usage assumptions and make financial state transitions user-verifiable.
+
+Detailed audit findings and Wave 1/2/3 implementation plan are tracked in:
+
+- `reports/10_frontend_core_ux_audit_roadmap.md`
+
 ### Security model
 
 - Backend routes in admin/resource/billing services are protected by:
