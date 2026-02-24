@@ -63,5 +63,7 @@ atlas:
     enabled: true
     urlSecretName: host.host-db.credentials.postgresql.acid.zalan.do
     urlSecretKey: uri
-    remoteDirName: migrations/resourceservice
+    mode: local
+    configMapName: atlas-migration-dir
+    remoteDirName: ""
     remoteDirTag: latest

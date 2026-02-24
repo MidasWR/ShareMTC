@@ -29,5 +29,6 @@ type PodCatalogItem struct {
 }
 
 type AgentInstallCommand struct {
-	Command string `json:"command"`
+	Command      string `json:"command"`
+	InstallerURL string `json:"installer_url"`
 }

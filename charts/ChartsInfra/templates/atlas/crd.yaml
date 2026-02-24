@@ -9,8 +9,14 @@ spec:
     secretKeyRef:
       name: {{ .Values.atlas.migration.urlSecretName }}
       key: {{ .Values.atlas.migration.urlSecretKey }}
+{{- if eq .Values.atlas.migration.mode "local" }}
+  dir:
+    configMap:
+      name: {{ .Values.atlas.migration.configMapName | quote }}
+{{- else }}
   dir:
     remote:
-      name: {{ required "atlas.migration.remoteDirName is required when atlas.migration.enabled=true" .Values.atlas.migration.remoteDirName | quote }}
+      name: {{ required "atlas.migration.remoteDirName is required when atlas.migration.mode=remote" .Values.atlas.migration.remoteDirName | quote }}
       tag: {{ .Values.atlas.migration.remoteDirTag | quote }}
+{{- end }}
 {{- end }}

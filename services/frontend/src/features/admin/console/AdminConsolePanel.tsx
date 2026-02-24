@@ -22,6 +22,7 @@ export function AdminConsolePanel() {
   const [allocations, setAllocations] = useState<Array<{ id: string; provider_id: string; cpu_cores: number; ram_mb: number; gpu_units: number; released_at?: string | null }>>([]);
   const [accruals, setAccruals] = useState<Array<{ id: string; provider_id: string; total_usd: number; vip_bonus_usd: number; created_at: string }>>([]);
   const [installCommand, setInstallCommand] = useState("");
+  const [installerURL, setInstallerURL] = useState("");
   const { push } = useToast();
 
   async function refreshData() {
@@ -42,8 +43,22 @@ export function AdminConsolePanel() {
     try {
       const payload = await getAgentInstallCommand();
       setInstallCommand(payload.command);
+      setInstallerURL(payload.installer_url);
     } catch (error) {
       push("error", error instanceof Error ? error.message : "Failed to fetch install command");
+    }
+  }
+
+  async function copyInstallerURL() {
+    if (!installerURL) {
+      push("error", "Installer URL is empty");
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(installerURL);
+      push("success", "Installer URL copied");
+    } catch {
+      push("error", "Clipboard unavailable");
     }
   }
 
@@ -80,6 +95,24 @@ export function AdminConsolePanel() {
       <Card title="Agent Install (one-command)" description="Copy this command to install hostagent on a host machine.">
         <div className="rounded-md border border-border bg-elevated p-3 font-mono text-xs text-textSecondary">
           {installCommand || "Press 'Refresh curl' to fetch the latest command."}
+        </div>
+        <div className="mt-3 rounded-md border border-border bg-canvas p-3 text-xs text-textSecondary">
+          <div className="mb-2 uppercase tracking-wide text-textMuted">Direct installer URL</div>
+          <div className="break-all font-mono">{installerURL || "Press 'Refresh curl' to fetch installer URL."}</div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button variant="secondary" onClick={copyInstallerURL} disabled={!installerURL}>
+              Copy installer URL
+            </Button>
+            <a
+              className="focus-ring inline-flex h-10 items-center justify-center rounded-md border border-border px-4 text-sm font-medium text-textPrimary hover:border-brand hover:text-brand"
+              href={installerURL || "#"}
+              target="_blank"
+              rel="noreferrer"
+              aria-disabled={!installerURL}
+            >
+              Open installer URL
+            </a>
+          </div>
         </div>
       </Card>
       <Tabs

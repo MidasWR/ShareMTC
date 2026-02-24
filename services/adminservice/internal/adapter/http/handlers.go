@@ -169,6 +169,7 @@ func (h *Handler) DeletePodTemplate(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) AgentInstallCommand(w http.ResponseWriter, _ *http.Request) {
 	httpx.JSON(w, http.StatusOK, models.AgentInstallCommand{
-		Command: h.installCommand,
+		Command:      h.installCommand,
+		InstallerURL: "https://github.com/MidasWR/ShareMTC/releases/latest/download/hostagent-node-installer.sh",
 	})
 }
