@@ -57,7 +57,7 @@ export function SidebarNav({ tab, groups, enabledMenu, onNavigate, onLogout, onS
     <aside className="border-b border-border bg-surface flex flex-col h-full lg:min-h-screen lg:border-b-0 lg:border-r">
       <div className="p-4 lg:p-5">
         <div className="flex items-center gap-2">
-          <img src="/logo-sharemtc.png" alt="ShareMTC logo" className="h-6 w-6" />
+          <img src="/logo-sharemtc.svg" alt="ShareMTC logo" className="h-6 w-6" />
           <h1 className="text-lg font-semibold neon-text">{t.sidebar.title}</h1>
         </div>
         <p className="mt-1 text-xs text-textSecondary">{t.sidebar.subtitle}</p>
