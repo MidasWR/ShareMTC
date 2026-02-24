@@ -20,10 +20,27 @@ spec:
       secretKeyRef:
         name: {{ .Values.atlas.migration.credentialsSecretName }}
         key: {{ .Values.atlas.migration.passwordKey }}
-  devURLFrom:
-    secretKeyRef:
-      name: {{ .Values.atlas.migration.credentialsSecretName }}
-      key: {{ .Values.atlas.migration.devURLKey }}
+  devURL: {{ printf "postgres://%s:%s@localhost:%v/%s?sslmode=disable" .Values.atlas.migration.devdb.user .Values.atlas.migration.devdb.password .Values.atlas.migration.devdb.port .Values.atlas.migration.devdb.database | quote }}
+  devDB:
+    spec:
+      containers:
+        - name: dev-db
+          image: {{ .Values.atlas.migration.devdb.image | quote }}
+          env:
+            - name: POSTGRES_DB
+              value: {{ .Values.atlas.migration.devdb.database | quote }}
+            - name: POSTGRES_USER
+              value: {{ .Values.atlas.migration.devdb.user | quote }}
+            - name: POSTGRES_PASSWORD
+              value: {{ .Values.atlas.migration.devdb.password | quote }}
+          ports:
+            - name: postgres
+              containerPort: {{ .Values.atlas.migration.devdb.port }}
+          startupProbe:
+            exec:
+              command: ["pg_isready", "-h", "127.0.0.1", "-p", "{{ .Values.atlas.migration.devdb.port }}", "-U", "{{ .Values.atlas.migration.devdb.user }}"]
+            failureThreshold: 30
+            periodSeconds: 2
 {{- if eq .Values.atlas.migration.mode "local" }}
   dir:
     configMapRef:
