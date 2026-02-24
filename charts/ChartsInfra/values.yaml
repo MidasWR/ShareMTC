@@ -67,6 +67,7 @@ atlas:
     database: host
     port: 5432
     sslmode: require
+    searchPath: public
     devdb:
       database: dev
       user: postgres

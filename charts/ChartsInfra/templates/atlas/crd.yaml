@@ -13,6 +13,9 @@ spec:
     database: {{ .Values.atlas.migration.database | quote }}
     parameters:
       sslmode: {{ .Values.atlas.migration.sslmode | quote }}
+{{- if .Values.atlas.migration.searchPath }}
+      search_path: {{ .Values.atlas.migration.searchPath | quote }}
+{{- end }}
     userFrom:
       secretKeyRef:
         name: {{ .Values.atlas.migration.credentialsSecretName }}
