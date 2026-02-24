@@ -6,6 +6,9 @@ metadata:
   namespace: {{ .Values.global.namespace }}
 spec:
   baseline: "202602240001"
+{{- if .Values.atlas.migration.revisionsSchema }}
+  revisionsSchema: {{ .Values.atlas.migration.revisionsSchema | quote }}
+{{- end }}
   credentials:
     scheme: postgres
     host: {{ printf "%s.%s.svc.cluster.local" .Values.postgres.dns .Values.global.namespace | quote }}

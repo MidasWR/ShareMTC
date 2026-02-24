@@ -68,6 +68,7 @@ atlas:
     port: 5432
     sslmode: require
     searchPath: public
+    revisionsSchema: atlas_schema_revisions
     devdb:
       database: dev
       user: postgres
