@@ -132,7 +132,7 @@ func (s *ResourceService) UpsertVMTemplate(ctx context.Context, tpl models.VMTem
 		tpl.OSFamily = "linux"
 	}
 	if tpl.LogoURL == "" {
-		tpl.LogoURL = "/logo-sharemtc.svg"
+		tpl.LogoURL = "/logo-sharemtc.png"
 	}
 	if tpl.OwnerUserID == "" {
 		tpl.OwnerUserID = "system"

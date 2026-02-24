@@ -63,7 +63,7 @@ export function Modal({
 
   return (
     <div className="fixed inset-0 z-[1300] flex items-center justify-center bg-slate-950/70 p-4" role="dialog" aria-modal="true" aria-label={title}>
-      <div ref={containerRef} className="w-full max-w-lg rounded-lg border border-border bg-surface p-5 shadow-lg">
+      <div ref={containerRef} className="w-full max-w-lg rounded-none border border-border bg-surface p-5 shadow-lg">
         <header className="mb-4 space-y-1">
           <h3 className="text-lg font-semibold">{title}</h3>
           {description ? <p className="text-sm text-textSecondary">{description}</p> : null}

@@ -22,7 +22,7 @@ export function Tabs<T extends string>({ items, value, onChange }: TabsProps<T>)
   }
 
   return (
-    <div className="inline-flex rounded-md border border-border bg-surface p-1" role="tablist" onKeyDown={onKeyDown} aria-label="Sections">
+    <div className="inline-flex rounded-none border border-border bg-surface p-1" role="tablist" onKeyDown={onKeyDown} aria-label="Sections">
       {items.map((item) => (
         <button
           key={item.id}
@@ -30,7 +30,7 @@ export function Tabs<T extends string>({ items, value, onChange }: TabsProps<T>)
           role="tab"
           aria-selected={item.id === value}
           className={cx(
-            "focus-ring rounded px-3 py-1.5 text-sm transition-colors",
+            "focus-ring rounded-none px-3 py-1.5 text-sm transition-colors",
             item.id === value ? "bg-brand text-white" : "text-textSecondary hover:text-textPrimary"
           )}
           onClick={() => onChange(item.id)}

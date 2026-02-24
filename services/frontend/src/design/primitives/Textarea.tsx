@@ -15,7 +15,7 @@ export function Textarea({ className, error, label, helpText, id, ...props }: Te
       <textarea
         id={textareaId}
         className={cx(
-          "focus-ring min-h-24 w-full rounded-md border bg-canvas px-3 py-2 text-sm text-textPrimary placeholder:text-textMuted",
+          "focus-ring min-h-24 w-full rounded-none border bg-canvas px-3 py-2 text-sm text-textPrimary placeholder:text-textMuted",
           error ? "border-danger" : "border-border",
           className
         )}

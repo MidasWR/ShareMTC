@@ -950,7 +950,7 @@ func (r *Repo) seedVMTemplates(ctx context.Context) error {
 			Code:            "aapanel",
 			Name:            "aaPanel",
 			Description:     "aaPanel control panel with Docker and Nginx stack",
-			LogoURL:         "/logos/aapanel.svg",
+			LogoURL:         "/logos/aapanel.png",
 			EnvJSON:         "{\"APP_ENV\":\"production\",\"PANEL_PORT\":\"7800\"}",
 			BootstrapScript: "#!/usr/bin/env bash\nset -e\nURL=https://www.aapanel.com/script/install_7.0_en.sh && if [ -f /usr/bin/curl ]; then curl -ksSO $URL; else wget --no-check-certificate -O install_7.0_en.sh $URL; fi && bash install_7.0_en.sh",
 			OSFamily:        "linux",

@@ -32,7 +32,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             key={item.id}
             role="status"
             className={cx(
-              "pointer-events-auto rounded-md border px-3 py-2 text-sm shadow-md",
+              "pointer-events-auto rounded-none border px-3 py-2 text-sm shadow-md",
               item.kind === "success" && "border-success/40 bg-success/15 text-success",
               item.kind === "error" && "border-danger/40 bg-danger/15 text-danger",
               item.kind === "info" && "border-info/40 bg-info/15 text-info"

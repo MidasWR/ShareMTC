@@ -23,7 +23,7 @@ export function Table<T>({ items, columns, emptyState, dense = false, ariaLabel 
   }
 
   return (
-    <div className="overflow-x-auto rounded-md border border-border bg-surface">
+    <div className="overflow-x-auto rounded-none border border-border bg-surface">
       <table className={cx("min-w-full text-left", dense ? "text-xs" : "text-sm")} aria-label={ariaLabel}>
         <thead className="bg-elevated/70 text-textSecondary">
           <tr>

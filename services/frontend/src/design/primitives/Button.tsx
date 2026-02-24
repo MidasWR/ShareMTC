@@ -40,7 +40,7 @@ export function Button({
   return (
     <button
       className={cx(
-        "focus-ring inline-flex items-center justify-center gap-2 rounded-md font-medium transition-colors disabled:pointer-events-none disabled:opacity-60",
+        "focus-ring inline-flex items-center justify-center gap-2 rounded-none font-medium transition-colors disabled:pointer-events-none disabled:opacity-60",
         variantClasses[variant],
         sizeClasses[size],
         className

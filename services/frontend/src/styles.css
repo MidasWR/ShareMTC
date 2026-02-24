@@ -57,7 +57,7 @@ body {
 }
 
 .surface-card {
-  @apply border border-border rounded-md bg-surface shadow-sm;
+  @apply border border-border rounded-none bg-surface shadow-sm;
 }
 
 .neon-glow {

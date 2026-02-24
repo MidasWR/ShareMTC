@@ -205,7 +205,7 @@ export function PodsCatalogPanel() {
             <button
               key={item.code}
               type="button"
-              className="rounded-md border border-border bg-surface p-3 text-left transition-colors hover:border-info/60 hover:bg-elevated/50"
+              className="h-32 rounded-none border border-border bg-surface p-3 text-left transition-colors hover:border-info/60 hover:bg-elevated/50"
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="font-semibold">{item.name}</div>
@@ -229,7 +229,7 @@ export function PodsCatalogPanel() {
             <button
               key={item.code}
               type="button"
-              className="rounded-md border border-border bg-surface p-3 text-left transition-colors hover:border-brand/60 hover:bg-elevated/40"
+              className="h-32 rounded-none border border-border bg-surface p-3 text-left transition-colors hover:border-brand/60 hover:bg-elevated/40"
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="font-medium">{item.name}</div>

@@ -15,7 +15,7 @@ export function Input({ className, error, label, helpText, id, ...props }: Input
       <input
         id={inputId}
         className={cx(
-          "focus-ring h-10 w-full rounded-md border bg-canvas px-3 text-sm text-textPrimary placeholder:text-textMuted",
+          "focus-ring h-10 w-full rounded-none border bg-canvas px-3 text-sm text-textPrimary placeholder:text-textMuted",
           error ? "border-danger" : "border-border",
           className
         )}

@@ -19,7 +19,7 @@ export function Select({ className, options, error, label, helpText, ...props }:
       {label ? <span className="text-sm font-medium text-textSecondary">{label}</span> : null}
       <select
         className={cx(
-          "focus-ring h-10 w-full rounded-md border bg-canvas px-3 text-sm text-textPrimary",
+          "focus-ring h-10 w-full rounded-none border bg-canvas px-3 text-sm text-textPrimary",
           error ? "border-danger" : "border-border",
           className
         )}
