@@ -32,7 +32,9 @@ func main() {
 	defer pool.Close()
 
 	repo := storage.NewRepo(pool)
-	logger.Info().Msg("database migrations are managed externally by Atlas CRD")
+	if err := repo.Migrate(context.Background()); err != nil {
+		logger.Fatal().Err(err).Msg("migration failed")
+	}
 	svc := service.New(repo)
 	handler := httpadapter.NewHandler(svc)
 

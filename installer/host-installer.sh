@@ -47,19 +47,6 @@ wait_for_crd() {
   done
 }
 
-wait_for_atlas_crd() {
-  local max_attempts="${1:-60}"
-  local i=0
-  until kubectl get crd atlasmigrations.db.atlasgo.io >/dev/null 2>&1 || kubectl get crd atlasschemas.db.atlasgo.io >/dev/null 2>&1; do
-    i=$((i + 1))
-    if [[ "${i}" -ge "${max_attempts}" ]]; then
-      echo "Timed out waiting for Atlas Operator CRDs (atlasmigrations/atlasschemas)"
-      exit 1
-    fi
-    sleep 2
-  done
-}
-
 wait_for_gatewayclass() {
   local name="${1:-envoy}"
   local max_attempts="${2:-90}"
@@ -156,14 +143,12 @@ install_prerequisites() {
   helm upgrade --install strimzi-kafka-operator strimzi/strimzi-kafka-operator -n "${STRIMZI_NAMESPACE}" --create-namespace
   helm upgrade --install kyverno kyverno/kyverno -n kyverno --create-namespace
   helm upgrade --install postgres-operator postgres-operator-charts/postgres-operator -n postgres-operator --create-namespace
-  helm upgrade --install atlas-operator oci://ghcr.io/ariga/charts/atlas-operator -n atlas-system --create-namespace
   helm upgrade --install vpa fairwinds-stable/vpa -n vpa --create-namespace
 
   wait_for_crd "kafkas.kafka.strimzi.io"
   wait_for_crd "kafkatopics.kafka.strimzi.io"
   wait_for_crd "clusterpolicies.kyverno.io"
   wait_for_crd "postgresqls.acid.zalan.do"
-  wait_for_atlas_crd
   wait_for_crd "verticalpodautoscalers.autoscaling.k8s.io"
   wait_for_gatewayclass "$(resolve_envoy_gateway_class)"
 }
