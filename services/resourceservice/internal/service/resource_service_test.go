@@ -19,6 +19,8 @@ type repoStub struct {
 	templates     []models.VMTemplate
 	healthChecks  []models.HealthCheck
 	metricPoints  []models.MetricPoint
+	sharedOffers  []models.SharedInventoryOffer
+	agentLogs     []models.AgentLog
 }
 
 func (r *repoStub) UpsertHostResource(_ context.Context, resource models.HostResource) error {
@@ -96,6 +98,38 @@ func (r *repoStub) CreateSharedPod(_ context.Context, item models.SharedPod) (mo
 func (r *repoStub) ListSharedPods(_ context.Context, _ string) ([]models.SharedPod, error) {
 	return r.sharedPods, nil
 }
+func (r *repoStub) UpsertSharedInventoryOffer(_ context.Context, item models.SharedInventoryOffer) (models.SharedInventoryOffer, error) {
+	if item.ID == "" {
+		item.ID = "offer-1"
+	}
+	r.sharedOffers = append(r.sharedOffers, item)
+	return item, nil
+}
+func (r *repoStub) ListSharedInventoryOffers(_ context.Context, status string, providerID string) ([]models.SharedInventoryOffer, error) {
+	out := make([]models.SharedInventoryOffer, 0)
+	for _, item := range r.sharedOffers {
+		if status != "" && string(item.Status) != status {
+			continue
+		}
+		if providerID != "" && item.ProviderID != providerID {
+			continue
+		}
+		out = append(out, item)
+	}
+	return out, nil
+}
+func (r *repoStub) ReserveSharedInventoryOffer(_ context.Context, offerID string, quantity int) (models.SharedInventoryOffer, error) {
+	for i := range r.sharedOffers {
+		if r.sharedOffers[i].ID == offerID {
+			if r.sharedOffers[i].AvailableQty < quantity {
+				return models.SharedInventoryOffer{}, errors.New("insufficient available quantity")
+			}
+			r.sharedOffers[i].AvailableQty -= quantity
+			return r.sharedOffers[i], nil
+		}
+	}
+	return models.SharedInventoryOffer{}, errors.New("not found")
+}
 func (r *repoStub) CreateHealthCheck(_ context.Context, item models.HealthCheck) (models.HealthCheck, error) {
 	item.ID = "health-1"
 	r.healthChecks = append(r.healthChecks, item)
@@ -126,6 +160,27 @@ func (r *repoStub) MetricSummaries(_ context.Context, _ int) ([]models.MetricSum
 		AvgValue:     r.metricPoints[0].Value,
 		LastValue:    r.metricPoints[len(r.metricPoints)-1].Value,
 	}}, nil
+}
+func (r *repoStub) CreateAgentLog(_ context.Context, item models.AgentLog) (models.AgentLog, error) {
+	item.ID = "log-1"
+	r.agentLogs = append(r.agentLogs, item)
+	return item, nil
+}
+func (r *repoStub) ListAgentLogs(_ context.Context, providerID string, resourceID string, level string, _ int) ([]models.AgentLog, error) {
+	out := make([]models.AgentLog, 0)
+	for _, item := range r.agentLogs {
+		if providerID != "" && item.ProviderID != providerID {
+			continue
+		}
+		if resourceID != "" && item.ResourceID != resourceID {
+			continue
+		}
+		if level != "" && string(item.Level) != level {
+			continue
+		}
+		out = append(out, item)
+	}
+	return out, nil
 }
 func (r *repoStub) CreateKubernetesCluster(_ context.Context, item models.KubernetesCluster) (models.KubernetesCluster, error) {
 	item.CreatedAt = time.Now().UTC()
@@ -287,5 +342,56 @@ func TestCreateKubernetesCluster(t *testing.T) {
 	}
 	if cluster.Endpoint == "" {
 		t.Fatal("expected endpoint to be set")
+	}
+}
+
+func TestSharedInventoryReserveFlow(t *testing.T) {
+	repo := &repoStub{}
+	svc := NewResourceService(repo, cgStub{}, orchestratorStub{})
+
+	offer, err := svc.UpsertSharedInventoryOffer(context.Background(), models.SharedInventoryOffer{
+		ProviderID:   "p1",
+		ResourceType: "gpu",
+		Title:        "Shared H100",
+		Description:  "8x H100 pool",
+		CPUCores:     32,
+		RAMMB:        131072,
+		GPUUnits:     8,
+		NetworkMbps:  20000,
+		Quantity:     8,
+		AvailableQty: 8,
+		PriceHourly:  4.2,
+		CreatedBy:    "owner-1",
+	})
+	if err != nil {
+		t.Fatalf("upsert shared offer: %v", err)
+	}
+	if offer.ID == "" {
+		t.Fatal("expected non-empty offer id")
+	}
+
+	reserved, err := svc.ReserveSharedInventoryOffer(context.Background(), offer.ID, 3)
+	if err != nil {
+		t.Fatalf("reserve shared offer: %v", err)
+	}
+	if reserved.AvailableQty != 5 {
+		t.Fatalf("expected available qty 5, got %d", reserved.AvailableQty)
+	}
+}
+
+func TestAgentLogRecord(t *testing.T) {
+	repo := &repoStub{}
+	svc := NewResourceService(repo, cgStub{}, orchestratorStub{})
+
+	entry, err := svc.RecordAgentLog(context.Background(), models.AgentLog{
+		ProviderID: "p1",
+		ResourceID: "vm-1",
+		Message:    "heartbeat ok",
+	})
+	if err != nil {
+		t.Fatalf("record agent log: %v", err)
+	}
+	if entry.Level != models.AgentLogInfo {
+		t.Fatalf("expected default level info, got %s", entry.Level)
 	}
 }

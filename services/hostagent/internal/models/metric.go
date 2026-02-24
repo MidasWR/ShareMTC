@@ -10,3 +10,12 @@ type HostMetric struct {
 	NetworkMbps  int       `json:"network_mbps"`
 	HeartbeatAt  time.Time `json:"heartbeat_at"`
 }
+
+type AgentLog struct {
+	ProviderID string    `json:"provider_id"`
+	ResourceID string    `json:"resource_id"`
+	Level      string    `json:"level"`
+	Message    string    `json:"message"`
+	Source     string    `json:"source"`
+	CreatedAt  time.Time `json:"created_at"`
+}

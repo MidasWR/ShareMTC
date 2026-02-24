@@ -98,6 +98,13 @@ type VMTemplate struct {
 	Code        string    `json:"code"`
 	Name        string    `json:"name"`
 	Description string    `json:"description"`
+	LogoURL     string    `json:"logo_url"`
+	EnvJSON     string    `json:"env_json"`
+	SSHPublicKey string   `json:"ssh_public_key"`
+	BootstrapScript string `json:"bootstrap_script"`
+	OSFamily    string    `json:"os_family"`
+	IsPublic    bool      `json:"is_public"`
+	OwnerUserID string    `json:"owner_user_id"`
 	OSName      string    `json:"os_name"`
 	Region      string    `json:"region"`
 	CloudType   string    `json:"cloud_type"`
@@ -113,6 +120,51 @@ type VMTemplate struct {
 	AvailabilityTier        string    `json:"availability_tier"`
 	MaxInstances            int       `json:"max_instances"`
 	CreatedAt   time.Time `json:"created_at"`
+}
+
+type SharedInventoryStatus string
+
+const (
+	SharedInventoryStatusActive  SharedInventoryStatus = "active"
+	SharedInventoryStatusPaused  SharedInventoryStatus = "paused"
+	SharedInventoryStatusSoldOut SharedInventoryStatus = "sold_out"
+)
+
+type SharedInventoryOffer struct {
+	ID           string                `json:"id"`
+	ProviderID   string                `json:"provider_id"`
+	ResourceType string                `json:"resource_type"`
+	Title        string                `json:"title"`
+	Description  string                `json:"description"`
+	CPUCores     int                   `json:"cpu_cores"`
+	RAMMB        int                   `json:"ram_mb"`
+	GPUUnits     int                   `json:"gpu_units"`
+	NetworkMbps  int                   `json:"network_mbps"`
+	Quantity     int                   `json:"quantity"`
+	AvailableQty int                   `json:"available_qty"`
+	PriceHourly  float64               `json:"price_hourly_usd"`
+	Status       SharedInventoryStatus `json:"status"`
+	CreatedBy    string                `json:"created_by"`
+	CreatedAt    time.Time             `json:"created_at"`
+	UpdatedAt    time.Time             `json:"updated_at"`
+}
+
+type AgentLogLevel string
+
+const (
+	AgentLogInfo  AgentLogLevel = "info"
+	AgentLogWarn  AgentLogLevel = "warning"
+	AgentLogError AgentLogLevel = "error"
+)
+
+type AgentLog struct {
+	ID         string        `json:"id"`
+	ProviderID string        `json:"provider_id"`
+	ResourceID string        `json:"resource_id"`
+	Level      AgentLogLevel `json:"level"`
+	Message    string        `json:"message"`
+	Source     string        `json:"source"`
+	CreatedAt  time.Time     `json:"created_at"`
 }
 
 type CatalogFilter struct {

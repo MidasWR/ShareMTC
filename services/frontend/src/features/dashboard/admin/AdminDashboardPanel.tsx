@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { listProviders } from "../../admin/api/adminApi";
 import { listAllAccruals, getBillingStats } from "../../billing/api/billingApi";
-import { listAllAllocations, getResourceStats, listHealthChecks, listMetricSummaries } from "../../resources/api/resourcesApi";
+import { listAgentLogs, listAllAllocations, getResourceStats, listHealthChecks, listMetricSummaries } from "../../resources/api/resourcesApi";
 import { useToast } from "../../../design/components/Toast";
 import { Table } from "../../../design/components/Table";
 import { EmptyState } from "../../../design/patterns/EmptyState";
@@ -11,6 +11,7 @@ import { PageSectionHeader } from "../../../design/patterns/PageSectionHeader";
 import { Button } from "../../../design/primitives/Button";
 import { Card } from "../../../design/primitives/Card";
 import { Badge } from "../../../design/primitives/Badge";
+import { AgentLog } from "../../../types/api";
 
 type ProviderLoad = {
   provider: string;
@@ -32,24 +33,29 @@ export function AdminDashboardPanel() {
   const [riskRows, setRiskRows] = useState<Array<{ provider: string; issue: string; severity: string }>>([]);
   const [healthRowsCount, setHealthRowsCount] = useState(0);
   const [metricRowsCount, setMetricRowsCount] = useState(0);
+  const [agentLogRowsCount, setAgentLogRowsCount] = useState(0);
+  const [agentLogRows, setAgentLogRows] = useState<AgentLog[]>([]);
   const { push } = useToast();
 
   async function refresh() {
     setLoading(true);
     try {
-      const [providers, allocations, accruals, nextResourceStats, nextBillingStats, healthRows, metricRows] = await Promise.all([
+      const [providers, allocations, accruals, nextResourceStats, nextBillingStats, healthRows, metricRows, agentLogs] = await Promise.all([
         listProviders(),
         listAllAllocations(500, 0),
         listAllAccruals(500, 0),
         getResourceStats(),
         getBillingStats(),
         listHealthChecks({ limit: 300 }),
-        listMetricSummaries(300)
+        listMetricSummaries(300),
+        listAgentLogs({ limit: 300 })
       ]);
       setResourceStats(nextResourceStats);
       setBillingStats(nextBillingStats);
       setHealthRowsCount(healthRows.length);
       setMetricRowsCount(metricRows.length);
+      setAgentLogRowsCount(agentLogs.length);
+      setAgentLogRows(agentLogs.slice(0, 12));
 
       const revenueByProvider = new Map<string, number>();
       for (const item of accruals) {
@@ -115,6 +121,7 @@ export function AdminDashboardPanel() {
         <MetricTile label="GPU in use" value={`${resourceStats.gpu_units_running}`} />
         <MetricTile label="Health records" value={`${healthRowsCount}`} />
         <MetricTile label="Metric streams" value={`${metricRowsCount}`} />
+        <MetricTile label="Agent logs" value={`${agentLogRowsCount}`} />
       </div>
 
       <Card title="Top Providers by Revenue" description="Leaders by total accrual value.">
@@ -149,6 +156,22 @@ export function AdminDashboardPanel() {
                 </Badge>
               )
             }
+          ]}
+        />
+      </Card>
+
+      <Card title="Agent Log Feed" description="Latest logs from provider agents for triage.">
+        <Table
+          dense
+          ariaLabel="Admin agent logs"
+          rowKey={(row) => `${row.id ?? ""}-${row.provider_id}-${row.message}`}
+          items={agentLogRows}
+          emptyState={<EmptyState title="No agent logs" description="No logs were ingested from hostagent." />}
+          columns={[
+            { key: "provider", header: "Provider", render: (row) => row.provider_id },
+            { key: "level", header: "Level", render: (row) => row.level },
+            { key: "message", header: "Message", render: (row) => row.message },
+            { key: "created", header: "Created", render: (row) => row.created_at ? new Date(row.created_at).toLocaleString() : "-" }
           ]}
         />
       </Card>

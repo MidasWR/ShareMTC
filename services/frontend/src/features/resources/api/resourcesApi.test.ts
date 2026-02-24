@@ -41,4 +41,20 @@ describe("resources API query composition", () => {
     expect(query).toContain("sort_by=vram");
     expect(query).toContain("min_vram_gb=48");
   });
+
+  it("creates query string for shared offers and agent logs", () => {
+    const offers = new URLSearchParams();
+    offers.set("status", "active");
+    offers.set("provider_id", "provider-1");
+    expect(offers.toString()).toContain("status=active");
+    expect(offers.toString()).toContain("provider_id=provider-1");
+
+    const logs = new URLSearchParams();
+    logs.set("provider_id", "provider-1");
+    logs.set("level", "warning");
+    logs.set("limit", "200");
+    expect(logs.toString()).toContain("provider_id=provider-1");
+    expect(logs.toString()).toContain("level=warning");
+    expect(logs.toString()).toContain("limit=200");
+  });
 });

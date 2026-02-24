@@ -41,6 +41,14 @@ spec:
     - matches:
         - path:
             type: PathPrefix
+            value: /v1/catalog
+      backendRefs:
+        - name: {{ .Values.services.admin.name }}
+          namespace: {{ .Values.services.namespace }}
+          port: {{ .Values.services.admin.port }}
+    - matches:
+        - path:
+            type: PathPrefix
             value: /v1/resources
       backendRefs:
         - name: {{ .Values.services.resource.name }}

@@ -54,3 +54,14 @@ export function deletePodTemplate(templateID: string) {
 export function getAgentInstallCommand() {
   return apiClient.get<{ command: string; installer_url: string }>(`${API_BASE.admin}/v1/admin/agent/install-command`);
 }
+
+export function getPodProxyInfo(podID: string) {
+  return apiClient.get<{ pod_id: string; route_target: string; host_ip: string; ssh_user: string }>(
+    `${API_BASE.admin}/v1/admin/pods/${encodeURIComponent(podID)}/proxy-info`
+  );
+}
+
+export function getPodProxyURL(podID: string, path = "/") {
+  const normalized = path.startsWith("/") ? path : `/${path}`;
+  return `${API_BASE.admin}/v1/admin/pods/${encodeURIComponent(podID)}/proxy${normalized}`;
+}

@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"time"
 
@@ -90,6 +91,17 @@ func (r *Repo) Migrate(ctx context.Context) error {
 		CREATE INDEX IF NOT EXISTS idx_vms_vram_availability ON vms(vram_gb, availability_tier);
 		CREATE INDEX IF NOT EXISTS idx_templates_region_cloud ON vm_templates(region, cloud_type);
 		CREATE INDEX IF NOT EXISTS idx_templates_vram_availability ON vm_templates(vram_gb, availability_tier);
+		CREATE TABLE IF NOT EXISTS vm_template_profiles (
+			template_code TEXT PRIMARY KEY,
+			logo_url TEXT NOT NULL DEFAULT '',
+			env_json TEXT NOT NULL DEFAULT '{}',
+			ssh_public_key TEXT NOT NULL DEFAULT '',
+			bootstrap_script TEXT NOT NULL DEFAULT '',
+			os_family TEXT NOT NULL DEFAULT 'linux',
+			is_public BOOLEAN NOT NULL DEFAULT TRUE,
+			owner_user_id TEXT NOT NULL DEFAULT 'system',
+			updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+		);
 		CREATE TABLE IF NOT EXISTS shared_vms (
 			id TEXT PRIMARY KEY,
 			vm_id TEXT NOT NULL REFERENCES vms(id) ON DELETE CASCADE,
@@ -108,6 +120,26 @@ func (r *Repo) Migrate(ctx context.Context) error {
 			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 		);
 		CREATE INDEX IF NOT EXISTS idx_shared_pods_owner ON shared_pods(owner_user_id);
+		CREATE TABLE IF NOT EXISTS shared_inventory_offers (
+			id TEXT PRIMARY KEY,
+			provider_id TEXT NOT NULL,
+			resource_type TEXT NOT NULL,
+			title TEXT NOT NULL,
+			description TEXT NOT NULL,
+			cpu_cores INTEGER NOT NULL,
+			ram_mb INTEGER NOT NULL,
+			gpu_units INTEGER NOT NULL,
+			network_mbps INTEGER NOT NULL,
+			quantity INTEGER NOT NULL,
+			available_qty INTEGER NOT NULL,
+			price_hourly_usd DOUBLE PRECISION NOT NULL,
+			status TEXT NOT NULL DEFAULT 'active',
+			created_by TEXT NOT NULL,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+			updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+		);
+		CREATE INDEX IF NOT EXISTS idx_shared_inventory_status ON shared_inventory_offers(status, updated_at DESC);
+		CREATE INDEX IF NOT EXISTS idx_shared_inventory_provider ON shared_inventory_offers(provider_id, updated_at DESC);
 		CREATE TABLE IF NOT EXISTS health_checks (
 			id TEXT PRIMARY KEY,
 			resource_type TEXT NOT NULL,
@@ -127,6 +159,17 @@ func (r *Repo) Migrate(ctx context.Context) error {
 			captured_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 		);
 		CREATE INDEX IF NOT EXISTS idx_metric_points_rt ON metric_points(resource_type, resource_id, metric_type, captured_at DESC);
+		CREATE TABLE IF NOT EXISTS agent_logs (
+			id TEXT PRIMARY KEY,
+			provider_id TEXT NOT NULL,
+			resource_id TEXT NOT NULL DEFAULT '',
+			level TEXT NOT NULL,
+			message TEXT NOT NULL,
+			source TEXT NOT NULL DEFAULT 'hostagent',
+			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+		);
+		CREATE INDEX IF NOT EXISTS idx_agent_logs_provider ON agent_logs(provider_id, created_at DESC);
+		CREATE INDEX IF NOT EXISTS idx_agent_logs_level ON agent_logs(level, created_at DESC);
 		CREATE TABLE IF NOT EXISTS kubernetes_clusters (
 			id TEXT PRIMARY KEY,
 			user_id TEXT NOT NULL,
@@ -143,7 +186,10 @@ func (r *Repo) Migrate(ctx context.Context) error {
 		);
 		CREATE INDEX IF NOT EXISTS idx_k8s_clusters_user ON kubernetes_clusters(user_id, updated_at DESC);
 	`)
-	return err
+	if err != nil {
+		return err
+	}
+	return r.seedVMTemplates(ctx)
 }
 
 func (r *Repo) UpsertHostResource(ctx context.Context, resource models.HostResource) error {
@@ -305,7 +351,13 @@ func (r *Repo) UpsertVMTemplate(ctx context.Context, tpl models.VMTemplate) (mod
 		tpl.AvailabilityTier,
 		tpl.MaxInstances,
 	).Scan(&tpl.ID, &tpl.CreatedAt)
-	return tpl, err
+	if err != nil {
+		return tpl, err
+	}
+	if err := r.upsertVMTemplateProfile(ctx, tpl); err != nil {
+		return tpl, err
+	}
+	return tpl, nil
 }
 
 func (r *Repo) ListVMTemplates(ctx context.Context, filter models.CatalogFilter) ([]models.VMTemplate, error) {
@@ -320,17 +372,26 @@ func (r *Repo) ListVMTemplates(ctx context.Context, filter models.CatalogFilter)
 	}
 	rows, err := r.db.Query(ctx, `
 		SELECT
-			id, code, name, description, os_name, region, cloud_type, cpu_cores, vcpu, ram_mb, system_ram_gb,
+			t.id, t.code, t.name, t.description,
+			COALESCE(p.logo_url, ''),
+			COALESCE(p.env_json, '{}'),
+			COALESCE(p.ssh_public_key, ''),
+			COALESCE(p.bootstrap_script, ''),
+			COALESCE(p.os_family, 'linux'),
+			COALESCE(p.is_public, TRUE),
+			COALESCE(p.owner_user_id, 'system'),
+			t.os_name, t.region, t.cloud_type, t.cpu_cores, t.vcpu, t.ram_mb, t.system_ram_gb,
 			gpu_units, vram_gb, network_mbps, network_volume_supported, global_networking_supported, availability_tier, max_instances, created_at
-		FROM vm_templates
+		FROM vm_templates t
+		LEFT JOIN vm_template_profiles p ON p.template_code = t.code
 		WHERE
-			($1 = '' OR LOWER(name) LIKE '%' || LOWER($1) || '%' OR LOWER(code) LIKE '%' || LOWER($1) || '%')
-			AND ($2 = '' OR region = $2)
-			AND ($3 = '' OR cloud_type = $3)
-			AND ($4 = '' OR availability_tier = $4)
-			AND ($5 = '' OR network_volume_supported = ($5 = 'true'))
-			AND ($6 = '' OR global_networking_supported = ($6 = 'true'))
-			AND ($7 <= 0 OR vram_gb >= $7)
+			($1 = '' OR LOWER(t.name) LIKE '%' || LOWER($1) || '%' OR LOWER(t.code) LIKE '%' || LOWER($1) || '%')
+			AND ($2 = '' OR t.region = $2)
+			AND ($3 = '' OR t.cloud_type = $3)
+			AND ($4 = '' OR t.availability_tier = $4)
+			AND ($5 = '' OR t.network_volume_supported = ($5 = 'true'))
+			AND ($6 = '' OR t.global_networking_supported = ($6 = 'true'))
+			AND ($7 <= 0 OR t.vram_gb >= $7)
 		ORDER BY `+orderBy+`
 	`, filter.Search, filter.Region, filter.CloudType, filter.AvailabilityTier, filter.NetworkVolumeSupported, filter.GlobalNetworkingSupported, filter.MinVRAMGB)
 	if err != nil {
@@ -341,7 +402,7 @@ func (r *Repo) ListVMTemplates(ctx context.Context, filter models.CatalogFilter)
 	for rows.Next() {
 		var item models.VMTemplate
 		if err := rows.Scan(
-			&item.ID, &item.Code, &item.Name, &item.Description, &item.OSName, &item.Region, &item.CloudType,
+			&item.ID, &item.Code, &item.Name, &item.Description, &item.LogoURL, &item.EnvJSON, &item.SSHPublicKey, &item.BootstrapScript, &item.OSFamily, &item.IsPublic, &item.OwnerUserID, &item.OSName, &item.Region, &item.CloudType,
 			&item.CPUCores, &item.VCPU, &item.RAMMB, &item.SystemRAMGB, &item.GPUUnits, &item.VRAMGB, &item.NetworkMbps,
 			&item.NetworkVolumeSupported, &item.GlobalNetworkingSupport, &item.AvailabilityTier, &item.MaxInstances, &item.CreatedAt,
 		); err != nil {
@@ -637,6 +698,118 @@ func (r *Repo) MetricSummaries(ctx context.Context, limit int) ([]models.MetricS
 	return out, nil
 }
 
+func (r *Repo) UpsertSharedInventoryOffer(ctx context.Context, item models.SharedInventoryOffer) (models.SharedInventoryOffer, error) {
+	if item.ID == "" {
+		item.ID = uuid.NewString()
+	}
+	err := r.db.QueryRow(ctx, `
+		INSERT INTO shared_inventory_offers (
+			id, provider_id, resource_type, title, description, cpu_cores, ram_mb, gpu_units, network_mbps,
+			quantity, available_qty, price_hourly_usd, status, created_by
+		)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+		ON CONFLICT (id) DO UPDATE SET
+			resource_type = EXCLUDED.resource_type,
+			title = EXCLUDED.title,
+			description = EXCLUDED.description,
+			cpu_cores = EXCLUDED.cpu_cores,
+			ram_mb = EXCLUDED.ram_mb,
+			gpu_units = EXCLUDED.gpu_units,
+			network_mbps = EXCLUDED.network_mbps,
+			quantity = EXCLUDED.quantity,
+			available_qty = EXCLUDED.available_qty,
+			price_hourly_usd = EXCLUDED.price_hourly_usd,
+			status = EXCLUDED.status,
+			updated_at = NOW()
+		RETURNING created_at, updated_at
+	`, item.ID, item.ProviderID, item.ResourceType, item.Title, item.Description, item.CPUCores, item.RAMMB, item.GPUUnits, item.NetworkMbps, item.Quantity, item.AvailableQty, item.PriceHourly, item.Status, item.CreatedBy).Scan(&item.CreatedAt, &item.UpdatedAt)
+	return item, err
+}
+
+func (r *Repo) ListSharedInventoryOffers(ctx context.Context, status string, providerID string) ([]models.SharedInventoryOffer, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT id, provider_id, resource_type, title, description, cpu_cores, ram_mb, gpu_units, network_mbps, quantity, available_qty, price_hourly_usd, status, created_by, created_at, updated_at
+		FROM shared_inventory_offers
+		WHERE ($1 = '' OR status = $1)
+		  AND ($2 = '' OR provider_id = $2)
+		ORDER BY updated_at DESC
+	`, status, providerID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make([]models.SharedInventoryOffer, 0)
+	for rows.Next() {
+		var item models.SharedInventoryOffer
+		if err := rows.Scan(&item.ID, &item.ProviderID, &item.ResourceType, &item.Title, &item.Description, &item.CPUCores, &item.RAMMB, &item.GPUUnits, &item.NetworkMbps, &item.Quantity, &item.AvailableQty, &item.PriceHourly, &item.Status, &item.CreatedBy, &item.CreatedAt, &item.UpdatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, item)
+	}
+	return out, nil
+}
+
+func (r *Repo) ReserveSharedInventoryOffer(ctx context.Context, offerID string, quantity int) (models.SharedInventoryOffer, error) {
+	cmd, err := r.db.Exec(ctx, `
+		UPDATE shared_inventory_offers
+		SET available_qty = available_qty - $2,
+		    status = CASE WHEN available_qty - $2 <= 0 THEN 'sold_out' ELSE status END,
+		    updated_at = NOW()
+		WHERE id = $1
+		  AND available_qty >= $2
+	`, offerID, quantity)
+	if err != nil {
+		return models.SharedInventoryOffer{}, err
+	}
+	if cmd.RowsAffected() == 0 {
+		return models.SharedInventoryOffer{}, errors.New("offer not found or insufficient available quantity")
+	}
+	var item models.SharedInventoryOffer
+	err = r.db.QueryRow(ctx, `
+		SELECT id, provider_id, resource_type, title, description, cpu_cores, ram_mb, gpu_units, network_mbps, quantity, available_qty, price_hourly_usd, status, created_by, created_at, updated_at
+		FROM shared_inventory_offers
+		WHERE id = $1
+	`, offerID).Scan(&item.ID, &item.ProviderID, &item.ResourceType, &item.Title, &item.Description, &item.CPUCores, &item.RAMMB, &item.GPUUnits, &item.NetworkMbps, &item.Quantity, &item.AvailableQty, &item.PriceHourly, &item.Status, &item.CreatedBy, &item.CreatedAt, &item.UpdatedAt)
+	return item, err
+}
+
+func (r *Repo) CreateAgentLog(ctx context.Context, item models.AgentLog) (models.AgentLog, error) {
+	if item.ID == "" {
+		item.ID = uuid.NewString()
+	}
+	err := r.db.QueryRow(ctx, `
+		INSERT INTO agent_logs (id, provider_id, resource_id, level, message, source)
+		VALUES ($1, $2, $3, $4, $5, $6)
+		RETURNING created_at
+	`, item.ID, item.ProviderID, item.ResourceID, item.Level, item.Message, item.Source).Scan(&item.CreatedAt)
+	return item, err
+}
+
+func (r *Repo) ListAgentLogs(ctx context.Context, providerID string, resourceID string, level string, limit int) ([]models.AgentLog, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT id, provider_id, resource_id, level, message, source, created_at
+		FROM agent_logs
+		WHERE ($1 = '' OR provider_id = $1)
+		  AND ($2 = '' OR resource_id = $2)
+		  AND ($3 = '' OR level = $3)
+		ORDER BY created_at DESC
+		LIMIT $4
+	`, providerID, resourceID, level, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make([]models.AgentLog, 0)
+	for rows.Next() {
+		var item models.AgentLog
+		if err := rows.Scan(&item.ID, &item.ProviderID, &item.ResourceID, &item.Level, &item.Message, &item.Source, &item.CreatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, item)
+	}
+	return out, nil
+}
+
 func (r *Repo) CreateKubernetesCluster(ctx context.Context, item models.KubernetesCluster) (models.KubernetesCluster, error) {
 	if item.ID == "" {
 		item.ID = uuid.NewString()
@@ -730,4 +903,76 @@ func nullableTime(value time.Time) *time.Time {
 		return nil
 	}
 	return &value
+}
+
+func (r *Repo) upsertVMTemplateProfile(ctx context.Context, tpl models.VMTemplate) error {
+	_, err := r.db.Exec(ctx, `
+		INSERT INTO vm_template_profiles (template_code, logo_url, env_json, ssh_public_key, bootstrap_script, os_family, is_public, owner_user_id)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+		ON CONFLICT (template_code) DO UPDATE SET
+			logo_url = EXCLUDED.logo_url,
+			env_json = EXCLUDED.env_json,
+			ssh_public_key = EXCLUDED.ssh_public_key,
+			bootstrap_script = EXCLUDED.bootstrap_script,
+			os_family = EXCLUDED.os_family,
+			is_public = EXCLUDED.is_public,
+			owner_user_id = EXCLUDED.owner_user_id,
+			updated_at = NOW()
+	`, tpl.Code, tpl.LogoURL, tpl.EnvJSON, tpl.SSHPublicKey, tpl.BootstrapScript, tpl.OSFamily, tpl.IsPublic, tpl.OwnerUserID)
+	return err
+}
+
+func (r *Repo) seedVMTemplates(ctx context.Context) error {
+	seed := []models.VMTemplate{
+		{
+			Code:            "fastpanel",
+			Name:            "FastPanel",
+			Description:     "FastPanel preinstalled web-hosting control panel",
+			LogoURL:         "/logos/fastpanel.svg",
+			EnvJSON:         "{\"APP_ENV\":\"production\",\"PANEL_PORT\":\"8888\"}",
+			BootstrapScript: "#!/usr/bin/env bash\nset -e\ncurl -fsSL https://repo.fastpanel.direct/install_fastpanel.sh | bash",
+			OSFamily:        "linux",
+			IsPublic:        true,
+			OwnerUserID:     "system",
+			OSName:          "Ubuntu 22.04",
+			Region:          "any",
+			CloudType:       "secure",
+			CPUCores:        4,
+			VCPU:            4,
+			RAMMB:           8192,
+			SystemRAMGB:     8,
+			GPUUnits:        0,
+			VRAMGB:          0,
+			NetworkMbps:     500,
+			MaxInstances:    20,
+		},
+		{
+			Code:            "aapanel",
+			Name:            "aaPanel",
+			Description:     "aaPanel control panel with Docker and Nginx stack",
+			LogoURL:         "/logos/aapanel.svg",
+			EnvJSON:         "{\"APP_ENV\":\"production\",\"PANEL_PORT\":\"7800\"}",
+			BootstrapScript: "#!/usr/bin/env bash\nset -e\nURL=https://www.aapanel.com/script/install_7.0_en.sh && if [ -f /usr/bin/curl ]; then curl -ksSO $URL; else wget --no-check-certificate -O install_7.0_en.sh $URL; fi && bash install_7.0_en.sh",
+			OSFamily:        "linux",
+			IsPublic:        true,
+			OwnerUserID:     "system",
+			OSName:          "Ubuntu 22.04",
+			Region:          "any",
+			CloudType:       "community",
+			CPUCores:        4,
+			VCPU:            4,
+			RAMMB:           8192,
+			SystemRAMGB:     8,
+			GPUUnits:        0,
+			VRAMGB:          0,
+			NetworkMbps:     500,
+			MaxInstances:    20,
+		},
+	}
+	for _, tpl := range seed {
+		if _, err := r.UpsertVMTemplate(ctx, tpl); err != nil {
+			return err
+		}
+	}
+	return nil
 }

@@ -251,6 +251,11 @@ export function PodsCatalogPanel() {
             const hasGPU = item.gpu_model && item.gpu_model !== "None";
             return (
               <Card key={item.id} title={item.name} description={item.description}>
+                {item.logo_url ? (
+                  <div className="mb-2">
+                    <img src={item.logo_url} alt={`${item.name} logo`} className="h-8 w-8 rounded-sm object-contain" />
+                  </div>
+                ) : null}
                 <div className="grid gap-2 text-sm text-textSecondary">
                   <div className="flex items-center gap-2">
                     {hasGPU ? <SiNvidia className="text-success" /> : <FaMicrochip className="text-info" />}

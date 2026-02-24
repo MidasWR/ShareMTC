@@ -8,6 +8,7 @@ import (
 	"github.com/MidasWR/ShareMTC/services/hostagent/config"
 	"github.com/MidasWR/ShareMTC/services/hostagent/internal/adapter/httpclient"
 	"github.com/MidasWR/ShareMTC/services/hostagent/internal/adapter/kafka"
+	"github.com/MidasWR/ShareMTC/services/hostagent/internal/models"
 	"github.com/MidasWR/ShareMTC/services/hostagent/internal/service"
 	"github.com/MidasWR/ShareMTC/services/sdk/logging"
 )
@@ -59,6 +60,18 @@ func main() {
 			if err := httpclient.SendHeartbeat(context.Background(), cfg.ResourceAPIURL, cfg.AgentToken, metric); err != nil {
 				logger.Error().Err(err).Msg("heartbeat http failed")
 			}
+			logLevel := "info"
+			if metric.GPUFreeUnits == 0 {
+				logLevel = "warning"
+			}
+			logMessage := "heartbeat delivered"
+			if metric.NetworkMbps == 0 {
+				logLevel = "warning"
+				logMessage = "network throughput is zero on heartbeat"
+			}
+			if err := httpclient.SendAgentLog(context.Background(), cfg.ResourceAPIURL, cfg.AgentToken, serviceLog(metric.ProviderID, logLevel, logMessage)); err != nil {
+				logger.Error().Err(err).Msg("agent log http failed")
+			}
 		}
 		logger.Info().
 			Str("provider_id", metric.ProviderID).
@@ -67,5 +80,15 @@ func main() {
 			Int("gpu_free_units", metric.GPUFreeUnits).
 			Int("network_mbps", metric.NetworkMbps).
 			Msg("metric sent")
+	}
+}
+
+func serviceLog(providerID string, level string, message string) models.AgentLog {
+	return models.AgentLog{
+		ProviderID: providerID,
+		Level:      level,
+		Message:    message,
+		Source:     "hostagent",
+		CreatedAt:  time.Now().UTC(),
 	}
 }

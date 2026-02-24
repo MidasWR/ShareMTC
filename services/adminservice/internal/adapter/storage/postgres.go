@@ -52,6 +52,15 @@ func (r *ProviderRepo) Migrate(ctx context.Context) error {
 			os_name TEXT NOT NULL,
 			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 		);
+		CREATE TABLE IF NOT EXISTS pod_route_profiles (
+			pod_code TEXT PRIMARY KEY,
+			logo_url TEXT NOT NULL DEFAULT '',
+			host_ip TEXT NOT NULL DEFAULT '',
+			ssh_user TEXT NOT NULL DEFAULT '',
+			ssh_auth_ref TEXT NOT NULL DEFAULT '',
+			route_target TEXT NOT NULL DEFAULT '',
+			updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+		);
 		CREATE TABLE IF NOT EXISTS pod_template_bindings (
 			pod_id UUID NOT NULL REFERENCES pods_catalog(id) ON DELETE CASCADE,
 			template_id UUID NOT NULL REFERENCES pod_templates(id) ON DELETE CASCADE,
@@ -184,8 +193,11 @@ func (r *ProviderRepo) tableExists(ctx context.Context, tableName string) (bool,
 
 func (r *ProviderRepo) ListPodCatalog(ctx context.Context) ([]models.PodCatalogItem, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT id, code, name, description, gpu_model, gpu_vram_gb, cpu_cores, ram_gb, network_mbps, hourly_price_usd, monthly_price_usd, os_name, created_at
-		FROM pods_catalog
+		SELECT c.id, c.code, c.name, c.description, c.gpu_model, c.gpu_vram_gb, c.cpu_cores, c.ram_gb, c.network_mbps, c.hourly_price_usd, c.monthly_price_usd, c.os_name,
+		       COALESCE(p.logo_url, ''), COALESCE(p.host_ip, ''), COALESCE(p.ssh_user, ''), COALESCE(p.ssh_auth_ref, ''), COALESCE(p.route_target, ''),
+		       c.created_at
+		FROM pods_catalog c
+		LEFT JOIN pod_route_profiles p ON p.pod_code = c.code
 		ORDER BY code
 	`)
 	if err != nil {
@@ -208,6 +220,11 @@ func (r *ProviderRepo) ListPodCatalog(ctx context.Context) ([]models.PodCatalogI
 			&item.HourlyPriceUSD,
 			&item.MonthlyPriceUSD,
 			&item.OSName,
+			&item.LogoURL,
+			&item.HostIP,
+			&item.SSHUser,
+			&item.SSHAuthRef,
+			&item.RouteTarget,
 			&item.CreatedAt,
 		); err != nil {
 			return nil, err
@@ -244,6 +261,19 @@ func (r *ProviderRepo) UpsertPodCatalog(ctx context.Context, item models.PodCata
 		RETURNING created_at
 	`, item.ID, item.Code, item.Name, item.Description, item.GPUModel, item.GPUVRAMGB, item.CPUCores, item.RAMGB, item.NetworkMbps, item.HourlyPriceUSD, item.MonthlyPriceUSD, item.OSName).Scan(&item.CreatedAt)
 	if err != nil {
+		return models.PodCatalogItem{}, err
+	}
+	if _, err := r.db.Exec(ctx, `
+		INSERT INTO pod_route_profiles (pod_code, logo_url, host_ip, ssh_user, ssh_auth_ref, route_target)
+		VALUES ($1,$2,$3,$4,$5,$6)
+		ON CONFLICT (pod_code) DO UPDATE SET
+			logo_url = EXCLUDED.logo_url,
+			host_ip = EXCLUDED.host_ip,
+			ssh_user = EXCLUDED.ssh_user,
+			ssh_auth_ref = EXCLUDED.ssh_auth_ref,
+			route_target = EXCLUDED.route_target,
+			updated_at = NOW()
+	`, item.Code, item.LogoURL, item.HostIP, item.SSHUser, item.SSHAuthRef, item.RouteTarget); err != nil {
 		return models.PodCatalogItem{}, err
 	}
 	if _, err := r.db.Exec(ctx, `DELETE FROM pod_template_bindings WHERE pod_id = $1`, item.ID); err != nil {

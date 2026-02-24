@@ -220,6 +220,35 @@ type shareRequest struct {
 	AccessLevel models.SharedAccessLevel  `json:"access_level"`
 }
 
+type sharedInventoryReserveRequest struct {
+	OfferID  string `json:"offer_id"`
+	Quantity int    `json:"quantity"`
+}
+
+type sharedInventoryUpsertRequest struct {
+	ID           string  `json:"id"`
+	ProviderID   string  `json:"provider_id"`
+	ResourceType string  `json:"resource_type"`
+	Title        string  `json:"title"`
+	Description  string  `json:"description"`
+	CPUCores     int     `json:"cpu_cores"`
+	RAMMB        int     `json:"ram_mb"`
+	GPUUnits     int     `json:"gpu_units"`
+	NetworkMbps  int     `json:"network_mbps"`
+	Quantity     int     `json:"quantity"`
+	AvailableQty int     `json:"available_qty"`
+	PriceHourly  float64 `json:"price_hourly_usd"`
+	Status       string  `json:"status"`
+}
+
+type agentLogRequest struct {
+	ProviderID string `json:"provider_id"`
+	ResourceID string `json:"resource_id"`
+	Level      string `json:"level"`
+	Message    string `json:"message"`
+	Source     string `json:"source"`
+}
+
 func (h *Handler) ShareVM(w http.ResponseWriter, r *http.Request) {
 	claims := sdkauth.ClaimsFromContext(r.Context())
 	if claims == nil {
@@ -296,6 +325,65 @@ func (h *Handler) ListSharedPods(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusOK, items)
 }
 
+func (h *Handler) UpsertSharedInventoryOffer(w http.ResponseWriter, r *http.Request) {
+	claims := sdkauth.ClaimsFromContext(r.Context())
+	if claims == nil {
+		httpx.Error(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	var req sharedInventoryUpsertRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid json")
+		return
+	}
+	item, err := h.svc.UpsertSharedInventoryOffer(r.Context(), models.SharedInventoryOffer{
+		ID:           req.ID,
+		ProviderID:   req.ProviderID,
+		ResourceType: req.ResourceType,
+		Title:        req.Title,
+		Description:  req.Description,
+		CPUCores:     req.CPUCores,
+		RAMMB:        req.RAMMB,
+		GPUUnits:     req.GPUUnits,
+		NetworkMbps:  req.NetworkMbps,
+		Quantity:     req.Quantity,
+		AvailableQty: req.AvailableQty,
+		PriceHourly:  req.PriceHourly,
+		Status:       models.SharedInventoryStatus(req.Status),
+		CreatedBy:    claims.UserID,
+	})
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	httpx.JSON(w, http.StatusCreated, item)
+}
+
+func (h *Handler) ListSharedInventoryOffers(w http.ResponseWriter, r *http.Request) {
+	status := strings.TrimSpace(r.URL.Query().Get("status"))
+	providerID := strings.TrimSpace(r.URL.Query().Get("provider_id"))
+	items, err := h.svc.ListSharedInventoryOffers(r.Context(), status, providerID)
+	if err != nil {
+		httpx.Error(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	httpx.JSON(w, http.StatusOK, items)
+}
+
+func (h *Handler) ReserveSharedInventoryOffer(w http.ResponseWriter, r *http.Request) {
+	var req sharedInventoryReserveRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid json")
+		return
+	}
+	item, err := h.svc.ReserveSharedInventoryOffer(r.Context(), req.OfferID, req.Quantity)
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	httpx.JSON(w, http.StatusOK, item)
+}
+
 func (h *Handler) RecordHealthCheck(w http.ResponseWriter, r *http.Request) {
 	var req models.HealthCheck
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -354,6 +442,39 @@ func (h *Handler) ListMetrics(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) MetricSummaries(w http.ResponseWriter, r *http.Request) {
 	limit := intQuery(r, "limit", 100)
 	items, err := h.svc.MetricSummaries(r.Context(), limit)
+	if err != nil {
+		httpx.Error(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	httpx.JSON(w, http.StatusOK, items)
+}
+
+func (h *Handler) RecordAgentLog(w http.ResponseWriter, r *http.Request) {
+	var req agentLogRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid json")
+		return
+	}
+	item, err := h.svc.RecordAgentLog(r.Context(), models.AgentLog{
+		ProviderID: req.ProviderID,
+		ResourceID: req.ResourceID,
+		Level:      models.AgentLogLevel(req.Level),
+		Message:    req.Message,
+		Source:     req.Source,
+	})
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	httpx.JSON(w, http.StatusCreated, item)
+}
+
+func (h *Handler) ListAgentLogs(w http.ResponseWriter, r *http.Request) {
+	providerID := strings.TrimSpace(r.URL.Query().Get("provider_id"))
+	resourceID := strings.TrimSpace(r.URL.Query().Get("resource_id"))
+	level := strings.TrimSpace(r.URL.Query().Get("level"))
+	limit := intQuery(r, "limit", 200)
+	items, err := h.svc.ListAgentLogs(r.Context(), providerID, resourceID, level, limit)
 	if err != nil {
 		httpx.Error(w, http.StatusInternalServerError, err.Error())
 		return

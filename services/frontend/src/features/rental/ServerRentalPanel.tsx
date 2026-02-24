@@ -15,6 +15,8 @@ import { StatusBadge } from "../../design/patterns/StatusBadge";
 import { Badge } from "../../design/primitives/Badge";
 import { FilterBar } from "../../design/components/FilterBar";
 import { ActionDropdown } from "../../design/components/ActionDropdown";
+import { listSharedOffers, reserveSharedOffer } from "../resources/api/resourcesApi";
+import { SharedInventoryOffer } from "../../types/api";
 
 type Props = {
   onNavigate: (tab: AppTab) => void;
@@ -39,6 +41,7 @@ export function ServerRentalPanel({ onNavigate }: Props) {
   const [typeFilter, setTypeFilter] = useState<"" | "hourly" | "monthly">("");
   const [createTarget, setCreateTarget] = useState<AppTab>("vm");
   const [vmByOrder, setVmByOrder] = useState<Record<string, string>>({});
+  const [sharedOffers, setSharedOffers] = useState<SharedInventoryOffer[]>([]);
   const { push } = useToast();
 
   const selectedPlan = useMemo(() => plans.find((item) => item.id === form.plan_id), [plans, form.plan_id]);
@@ -46,9 +49,10 @@ export function ServerRentalPanel({ onNavigate }: Props) {
   useEffect(() => {
     async function loadInitial() {
       try {
-        const [planRows, orderRows] = await Promise.all([listRentalPlans(), listServerOrders()]);
+        const [planRows, orderRows, offers] = await Promise.all([listRentalPlans(), listServerOrders(), listSharedOffers({ status: "active" })]);
         setPlans(planRows);
         setOrders(orderRows);
+        setSharedOffers(offers);
         if (planRows.length && !form.plan_id) {
           setForm((prev) => ({ ...prev, plan_id: planRows[0].id, period: planRows[0].period }));
         }
@@ -62,8 +66,9 @@ export function ServerRentalPanel({ onNavigate }: Props) {
   async function refresh() {
     setLoading(true);
     try {
-      const [orderRows] = await Promise.all([listServerOrders(), listVMs({ search })]);
+      const [orderRows, offers] = await Promise.all([listServerOrders(), listSharedOffers({ status: "active" }), listVMs({ search })]);
       setOrders(orderRows);
+      setSharedOffers(offers);
       push("info", "Server list refreshed");
     } catch (error) {
       push("error", error instanceof Error ? error.message : "Failed to refresh servers");
@@ -121,6 +126,23 @@ export function ServerRentalPanel({ onNavigate }: Props) {
       push("success", "Server order created");
     } catch (error) {
       push("error", error instanceof Error ? error.message : "Failed to create order");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function rentSharedOffer(offer: SharedInventoryOffer) {
+    if (!offer.id) {
+      push("error", "Offer id is missing");
+      return;
+    }
+    setLoading(true);
+    try {
+      await reserveSharedOffer({ offer_id: offer.id, quantity: 1 });
+      push("success", `Reserved 1 unit from ${offer.title}`);
+      await refresh();
+    } catch (error) {
+      push("error", error instanceof Error ? error.message : "Failed to reserve shared offer");
     } finally {
       setLoading(false);
     }
@@ -230,6 +252,32 @@ export function ServerRentalPanel({ onNavigate }: Props) {
                   ]}
                   onSelect={(action) => handleLifecycle(row, action as "start" | "stop" | "reboot" | "terminate")}
                 />
+              )
+            }
+          ]}
+        />
+      </Card>
+
+      <Card title="Shared Resource Marketplace" description="Rent published shared capacities from providers.">
+        <Table
+          dense
+          ariaLabel="Shared offers table"
+          rowKey={(row) => row.id ?? `${row.provider_id}-${row.title}`}
+          items={sharedOffers}
+          emptyState={<EmptyState title="No shared offers" description="Providers have not published capacity yet." />}
+          columns={[
+            { key: "title", header: "Offer", render: (row) => row.title },
+            { key: "provider", header: "Provider", render: (row) => row.provider_id },
+            { key: "shape", header: "Shape", render: (row) => `${row.cpu_cores} CPU / ${row.ram_mb} MB / ${row.gpu_units} GPU` },
+            { key: "available", header: "Available", render: (row) => `${row.available_qty}/${row.quantity}` },
+            { key: "price", header: "$/hr", render: (row) => row.price_hourly_usd.toFixed(2) },
+            {
+              key: "actions",
+              header: "Actions",
+              render: (row) => (
+                <Button variant="secondary" disabled={!row.id || row.available_qty <= 0 || loading} onClick={() => rentSharedOffer(row)}>
+                  Rent 1
+                </Button>
               )
             }
           ]}

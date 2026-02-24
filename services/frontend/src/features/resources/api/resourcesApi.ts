@@ -7,11 +7,13 @@ import {
   MetricPoint,
   MetricSummary,
   ResourceStats,
+  SharedInventoryOffer,
   SharedPod,
   SharedVM,
   VM,
   VMTemplate,
-  CatalogFilter
+  CatalogFilter,
+  AgentLog
 } from "../../../types/api";
 
 export function listAllocations(providerID: string) {
@@ -123,6 +125,22 @@ export function listSharedPods() {
   return apiClient.get<SharedPod[]>(`${API_BASE.resource}/v1/resources/shared/pods`);
 }
 
+export function upsertSharedOffer(payload: SharedInventoryOffer) {
+  return apiClient.post<SharedInventoryOffer>(`${API_BASE.resource}/v1/resources/shared/offers`, payload);
+}
+
+export function listSharedOffers(params?: { status?: "active" | "paused" | "sold_out"; provider_id?: string }) {
+  const search = new URLSearchParams();
+  if (params?.status) search.set("status", params.status);
+  if (params?.provider_id) search.set("provider_id", params.provider_id);
+  const query = search.toString();
+  return apiClient.get<SharedInventoryOffer[]>(`${API_BASE.resource}/v1/resources/shared/offers${query ? `?${query}` : ""}`);
+}
+
+export function reserveSharedOffer(payload: { offer_id: string; quantity: number }) {
+  return apiClient.post<SharedInventoryOffer>(`${API_BASE.resource}/v1/resources/shared/offers/reserve`, payload);
+}
+
 export function recordHealthCheck(payload: HealthCheck) {
   return apiClient.post<HealthCheck>(`${API_BASE.resource}/v1/resources/health-checks`, payload);
 }
@@ -161,6 +179,25 @@ export function listMetrics(params?: {
 
 export function listMetricSummaries(limit = 100) {
   return apiClient.get<MetricSummary[]>(`${API_BASE.resource}/v1/resources/metrics/summary?limit=${limit}`);
+}
+
+export function recordAgentLog(payload: AgentLog) {
+  return apiClient.post<AgentLog>(`${API_BASE.resource}/v1/resources/agent-logs`, payload);
+}
+
+export function listAgentLogs(params?: {
+  provider_id?: string;
+  resource_id?: string;
+  level?: "info" | "warning" | "error";
+  limit?: number;
+}) {
+  const search = new URLSearchParams();
+  if (params?.provider_id) search.set("provider_id", params.provider_id);
+  if (params?.resource_id) search.set("resource_id", params.resource_id);
+  if (params?.level) search.set("level", params.level);
+  if (params?.limit) search.set("limit", String(params.limit));
+  const query = search.toString();
+  return apiClient.get<AgentLog[]>(`${API_BASE.resource}/v1/resources/agent-logs${query ? `?${query}` : ""}`);
 }
 
 export function createK8sCluster(payload: KubernetesCluster) {

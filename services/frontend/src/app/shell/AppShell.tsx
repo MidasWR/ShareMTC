@@ -30,6 +30,10 @@ export function AppShell({ tab, enabledMenu, onNavigate, onShortcuts, onLogout, 
         onShortcuts={onShortcuts}
       />
       <main id="content" className="page-container section-stack" tabIndex={-1}>
+        <header className="mb-2 flex items-center gap-2 text-textSecondary">
+          <img src="/logo-sharemtc.svg" alt="ShareMTC logo" className="h-6 w-6" />
+          <span className="text-xs uppercase tracking-wide">ShareMTC</span>
+        </header>
         {children}
       </main>
     </div>

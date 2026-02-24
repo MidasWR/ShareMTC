@@ -2,7 +2,10 @@ package httpadapter
 
 import (
 	"encoding/json"
+	"net/http/httputil"
 	"net/http"
+	"net/url"
+	"strings"
 
 	"github.com/MidasWR/ShareMTC/services/adminservice/internal/models"
 	"github.com/MidasWR/ShareMTC/services/adminservice/internal/service"
@@ -172,4 +175,64 @@ func (h *Handler) AgentInstallCommand(w http.ResponseWriter, _ *http.Request) {
 		Command:      h.installCommand,
 		InstallerURL: "https://github.com/MidasWR/ShareMTC/releases/latest/download/hostagent-node-installer.sh",
 	})
+}
+
+func (h *Handler) PodProxyInfo(w http.ResponseWriter, r *http.Request) {
+	podID := chi.URLParam(r, "podID")
+	if strings.TrimSpace(podID) == "" {
+		httpx.Error(w, http.StatusBadRequest, "podID is required")
+		return
+	}
+	items, err := h.svc.ListPodCatalog(r.Context())
+	if err != nil {
+		httpx.Error(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	for _, item := range items {
+		if item.ID == podID {
+			httpx.JSON(w, http.StatusOK, map[string]string{
+				"pod_id":       item.ID,
+				"route_target": item.RouteTarget,
+				"host_ip":      item.HostIP,
+				"ssh_user":     item.SSHUser,
+			})
+			return
+		}
+	}
+	httpx.Error(w, http.StatusNotFound, "pod not found")
+}
+
+func (h *Handler) PodProxy(w http.ResponseWriter, r *http.Request) {
+	podID := chi.URLParam(r, "podID")
+	if strings.TrimSpace(podID) == "" {
+		httpx.Error(w, http.StatusBadRequest, "podID is required")
+		return
+	}
+	items, err := h.svc.ListPodCatalog(r.Context())
+	if err != nil {
+		httpx.Error(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	for _, item := range items {
+		if item.ID != podID {
+			continue
+		}
+		if strings.TrimSpace(item.RouteTarget) == "" {
+			httpx.Error(w, http.StatusBadRequest, "route target is not configured for pod")
+			return
+		}
+		target, err := url.Parse(item.RouteTarget)
+		if err != nil {
+			httpx.Error(w, http.StatusBadRequest, "invalid route target")
+			return
+		}
+		proxy := httputil.NewSingleHostReverseProxy(target)
+		r.URL.Path = strings.TrimPrefix(r.URL.Path, "/v1/admin/pods/"+podID+"/proxy")
+		if r.URL.Path == "" {
+			r.URL.Path = "/"
+		}
+		proxy.ServeHTTP(w, r)
+		return
+	}
+	httpx.Error(w, http.StatusNotFound, "pod not found")
 }

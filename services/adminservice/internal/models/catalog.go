@@ -24,6 +24,11 @@ type PodCatalogItem struct {
 	HourlyPriceUSD  float64   `json:"hourly_price_usd"`
 	MonthlyPriceUSD float64   `json:"monthly_price_usd"`
 	OSName          string    `json:"os_name"`
+	LogoURL         string    `json:"logo_url"`
+	HostIP          string    `json:"host_ip"`
+	SSHUser         string    `json:"ssh_user"`
+	SSHAuthRef      string    `json:"ssh_auth_ref"`
+	RouteTarget     string    `json:"route_target"`
 	TemplateIDs     []string  `json:"template_ids,omitempty"`
 	CreatedAt       time.Time `json:"created_at"`
 }

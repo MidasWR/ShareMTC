@@ -67,6 +67,8 @@ func main() {
 		api.Route("/pods", func(pods chi.Router) {
 			pods.Post("/", handler.UpsertPodCatalog)
 			pods.Delete("/{podID}", handler.DeletePodCatalog)
+			pods.Get("/{podID}/proxy-info", handler.PodProxyInfo)
+			pods.Handle("/{podID}/proxy/*", http.HandlerFunc(handler.PodProxy))
 		})
 		api.Route("/templates", func(templates chi.Router) {
 			templates.Post("/", handler.UpsertPodTemplate)

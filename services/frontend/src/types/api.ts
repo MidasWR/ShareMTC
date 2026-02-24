@@ -85,6 +85,11 @@ export type PodCatalogItem = {
   hourly_price_usd: number;
   monthly_price_usd: number;
   os_name: string;
+  logo_url?: string;
+  host_ip?: string;
+  ssh_user?: string;
+  ssh_auth_ref?: string;
+  route_target?: string;
   template_ids: string[];
 };
 
@@ -155,6 +160,13 @@ export type VMTemplate = {
   code: string;
   name: string;
   description: string;
+  logo_url?: string;
+  env_json?: string;
+  ssh_public_key?: string;
+  bootstrap_script?: string;
+  os_family?: "linux" | "windows" | "bsd";
+  is_public?: boolean;
+  owner_user_id?: string;
   os_name: string;
   region?: string;
   cloud_type?: "secure" | "community";
@@ -170,6 +182,25 @@ export type VMTemplate = {
   availability_tier?: "low" | "medium" | "high";
   max_instances?: number;
   created_at?: string;
+};
+
+export type SharedInventoryOffer = {
+  id?: string;
+  provider_id: string;
+  resource_type: "vm" | "pod" | "gpu";
+  title: string;
+  description: string;
+  cpu_cores: number;
+  ram_mb: number;
+  gpu_units: number;
+  network_mbps: number;
+  quantity: number;
+  available_qty: number;
+  price_hourly_usd: number;
+  status: "active" | "paused" | "sold_out";
+  created_by?: string;
+  created_at?: string;
+  updated_at?: string;
 };
 
 export type CatalogFilter = {
@@ -230,6 +261,16 @@ export type MetricSummary = {
   max_value: number;
   avg_value: number;
   last_value: number;
+};
+
+export type AgentLog = {
+  id?: string;
+  provider_id: string;
+  resource_id?: string;
+  level: "info" | "warning" | "error";
+  message: string;
+  source?: string;
+  created_at?: string;
 };
 
 export type KubernetesCluster = {

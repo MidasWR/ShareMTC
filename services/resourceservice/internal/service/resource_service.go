@@ -31,6 +31,9 @@ type Repository interface {
 	ListSharedVMs(ctx context.Context, userID string) ([]models.SharedVM, error)
 	CreateSharedPod(ctx context.Context, item models.SharedPod) (models.SharedPod, error)
 	ListSharedPods(ctx context.Context, userID string) ([]models.SharedPod, error)
+	UpsertSharedInventoryOffer(ctx context.Context, item models.SharedInventoryOffer) (models.SharedInventoryOffer, error)
+	ListSharedInventoryOffers(ctx context.Context, status string, providerID string) ([]models.SharedInventoryOffer, error)
+	ReserveSharedInventoryOffer(ctx context.Context, offerID string, quantity int) (models.SharedInventoryOffer, error)
 
 	CreateHealthCheck(ctx context.Context, item models.HealthCheck) (models.HealthCheck, error)
 	ListHealthChecks(ctx context.Context, resourceType string, resourceID string, limit int) ([]models.HealthCheck, error)
@@ -38,6 +41,8 @@ type Repository interface {
 	CreateMetricPoint(ctx context.Context, item models.MetricPoint) (models.MetricPoint, error)
 	ListMetricPoints(ctx context.Context, resourceType string, resourceID string, metricType string, from time.Time, to time.Time, limit int) ([]models.MetricPoint, error)
 	MetricSummaries(ctx context.Context, limit int) ([]models.MetricSummary, error)
+	CreateAgentLog(ctx context.Context, item models.AgentLog) (models.AgentLog, error)
+	ListAgentLogs(ctx context.Context, providerID string, resourceID string, level string, limit int) ([]models.AgentLog, error)
 
 	CreateKubernetesCluster(ctx context.Context, item models.KubernetesCluster) (models.KubernetesCluster, error)
 	GetKubernetesCluster(ctx context.Context, clusterID string) (models.KubernetesCluster, error)
@@ -122,6 +127,15 @@ func (s *ResourceService) UpsertVMTemplate(ctx context.Context, tpl models.VMTem
 	}
 	if tpl.MaxInstances <= 0 {
 		tpl.MaxInstances = 1
+	}
+	if tpl.OSFamily == "" {
+		tpl.OSFamily = "linux"
+	}
+	if tpl.LogoURL == "" {
+		tpl.LogoURL = "/logo-sharemtc.svg"
+	}
+	if tpl.OwnerUserID == "" {
+		tpl.OwnerUserID = "system"
 	}
 	return s.repo.UpsertVMTemplate(ctx, tpl)
 }
@@ -251,6 +265,30 @@ func (s *ResourceService) ListSharedPods(ctx context.Context, userID string) ([]
 	return s.repo.ListSharedPods(ctx, userID)
 }
 
+func (s *ResourceService) UpsertSharedInventoryOffer(ctx context.Context, item models.SharedInventoryOffer) (models.SharedInventoryOffer, error) {
+	if item.ProviderID == "" || item.ResourceType == "" || item.Title == "" {
+		return models.SharedInventoryOffer{}, errors.New("provider_id, resource_type and title are required")
+	}
+	if item.Quantity <= 0 || item.AvailableQty < 0 || item.AvailableQty > item.Quantity {
+		return models.SharedInventoryOffer{}, errors.New("quantity/available_qty are invalid")
+	}
+	if item.Status == "" {
+		item.Status = models.SharedInventoryStatusActive
+	}
+	return s.repo.UpsertSharedInventoryOffer(ctx, item)
+}
+
+func (s *ResourceService) ListSharedInventoryOffers(ctx context.Context, status string, providerID string) ([]models.SharedInventoryOffer, error) {
+	return s.repo.ListSharedInventoryOffers(ctx, status, providerID)
+}
+
+func (s *ResourceService) ReserveSharedInventoryOffer(ctx context.Context, offerID string, quantity int) (models.SharedInventoryOffer, error) {
+	if offerID == "" || quantity <= 0 {
+		return models.SharedInventoryOffer{}, errors.New("offer_id and positive quantity are required")
+	}
+	return s.repo.ReserveSharedInventoryOffer(ctx, offerID, quantity)
+}
+
 func (s *ResourceService) RecordHealthCheck(ctx context.Context, item models.HealthCheck) (models.HealthCheck, error) {
 	if item.ResourceType == "" || item.ResourceID == "" || item.CheckType == "" || item.Status == "" {
 		return models.HealthCheck{}, errors.New("resource_type, resource_id, check_type and status are required")
@@ -290,6 +328,26 @@ func (s *ResourceService) MetricSummaries(ctx context.Context, limit int) ([]mod
 		limit = 100
 	}
 	return s.repo.MetricSummaries(ctx, limit)
+}
+
+func (s *ResourceService) RecordAgentLog(ctx context.Context, item models.AgentLog) (models.AgentLog, error) {
+	if item.ProviderID == "" || item.Message == "" {
+		return models.AgentLog{}, errors.New("provider_id and message are required")
+	}
+	if item.Level == "" {
+		item.Level = models.AgentLogInfo
+	}
+	if item.Source == "" {
+		item.Source = "hostagent"
+	}
+	return s.repo.CreateAgentLog(ctx, item)
+}
+
+func (s *ResourceService) ListAgentLogs(ctx context.Context, providerID string, resourceID string, level string, limit int) ([]models.AgentLog, error) {
+	if limit <= 0 {
+		limit = 200
+	}
+	return s.repo.ListAgentLogs(ctx, providerID, resourceID, level, limit)
 }
 
 func (s *ResourceService) CreateKubernetesCluster(ctx context.Context, cluster models.KubernetesCluster) (models.KubernetesCluster, error) {

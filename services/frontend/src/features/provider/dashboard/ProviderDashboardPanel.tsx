@@ -10,9 +10,9 @@ import { StatusBadge } from "../../../design/patterns/StatusBadge";
 import { Button } from "../../../design/primitives/Button";
 import { Card } from "../../../design/primitives/Card";
 import { Input } from "../../../design/primitives/Input";
-import { Allocation, UsageAccrual } from "../../../types/api";
+import { AgentLog, Allocation, UsageAccrual } from "../../../types/api";
 import { loadProviderDashboard } from "../api/providerApi";
-import { listHealthChecks, listMetrics } from "../../resources/api/resourcesApi";
+import { listAgentLogs, listHealthChecks, listMetrics, listSharedOffers, upsertSharedOffer } from "../../resources/api/resourcesApi";
 
 
 export function ProviderDashboardPanel() {
@@ -24,6 +24,9 @@ export function ProviderDashboardPanel() {
   const [metrics, setMetrics] = useState({ allocation_total: 0, allocation_running: 0, accrual_total_usd: 0, accrual_vip_bonus_usd: 0 });
   const [healthCount, setHealthCount] = useState(0);
   const [metricCount, setMetricCount] = useState(0);
+  const [agentLogsCount, setAgentLogsCount] = useState(0);
+  const [recentLogs, setRecentLogs] = useState<AgentLog[]>([]);
+  const [sharedOfferQty, setSharedOfferQty] = useState(0);
   const { push } = useToast();
   const installerCommand =
     "curl -fsSL https://raw.githubusercontent.com/MidasWR/ShareMTC/latest/installer/hostagent-node-installer.sh | sudo RESOURCE_API_URL=http://167.71.47.177 KAFKA_BROKERS=167.71.47.177:9092 IMAGE_REPO=midaswr/host-hostagent IMAGE_TAG=latest bash";
@@ -49,6 +52,13 @@ export function ProviderDashboardPanel() {
       ]);
       setHealthCount(healthRows.length);
       setMetricCount(metricRows.length);
+      const [agentLogs, sharedOffers] = await Promise.all([
+        listAgentLogs({ provider_id: providerID.trim(), limit: 200 }),
+        listSharedOffers({ provider_id: providerID.trim() })
+      ]);
+      setAgentLogsCount(agentLogs.length);
+      setRecentLogs(agentLogs.slice(0, 8));
+      setSharedOfferQty(sharedOffers.reduce((sum, item) => sum + (item.available_qty || 0), 0));
       push("info", "Provider data synchronized");
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Failed to refresh provider dashboard");
@@ -64,6 +74,33 @@ export function ProviderDashboardPanel() {
       push("success", "Installer command copied");
     } catch {
       push("error", "Clipboard unavailable");
+    }
+  }
+
+  async function publishSharedCapacity() {
+    if (!providerID.trim()) {
+      push("error", "Provider ID is required");
+      return;
+    }
+    try {
+      await upsertSharedOffer({
+        provider_id: providerID.trim(),
+        resource_type: "gpu",
+        title: "Provider Shared GPU Pool",
+        description: "Shared GPU capacity for marketplace users",
+        cpu_cores: 16,
+        ram_mb: 65536,
+        gpu_units: 4,
+        network_mbps: 5000,
+        quantity: 4,
+        available_qty: 4,
+        price_hourly_usd: 1.49,
+        status: "active"
+      });
+      push("success", "Shared capacity published");
+      await refresh();
+    } catch (error) {
+      push("error", error instanceof Error ? error.message : "Failed to publish shared capacity");
     }
   }
 
@@ -87,6 +124,13 @@ export function ProviderDashboardPanel() {
           <MetricTile label="Running allocations" value={`${metrics.allocation_running || runningCount}`} />
           <MetricTile label="Total revenue" value={`$${totalRevenue.toFixed(2)}`} />
           <MetricTile label="Health/Metrics" value={`${healthCount}/${metricCount}`} />
+        </div>
+        <div className="mt-3 grid gap-3 md:grid-cols-2">
+          <MetricTile label="Agent logs" value={`${agentLogsCount}`} />
+          <MetricTile label="Shared offer qty" value={`${sharedOfferQty}`} />
+        </div>
+        <div className="mt-3">
+          <Button variant="secondary" onClick={publishSharedCapacity}>Publish shared capacity</Button>
         </div>
       </Card>
 
@@ -113,6 +157,20 @@ export function ProviderDashboardPanel() {
             { key: "ram", header: "RAM MB", render: (item) => <span className="tabular-nums">{item.ram_mb}</span> },
             { key: "gpu", header: "GPU", render: (item) => <span className="tabular-nums">{item.gpu_units}</span> },
             { key: "status", header: "Status", render: (item) => <StatusBadge status={item.released_at ? "stopped" : "running"} /> }
+          ]}
+        />
+      </Card>
+      <Card title="Recent Agent Logs" description="Latest messages delivered by hostagent for this provider.">
+        <Table
+          dense
+          ariaLabel="Provider agent logs table"
+          rowKey={(row) => `${row.created_at ?? ""}-${row.level}-${row.message}`}
+          items={recentLogs}
+          emptyState={<EmptyState title="No logs" description="No hostagent logs were received yet." />}
+          columns={[
+            { key: "level", header: "Level", render: (row) => row.level },
+            { key: "message", header: "Message", render: (row) => row.message },
+            { key: "created", header: "Created", render: (row) => row.created_at ? new Date(row.created_at).toLocaleString() : "-" }
           ]}
         />
       </Card>

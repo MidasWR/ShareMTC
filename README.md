@@ -130,6 +130,11 @@ ShareMTC is a compute marketplace and control plane where providers expose CPU/R
 - `GET /v1/resources/shared/vms`
 - `POST /v1/resources/shared/pods`
 - `GET /v1/resources/shared/pods`
+- `POST /v1/resources/shared/offers`
+- `GET /v1/resources/shared/offers?status=&provider_id=`
+- `POST /v1/resources/shared/offers/reserve`
+- `POST /v1/resources/agent-logs`
+- `GET /v1/resources/agent-logs?provider_id=&resource_id=&level=&limit=`
 - `POST /v1/resources/k8s/clusters`
 - `GET /v1/resources/k8s/clusters`
 - `POST /v1/resources/k8s/clusters/{clusterID}/refresh`
@@ -222,3 +227,4 @@ Latest upgrade reports:
 - `reports/6_full_rebrand_russian_marketplace.md`
 - `reports/7_core_vm_k8s_fullstack_iteration.md`
 - `reports/8_runpod_style_core_ux_iteration.md`
+- `reports/9_phase1_templates_sharing_pipeline.md`

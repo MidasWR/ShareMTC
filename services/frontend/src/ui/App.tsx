@@ -108,6 +108,9 @@ export function App() {
       <ToastProvider>
         <main className="page-container section-stack flex min-h-screen max-w-5xl flex-col justify-center">
           <header className="text-center">
+            <div className="mb-2 flex justify-center">
+              <img src="/logo-sharemtc.svg" alt="ShareMTC logo" className="h-10 w-10" />
+            </div>
             <h1 className="text-2xl font-semibold">ShareMTC Control Plane</h1>
             <p className="mt-2 text-sm text-textSecondary">Sign in to manage PODs, VMs, shared resources, and admin infrastructure.</p>
           </header>
