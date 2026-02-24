@@ -5,13 +5,13 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="093339f5-8e40-4fff-8dda-262df5227056" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/Makefile" beforeDir="false" afterPath="$PROJECT_DIR$/Makefile" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/charts/ChartsInfra/templates/atlas/crd.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/charts/ChartsInfra/templates/atlas/crd.yaml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/charts/ChartsInfra/values.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/charts/ChartsInfra/values.yaml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/charts/ChartsServices/templates/admin/deployment.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/charts/ChartsServices/templates/admin/deployment.yaml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/charts/ChartsServices/values.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/charts/ChartsServices/values.yaml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/adminservice/cmd/main.go" beforeDir="false" afterPath="$PROJECT_DIR$/services/adminservice/cmd/main.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/adminservice/config/config.go" beforeDir="false" afterPath="$PROJECT_DIR$/services/adminservice/config/config.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/frontend/src/features/provider/dashboard/ProviderDashboardPanel.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/services/frontend/src/features/provider/dashboard/ProviderDashboardPanel.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/adminservice/internal/adapter/http/handlers.go" beforeDir="false" afterPath="$PROJECT_DIR$/services/adminservice/internal/adapter/http/handlers.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/adminservice/internal/models/catalog.go" beforeDir="false" afterPath="$PROJECT_DIR$/services/adminservice/internal/models/catalog.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/frontend/src/features/admin/api/adminApi.ts" beforeDir="false" afterPath="$PROJECT_DIR$/services/frontend/src/features/admin/api/adminApi.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/frontend/src/features/admin/console/AdminConsolePanel.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/services/frontend/src/features/admin/console/AdminConsolePanel.tsx" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />

@@ -3,9 +3,12 @@ package storage
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"github.com/MidasWR/ShareMTC/services/authservice/internal/models"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -53,6 +56,7 @@ func (r *PostgresRepo) Migrate(ctx context.Context) error {
 }
 
 func (r *PostgresRepo) CreateLocalUser(ctx context.Context, email string, passwordHash string, role string) (models.User, error) {
+	email = strings.ToLower(strings.TrimSpace(email))
 	user := models.User{
 		ID:           uuid.NewString(),
 		Email:        email,
@@ -64,10 +68,17 @@ func (r *PostgresRepo) CreateLocalUser(ctx context.Context, email string, passwo
 		VALUES ($1, $2, $3, $4)
 		RETURNING created_at
 	`, user.ID, user.Email, user.PasswordHash, user.Role).Scan(&user.CreatedAt)
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" && pgErr.ConstraintName == "users_email_key" {
+			return models.User{}, errors.New("email already exists")
+		}
+	}
 	return user, err
 }
 
 func (r *PostgresRepo) GetByEmail(ctx context.Context, email string) (models.User, error) {
+	email = strings.ToLower(strings.TrimSpace(email))
 	var user models.User
 	err := r.db.QueryRow(ctx, `
 		SELECT id, email, password_hash, google_sub, role, created_at
@@ -75,6 +86,9 @@ func (r *PostgresRepo) GetByEmail(ctx context.Context, email string) (models.Use
 		WHERE email = $1
 	`, email).Scan(&user.ID, &user.Email, &user.PasswordHash, &user.GoogleSub, &user.Role, &user.CreatedAt)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return models.User{}, errors.New("user not found")
+		}
 		return models.User{}, errors.New("user not found")
 	}
 	return user, nil

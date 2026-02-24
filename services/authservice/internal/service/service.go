@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/MidasWR/ShareMTC/services/authservice/internal/models"
@@ -34,6 +35,7 @@ func New(repo UserRepository, jwtSecret string, tokenTTL time.Duration) *AuthSer
 }
 
 func (s *AuthService) Register(ctx context.Context, email string, password string) (models.User, string, error) {
+	email = strings.ToLower(strings.TrimSpace(email))
 	if email == "" || password == "" {
 		return models.User{}, "", errors.New("email and password are required")
 	}
@@ -53,6 +55,7 @@ func (s *AuthService) Register(ctx context.Context, email string, password strin
 }
 
 func (s *AuthService) Login(ctx context.Context, email string, password string) (models.User, string, error) {
+	email = strings.ToLower(strings.TrimSpace(email))
 	user, err := s.repo.GetByEmail(ctx, email)
 	if err != nil {
 		return models.User{}, "", err

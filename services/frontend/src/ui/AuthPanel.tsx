@@ -34,6 +34,18 @@ export function AuthPanel({ onAuthenticated }: AuthPanelProps) {
     return "";
   }, [password]);
 
+  function normalizeAuthError(raw: unknown, path: "register" | "login"): string {
+    const message = raw instanceof Error ? raw.message : "Request error";
+    const lower = message.toLowerCase();
+    if (lower.includes("email already exists") || lower.includes("users_email_key") || lower.includes("duplicate key")) {
+      return "Email is already registered. Use Sign in.";
+    }
+    if (path === "login" && lower.includes("user not found")) {
+      return "Account not found. Try Register first.";
+    }
+    return message;
+  }
+
   async function submit(path: "register" | "login", e: FormEvent) {
     e.preventDefault();
     if (emailError || passwordError) {
@@ -52,7 +64,7 @@ export function AuthPanel({ onAuthenticated }: AuthPanelProps) {
       onAuthenticated?.();
       push("success", `Signed in as ${json.user.email}`);
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Request error");
+      setError(normalizeAuthError(requestError, path));
       push("error", "Authentication failed");
     } finally {
       setLoading("");
@@ -76,7 +88,7 @@ export function AuthPanel({ onAuthenticated }: AuthPanelProps) {
       onAuthenticated?.();
       push("success", `Signed in as ${json.user.email}`);
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Request error");
+      setError(normalizeAuthError(requestError, "login"));
       push("error", "Authentication failed");
     } finally {
       setLoading("");
