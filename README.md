@@ -101,6 +101,20 @@ The current UX baseline for core scenarios is evaluated with three axes:
 
 Priority is assigned using `S/F/B` together, with `S0` always in Wave 1.
 
+### 2026 hackathon UI/UX remediation
+
+Implemented in this iteration:
+
+- **Trust fix for marketplace deploy:** `Instance name` is now a real billing contract field (`server_orders.name`) and is persisted end-to-end, including backend model/storage and frontend payload/summary rendering.
+- **A11y foundation:** live regions now distinguish error (`alert/assertive`) vs info (`status/polite`), reusable focus styles are applied to checkboxes and details summaries, and reduced-motion is honored.
+- **Tabs semantics:** tab controls now expose `aria-controls` with explicit `tabpanel` linkage in major workspaces (`My Compute`, `Provide Compute`, `Admin`).
+- **Form validation UX:** server order validation now returns field-level errors, and key forms show inline errors instead of relying only on global toasts.
+- **Visual consistency:** table wrapper and controls use consistent rounded/border contracts; monospace is no longer forced for every table cell.
+- **Mobile navigation:** sidebar now has a mobile drawer entry point (`Menu`) with focus-managed navigation reuse.
+- **Admin access hardening:** `/admin` no longer pre-fills credentials by default; optional demo-fill can be enabled only via `VITE_ENABLE_ADMIN_QUICK_ACCESS=true`.
+- **Performance:** route/panel-level lazy loading is enabled in app shell, and Vite `manualChunks` separates heavy vendors (`recharts`, `framer-motion`, `react-icons`).
+- **Quality gates:** added/updated tests for rental validation, tabs ID linkage, Playwright smoke flow, and admin access a11y/safety check.
+
 ### Current UX roadmap focus (4 core flows)
 
 - **Resources -> VM/POD lifecycle:** reduce hidden defaults, tighten form validation, and make lifecycle feedback deterministic.
@@ -226,6 +240,7 @@ npm run dev
 cd services/frontend
 npm run build
 npm run test:unit
+npm run test:a11y
 ```
 
 ### Backend

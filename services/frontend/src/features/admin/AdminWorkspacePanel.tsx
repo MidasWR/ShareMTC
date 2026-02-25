@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Tabs } from "../../design/primitives/Tabs";
+import { getTabElementID, getTabPanelElementID, Tabs } from "../../design/primitives/Tabs";
 import { AdminAccessPanel } from "./access/AdminAccessPanel";
 import { AdminConsolePanel } from "./console/AdminConsolePanel";
 import { AdminDashboardPanel } from "../dashboard/admin/AdminDashboardPanel";
@@ -29,10 +29,24 @@ export function AdminWorkspacePanel({ canAdmin, onAuthenticated }: Props) {
         ]}
         value={tab}
         onChange={setTab}
+        instanceId="admin-workspace-tabs"
+        ariaLabel="Admin workspace sections"
       />
-      {tab === "console" ? <AdminConsolePanel /> : null}
-      {tab === "dashboard" ? <AdminDashboardPanel /> : null}
-      {tab === "sharing" ? <SharingAdminPanel /> : null}
+      {tab === "console" ? (
+        <div role="tabpanel" id={getTabPanelElementID("admin-workspace-tabs", "console")} aria-labelledby={getTabElementID("admin-workspace-tabs", "console")}>
+          <AdminConsolePanel />
+        </div>
+      ) : null}
+      {tab === "dashboard" ? (
+        <div role="tabpanel" id={getTabPanelElementID("admin-workspace-tabs", "dashboard")} aria-labelledby={getTabElementID("admin-workspace-tabs", "dashboard")}>
+          <AdminDashboardPanel />
+        </div>
+      ) : null}
+      {tab === "sharing" ? (
+        <div role="tabpanel" id={getTabPanelElementID("admin-workspace-tabs", "sharing")} aria-labelledby={getTabElementID("admin-workspace-tabs", "sharing")}>
+          <SharingAdminPanel />
+        </div>
+      ) : null}
     </section>
   );
 }

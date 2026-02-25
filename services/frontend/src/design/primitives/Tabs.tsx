@@ -1,4 +1,4 @@
-import { KeyboardEvent, useRef } from "react";
+import { KeyboardEvent, useId, useRef } from "react";
 import { cx } from "../utils/cx";
 
 export type TabItem<T extends string> = {
@@ -13,6 +13,8 @@ type TabsProps<T extends string> = {
   collapseAfter?: number;
   moreLabel?: string;
   mode?: "default" | "many";
+  instanceId?: string;
+  ariaLabel?: string;
 };
 
 export function nextTabByArrow<T extends string>(items: TabItem<T>[], value: T, key: "ArrowLeft" | "ArrowRight"): T {
@@ -32,14 +34,26 @@ export function splitTabItems<T extends string>(items: TabItem<T>[], collapseAft
   };
 }
 
+export function getTabElementID(instanceId: string, tabId: string) {
+  return `${instanceId}-tab-${tabId}`;
+}
+
+export function getTabPanelElementID(instanceId: string, tabId: string) {
+  return `${instanceId}-panel-${tabId}`;
+}
+
 export function Tabs<T extends string>({
   items,
   value,
   onChange,
   collapseAfter = Number.POSITIVE_INFINITY,
   moreLabel = "More",
-  mode = "default"
+  mode = "default",
+  instanceId,
+  ariaLabel = "Sections"
 }: TabsProps<T>) {
+  const generatedId = useId();
+  const tabsId = instanceId ?? `tabs-${generatedId}`;
   const buttonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const overflowSelectRef = useRef<HTMLSelectElement | null>(null);
 
@@ -86,16 +100,18 @@ export function Tabs<T extends string>({
   }
 
   return (
-    <div className="overflow-x-auto" role="tablist" aria-label="Sections">
+    <div className="overflow-x-auto" role="tablist" aria-label={ariaLabel}>
       <div className="inline-flex min-w-full whitespace-nowrap rounded-lg border border-border bg-surface">
         {visibleItems.map((item, index) => (
           <button
             key={item.id}
             type="button"
+            id={getTabElementID(tabsId, item.id)}
             role="tab"
             ref={(node) => {
               buttonRefs.current[item.id] = node;
             }}
+            aria-controls={getTabPanelElementID(tabsId, item.id)}
             aria-selected={item.id === value}
             tabIndex={item.id === value ? 0 : -1}
             className={cx(

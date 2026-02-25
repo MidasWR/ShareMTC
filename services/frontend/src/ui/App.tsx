@@ -1,18 +1,19 @@
-import { useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { ToastProvider } from "../design/components/Toast";
 import { useSessionState } from "../app/auth/useSessionState";
 import { AppTab, menu } from "../app/navigation/menu";
 import { useSectionRouting } from "../app/routing/useSectionRouting";
 import { AppShell } from "../app/shell/AppShell";
 import { AuthPanel } from "./AuthPanel";
-import { BillingPanel } from "./BillingPanel";
-import { SettingsPanel } from "../features/settings/SettingsPanel";
-import { AdminAccessPanel } from "../features/admin/access/AdminAccessPanel";
 import { KeyboardShortcutsPanel } from "./KeyboardShortcutsPanel";
-import { MyComputePanel } from "../features/compute/MyComputePanel";
-import { ProvideComputePanel } from "../features/provider/ProvideComputePanel";
-import { MarketplacePanel } from "../features/marketplace/MarketplacePanel";
-import { AdminWorkspacePanel } from "../features/admin/AdminWorkspacePanel";
+import { AdminAccessPanel } from "../features/admin/access/AdminAccessPanel";
+
+const BillingPanel = lazy(() => import("./BillingPanel").then((module) => ({ default: module.BillingPanel })));
+const SettingsPanel = lazy(() => import("../features/settings/SettingsPanel").then((module) => ({ default: module.SettingsPanel })));
+const MyComputePanel = lazy(() => import("../features/compute/MyComputePanel").then((module) => ({ default: module.MyComputePanel })));
+const ProvideComputePanel = lazy(() => import("../features/provider/ProvideComputePanel").then((module) => ({ default: module.ProvideComputePanel })));
+const MarketplacePanel = lazy(() => import("../features/marketplace/MarketplacePanel").then((module) => ({ default: module.MarketplacePanel })));
+const AdminWorkspacePanel = lazy(() => import("../features/admin/AdminWorkspacePanel").then((module) => ({ default: module.AdminWorkspacePanel })));
 
 export function App() {
   const { isAuthenticated, role, refreshSession, logout } = useSessionState();
@@ -21,7 +22,7 @@ export function App() {
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const activeLabel = menu.find((item) => item.id === tab)?.label ?? "Marketplace";
 
-  const content = useMemo(() => {
+  const content = useMemo<JSX.Element>(() => {
     if (tab === "marketplace") return <MarketplacePanel />;
     if (tab === "myCompute") return <MyComputePanel />;
     if (tab === "provideCompute") return <ProvideComputePanel />;
@@ -109,7 +110,9 @@ export function App() {
         onShortcuts={() => setShortcutsOpen(true)}
         onLogout={handleLogout}
       >
-        {content}
+        <Suspense fallback={<div className="rounded-md border border-border bg-surface p-4 text-sm text-textSecondary">Loading section...</div>}>
+          {content}
+        </Suspense>
       </AppShell>
       <KeyboardShortcutsPanel open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
     </ToastProvider>

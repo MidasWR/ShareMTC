@@ -102,6 +102,9 @@ func (s *BillingService) EstimateServerOrder(ctx context.Context, order models.S
 }
 
 func (s *BillingService) CreateServerOrder(ctx context.Context, order models.ServerOrder) (models.ServerOrder, error) {
+	if order.Name == "" {
+		return models.ServerOrder{}, errors.New("name is required")
+	}
 	estimated, err := s.EstimateServerOrder(ctx, order)
 	if err != nil {
 		return models.ServerOrder{}, err

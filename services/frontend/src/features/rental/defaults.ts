@@ -2,6 +2,7 @@ import { ServerOrder } from "../../types/api";
 
 export const SERVER_ORDER_DEFAULTS: ServerOrder = {
   plan_id: "",
+  name: "demo-instance",
   os_name: "Ubuntu 22.04",
   network_mbps: 1000,
   cpu_cores: 8,

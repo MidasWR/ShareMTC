@@ -23,7 +23,7 @@ export function Table<T>({ items, columns, emptyState, dense = false, ariaLabel 
   }
 
   return (
-    <div className="overflow-x-auto rounded-none border border-border bg-surface">
+    <div className="overflow-x-auto rounded-md border border-border bg-surface">
       <table className={cx("min-w-full text-left", dense ? "text-xs" : "text-sm")} aria-label={ariaLabel}>
         <thead className="bg-elevated/70 text-textSecondary">
           <tr>
@@ -38,7 +38,7 @@ export function Table<T>({ items, columns, emptyState, dense = false, ariaLabel 
           {items.map((item, index) => (
             <tr key={rowKey ? rowKey(item, index) : index} className="border-t border-border bg-surface hover:bg-elevated/50 transition-colors">
               {columns.map((column) => (
-                <td key={column.key} className={cx("px-3 py-2 align-top font-mono", column.className)}>
+                <td key={column.key} className={cx("px-3 py-2 align-top", column.className)}>
                   {column.render(item)}
                 </td>
               ))}

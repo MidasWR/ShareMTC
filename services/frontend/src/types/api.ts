@@ -108,6 +108,7 @@ export type ServerOrder = {
   id?: string;
   user_id?: string;
   plan_id: string;
+  name: string;
   vm_id?: string;
   os_name: string;
   network_mbps: number;

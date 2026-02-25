@@ -1,4 +1,4 @@
-import { ReactNode, useEffect, useRef } from "react";
+import { ReactNode, useEffect, useId, useRef } from "react";
 import { Button } from "../primitives/Button";
 
 type ModalProps = {
@@ -24,6 +24,9 @@ export function Modal({
 }: ModalProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLElement | null>(null);
+  const idPrefix = useId();
+  const titleID = `${idPrefix}-modal-title`;
+  const descriptionID = `${idPrefix}-modal-description`;
 
   useEffect(() => {
     if (!open) {
@@ -67,11 +70,22 @@ export function Modal({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[1300] flex items-center justify-center bg-slate-950/70 p-4" role="dialog" aria-modal="true" aria-label={title}>
-      <div ref={containerRef} className="w-full max-w-lg rounded-none border border-border bg-surface p-5 shadow-lg">
+    <div
+      className="fixed inset-0 z-[1300] flex items-center justify-center bg-slate-950/70 p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={titleID}
+      aria-describedby={description ? descriptionID : undefined}
+      onMouseDown={onClose}
+    >
+      <div
+        ref={containerRef}
+        className="w-full max-w-lg rounded-md border border-border bg-surface p-5 shadow-lg"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
         <header className="mb-4 space-y-1">
-          <h3 className="text-lg font-semibold">{title}</h3>
-          {description ? <p className="text-sm text-textSecondary">{description}</p> : null}
+          <h3 id={titleID} className="text-lg font-semibold">{title}</h3>
+          {description ? <p id={descriptionID} className="text-sm text-textSecondary">{description}</p> : null}
         </header>
         {children}
         <footer className="mt-5 flex justify-end gap-2">

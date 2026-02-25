@@ -18,8 +18,10 @@ import { ActionDropdown } from "../../design/components/ActionDropdown";
 import { listSharedOffers, reserveSharedOffer } from "../resources/api/resourcesApi";
 import { SharedInventoryOffer } from "../../types/api";
 import { buildVmSelectOptions, getLinkedVMID } from "./orderVmMapping";
-import { validateServerOrder } from "./rentalValidation";
+import { firstServerOrderError, ServerOrderValidationErrors, validateServerOrder } from "./rentalValidation";
 import { SERVER_ORDER_DEFAULTS } from "./defaults";
+import { Modal } from "../../design/components/Modal";
+import { DataFreshnessBadge } from "../../design/patterns/DataFreshnessBadge";
 
 type Props = {
   onNavigate?: (tab: AppTab) => void;
@@ -29,6 +31,7 @@ export function ServerRentalPanel({ onNavigate }: Props) {
   const [plans, setPlans] = useState<RentalPlan[]>([]);
   const [orders, setOrders] = useState<ServerOrder[]>([]);
   const [form, setForm] = useState<ServerOrder>({ ...SERVER_ORDER_DEFAULTS });
+  const [formErrors, setFormErrors] = useState<ServerOrderValidationErrors>({});
   const [estimate, setEstimate] = useState<number>(0);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
@@ -39,6 +42,8 @@ export function ServerRentalPanel({ onNavigate }: Props) {
   const [vmOptions, setVmOptions] = useState<Array<{ value: string; label: string }>>([]);
   const [sharedOffers, setSharedOffers] = useState<SharedInventoryOffer[]>([]);
   const [lastRefreshedAt, setLastRefreshedAt] = useState<Date | null>(null);
+  const [linkOrderID, setLinkOrderID] = useState<string>("");
+  const [linkVmID, setLinkVmID] = useState<string>("");
   const { push } = useToast();
 
   const selectedPlan = useMemo(() => plans.find((item) => item.id === form.plan_id), [plans, form.plan_id]);
@@ -105,7 +110,9 @@ export function ServerRentalPanel({ onNavigate }: Props) {
 
   async function handleEstimate(event: FormEvent) {
     event.preventDefault();
-    const validationError = validateServerOrder(form);
+    const errors = validateServerOrder(form);
+    setFormErrors(errors);
+    const validationError = firstServerOrderError(errors);
     if (validationError) {
       push("error", validationError);
       return;
@@ -122,7 +129,9 @@ export function ServerRentalPanel({ onNavigate }: Props) {
   }
 
   async function handleCreateOrder() {
-    const validationError = validateServerOrder(form);
+    const errors = validateServerOrder(form);
+    setFormErrors(errors);
+    const validationError = firstServerOrderError(errors);
     if (validationError) {
       push("error", validationError);
       return;
@@ -155,6 +164,26 @@ export function ServerRentalPanel({ onNavigate }: Props) {
     } finally {
       setLoading(false);
     }
+  }
+
+  function openLinkVMDialog(order: ServerOrder) {
+    if (!order.id) {
+      push("error", "Order ID is missing");
+      return;
+    }
+    setLinkOrderID(order.id);
+    setLinkVmID(vmByOrder[order.id] || "");
+  }
+
+  function applyLinkedVM() {
+    if (!linkOrderID || !linkVmID) {
+      push("error", "Select VM to link");
+      return;
+    }
+    setVmByOrder((prev) => ({ ...prev, [linkOrderID]: linkVmID }));
+    push("success", "VM linked to order");
+    setLinkOrderID("");
+    setLinkVmID("");
   }
 
   const filteredOrders = useMemo(() => {
@@ -213,6 +242,7 @@ export function ServerRentalPanel({ onNavigate }: Props) {
             <Select
               label="Plan"
               value={form.plan_id}
+              error={formErrors.plan_id}
               onChange={(event) => {
                 const nextPlan = plans.find((item) => item.id === event.target.value);
                 setForm((prev) => ({
@@ -220,13 +250,27 @@ export function ServerRentalPanel({ onNavigate }: Props) {
                   plan_id: event.target.value,
                   period: (nextPlan?.period as "hourly" | "monthly") ?? prev.period
                 }));
+                setFormErrors((prev) => ({ ...prev, plan_id: undefined }));
               }}
               options={plans.map((item) => ({ value: item.id, label: `${item.name} (${item.period})` }))}
+            />
+            <Input
+              label="Instance name"
+              value={form.name}
+              error={formErrors.name}
+              onChange={(event) => {
+                setForm((prev) => ({ ...prev, name: event.target.value }));
+                setFormErrors((prev) => ({ ...prev, name: undefined }));
+              }}
             />
             <Select
               label="OS Template"
               value={form.os_name}
-              onChange={(event) => setForm((prev) => ({ ...prev, os_name: event.target.value }))}
+              error={formErrors.os_name}
+              onChange={(event) => {
+                setForm((prev) => ({ ...prev, os_name: event.target.value }));
+                setFormErrors((prev) => ({ ...prev, os_name: undefined }));
+              }}
               options={[
                 { value: "Ubuntu 22.04", label: "Ubuntu 22.04" },
                 { value: "Ubuntu 24.04", label: "Ubuntu 24.04" },
@@ -238,35 +282,51 @@ export function ServerRentalPanel({ onNavigate }: Props) {
               min={1}
               step={1}
               label="CPU Cores"
+              error={formErrors.cpu_cores}
               value={`${form.cpu_cores}`}
-              onChange={(event) => setForm((prev) => ({ ...prev, cpu_cores: Number(event.target.value) || 0 }))}
+              onChange={(event) => {
+                setForm((prev) => ({ ...prev, cpu_cores: Number(event.target.value) || 0 }));
+                setFormErrors((prev) => ({ ...prev, cpu_cores: undefined }));
+              }}
             />
             <Input
               type="number"
               min={1}
               step={1}
               label="RAM (GB)"
+              error={formErrors.ram_gb}
               value={`${form.ram_gb}`}
-              onChange={(event) => setForm((prev) => ({ ...prev, ram_gb: Number(event.target.value) || 0 }))}
+              onChange={(event) => {
+                setForm((prev) => ({ ...prev, ram_gb: Number(event.target.value) || 0 }));
+                setFormErrors((prev) => ({ ...prev, ram_gb: undefined }));
+              }}
             />
             <details className="md:col-span-2 rounded-md border border-border bg-canvas p-3">
-              <summary className="cursor-pointer text-sm text-textPrimary">Advanced</summary>
+              <summary className="details-summary-focus cursor-pointer text-sm text-textPrimary">Advanced</summary>
               <div className="mt-3 grid gap-3 md:grid-cols-2">
                 <Input
                   type="number"
                   min={0}
                   step={1}
                   label="GPU units"
+                  error={formErrors.gpu_units}
                   value={`${form.gpu_units}`}
-                  onChange={(event) => setForm((prev) => ({ ...prev, gpu_units: Number(event.target.value) || 0 }))}
+                  onChange={(event) => {
+                    setForm((prev) => ({ ...prev, gpu_units: Number(event.target.value) || 0 }));
+                    setFormErrors((prev) => ({ ...prev, gpu_units: undefined }));
+                  }}
                 />
                 <Input
                   type="number"
                   min={1}
                   step={100}
                   label="Network (Mbps)"
+                  error={formErrors.network_mbps}
                   value={`${form.network_mbps}`}
-                  onChange={(event) => setForm((prev) => ({ ...prev, network_mbps: Number(event.target.value) || 0 }))}
+                  onChange={(event) => {
+                    setForm((prev) => ({ ...prev, network_mbps: Number(event.target.value) || 0 }));
+                    setFormErrors((prev) => ({ ...prev, network_mbps: undefined }));
+                  }}
                 />
                 {onNavigate ? (
                   <>
@@ -292,6 +352,7 @@ export function ServerRentalPanel({ onNavigate }: Props) {
             <div className="md:col-span-2 rounded-md border border-border bg-canvas p-3 text-xs text-textSecondary">
               <div className="mb-1 text-sm text-textPrimary">Summary</div>
               <div>Plan: {selectedPlan?.name || form.plan_id || "not selected"}</div>
+              <div>Instance: {form.name}</div>
               <div>Shape: {form.cpu_cores} CPU / {form.ram_gb} GB / {form.gpu_units} GPU</div>
               <div>Network: {form.network_mbps} Mbps · Billing: {form.period}</div>
               <div>Config source: <span className="font-medium text-textPrimary">Manual order form</span></div>
@@ -340,9 +401,7 @@ export function ServerRentalPanel({ onNavigate }: Props) {
           }
           actions={
             <>
-              <Badge variant={lastRefreshedAt ? "success" : "warning"}>
-                {lastRefreshedAt ? `Fresh: ${lastRefreshedAt.toLocaleTimeString()}` : "Data not loaded yet"}
-              </Badge>
+              <DataFreshnessBadge ts={lastRefreshedAt} />
               <Button variant="secondary" onClick={refresh} loading={loading}>
                 Refresh
               </Button>
@@ -356,8 +415,9 @@ export function ServerRentalPanel({ onNavigate }: Props) {
           items={filteredOrders}
           emptyState={<EmptyState title="No active servers" description="Configure and deploy your first server below." />}
           columns={[
+            { key: "name", header: "Instance", render: (row) => row.name || "-" },
             { key: "plan", header: "Plan", render: (row) => <span className="font-medium">{row.plan_id}</span> },
-            { key: "shape", header: "Config", render: (row) => <span className="font-mono text-xs text-textSecondary">{row.cpu_cores} CPU / {row.ram_gb}GB / {row.gpu_units} GPU</span> },
+            { key: "shape", header: "Config", render: (row) => <span className="text-xs text-textSecondary">{row.cpu_cores} CPU / {row.ram_gb}GB / {row.gpu_units} GPU</span> },
             { key: "os", header: "OS", render: (row) => row.os_name },
             { key: "status", header: "Status", render: (row) => (
               <span className="flex items-center gap-2">
@@ -366,34 +426,35 @@ export function ServerRentalPanel({ onNavigate }: Props) {
             ) },
             { key: "period", header: "Billing", render: (row) => <Badge variant="neutral">{row.period}</Badge> },
             {
+              key: "vm_link",
+              header: "Linked VM",
+              render: (row) => {
+                const vmID = getLinkedVMID(row, vmByOrder);
+                return vmID ? <span className="text-xs text-textSecondary">{vmID}</span> : <span className="text-xs text-textMuted">Not linked</span>;
+              }
+            },
+            {
               key: "actions",
               header: "Actions",
               render: (row) => (
-                <div className="flex min-w-[280px] items-end gap-2">
-                  <div className="min-w-[120px] pb-1 text-xs text-textMuted">
-                    {row.vm_id ? "From server vm_id" : "Manual link"}
-                  </div>
-                  <Select
-                    label="Linked VM"
-                    value={row.vm_id || (row.id && vmByOrder[row.id]) || ""}
-                    onChange={(event) => {
-                      if (row.vm_id) return;
-                      if (!row.id) return;
-                      setVmByOrder((prev) => ({ ...prev, [row.id as string]: event.target.value }));
-                    }}
-                    disabled={Boolean(row.vm_id)}
-                    options={[{ value: "", label: "Select VM" }, ...vmOptions]}
-                  />
+                <div className="flex items-center gap-2">
                   <ActionDropdown
                     label="Actions"
                     disabled={loading}
                     options={[
+                      { value: "link", label: "Link VM..." },
                       { value: "start", label: "Start" },
                       { value: "stop", label: "Stop" },
                       { value: "reboot", label: "Reboot" },
                       { value: "terminate", label: "Terminate" }
                     ]}
-                    onSelect={(action) => handleLifecycle(row, action as "start" | "stop" | "reboot" | "terminate")}
+                    onSelect={(action) => {
+                      if (action === "link") {
+                        openLinkVMDialog(row);
+                        return;
+                      }
+                      handleLifecycle(row, action as "start" | "stop" | "reboot" | "terminate");
+                    }}
                   />
                 </div>
               )
@@ -401,6 +462,24 @@ export function ServerRentalPanel({ onNavigate }: Props) {
           ]}
         />
       </Card>
+      <Modal
+        open={Boolean(linkOrderID)}
+        title="Link VM to order"
+        description="Select an existing VM to attach lifecycle actions to this order."
+        confirmLabel="Save link"
+        onConfirm={applyLinkedVM}
+        onClose={() => {
+          setLinkOrderID("");
+          setLinkVmID("");
+        }}
+      >
+        <Select
+          label="VM"
+          value={linkVmID}
+          onChange={(event) => setLinkVmID(event.target.value)}
+          options={[{ value: "", label: "Select VM" }, ...vmOptions]}
+        />
+      </Modal>
     </section>
   );
 }

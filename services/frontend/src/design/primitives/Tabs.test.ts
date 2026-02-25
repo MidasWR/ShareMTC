@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { nextTabByArrow, splitTabItems, TabItem } from "./Tabs";
+import { getTabElementID, getTabPanelElementID, nextTabByArrow, splitTabItems, TabItem } from "./Tabs";
 
 type TabID = "one" | "two" | "three" | "four" | "five";
 
@@ -27,5 +27,10 @@ describe("tabs helpers", () => {
     const { visibleItems, overflowItems } = splitTabItems(items, Number.POSITIVE_INFINITY);
     expect(visibleItems).toHaveLength(5);
     expect(overflowItems).toHaveLength(0);
+  });
+
+  it("builds stable aria ids for tab and panel linkage", () => {
+    expect(getTabElementID("scope", "two")).toBe("scope-tab-two");
+    expect(getTabPanelElementID("scope", "two")).toBe("scope-panel-two");
   });
 });

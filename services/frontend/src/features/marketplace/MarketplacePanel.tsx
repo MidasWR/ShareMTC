@@ -11,7 +11,7 @@ import { Input } from "../../design/primitives/Input";
 import { Select } from "../../design/primitives/Select";
 import { RentalPlan, ServerOrder, VMTemplate } from "../../types/api";
 import { resolveTemplateLogoURL } from "../../lib/logoResolver";
-import { validateServerOrder } from "../rental/rentalValidation";
+import { firstServerOrderError, ServerOrderValidationErrors, validateServerOrder } from "../rental/rentalValidation";
 
 function toRamGB(value: number) {
   return Math.max(1, Math.ceil(value / 1024));
@@ -24,9 +24,9 @@ export function MarketplacePanel() {
   const [selectedCode, setSelectedCode] = useState("");
   const [search, setSearch] = useState("");
   const [minVram, setMinVram] = useState(0);
-  const [vmName, setVmName] = useState("demo-instance");
   const [form, setForm] = useState<ServerOrder>({
     plan_id: "",
+    name: "demo-instance",
     os_name: "Ubuntu 22.04",
     network_mbps: 1000,
     cpu_cores: 8,
@@ -34,6 +34,7 @@ export function MarketplacePanel() {
     gpu_units: 1,
     period: "hourly"
   });
+  const [formErrors, setFormErrors] = useState<ServerOrderValidationErrors>({});
   const [loading, setLoading] = useState(false);
   const { push } = useToast();
 
@@ -101,7 +102,9 @@ export function MarketplacePanel() {
   }
 
   async function deploy() {
-    const validationError = validateServerOrder(form);
+    const errors = validateServerOrder(form);
+    setFormErrors(errors);
+    const validationError = firstServerOrderError(errors);
     if (validationError) {
       push("error", validationError);
       return;
@@ -114,7 +117,7 @@ export function MarketplacePanel() {
     try {
       const created = await createServerOrder(form);
       setOrders((prev) => [created, ...prev]);
-      push("success", `Deploy started for ${vmName}`);
+      push("success", `Deploy started for ${created.name || form.name}`);
     } catch (error) {
       push("error", error instanceof Error ? error.message : "Failed to deploy instance");
     } finally {
@@ -179,7 +182,16 @@ export function MarketplacePanel() {
         <div className="space-y-4">
           <Card title="Deploy" description="Only a few required fields for a demo-ready launch.">
             <div className="grid gap-3">
-              <Input label="Instance name" value={vmName} onChange={(event) => setVmName(event.target.value)} />
+              <Input
+                label="Instance name"
+                value={form.name}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  setForm((prev) => ({ ...prev, name: value }));
+                  setFormErrors((prev) => ({ ...prev, name: undefined }));
+                }}
+                error={formErrors.name}
+              />
               <Select
                 label="Billing plan"
                 value={form.plan_id}
@@ -190,8 +202,10 @@ export function MarketplacePanel() {
                     plan_id: event.target.value,
                     period: (nextPlan?.period as "hourly" | "monthly") ?? prev.period
                   }));
+                  setFormErrors((prev) => ({ ...prev, plan_id: undefined }));
                 }}
                 options={plans.map((plan) => ({ value: plan.id, label: `${plan.name} (${plan.period})` }))}
+                error={formErrors.plan_id}
               />
               <div className="rounded-md border border-border bg-elevated p-3 text-sm text-textSecondary">
                 <div className="text-xs uppercase tracking-wide text-textMuted">Summary</div>
@@ -206,7 +220,7 @@ export function MarketplacePanel() {
                 )}
               </div>
               <details className="rounded-md border border-border bg-canvas px-3 py-2 text-sm text-textSecondary">
-                <summary className="cursor-pointer text-textPrimary">Advanced</summary>
+                <summary className="details-summary-focus cursor-pointer text-textPrimary">Advanced</summary>
                 {selectedTemplate ? (
                   <div className="mt-2 space-y-1 text-xs">
                     <div>Region: {selectedTemplate.region || "any"}</div>
@@ -232,6 +246,7 @@ export function MarketplacePanel() {
               items={orders}
               emptyState={<EmptyState title="No instances yet" description="Deploy your first instance from the panel above." />}
               columns={[
+                { key: "name", header: "Instance", render: (row) => row.name || "-" },
                 { key: "plan", header: "Plan", render: (row) => row.plan_id },
                 { key: "shape", header: "Config", render: (row) => `${row.cpu_cores} CPU / ${row.ram_gb} GB / ${row.gpu_units} GPU` },
                 { key: "os", header: "OS", render: (row) => row.os_name },

@@ -75,11 +75,19 @@ body {
 }
 
 .glass {
-  @apply rounded-xl border border-border bg-surface/95 shadow-md backdrop-blur;
+  @apply rounded-lg border border-border bg-surface/95 shadow-md backdrop-blur;
 }
 
 .focus-ring {
   @apply focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-canvas;
+}
+
+.checkbox-control {
+  @apply focus-ring h-4 w-4 rounded border border-border bg-canvas;
+}
+
+.details-summary-focus {
+  @apply focus-ring rounded-sm;
 }
 
 .page-shell {
@@ -112,4 +120,19 @@ body {
 
 .neon-text {
   @apply text-brand drop-shadow-brand;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .health-pulse {
+    animation: none !important;
+  }
 }

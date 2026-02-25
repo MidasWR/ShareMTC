@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { listAllAccruals } from "../../billing/api/billingApi";
 import { listAllAllocations } from "../../resources/api/resourcesApi";
 import { useToast } from "../../../design/components/Toast";
-import { Tabs } from "../../../design/primitives/Tabs";
+import { getTabElementID, getTabPanelElementID, Tabs } from "../../../design/primitives/Tabs";
+import { DataFreshnessBadge } from "../../../design/patterns/DataFreshnessBadge";
 import { EmptyState } from "../../../design/patterns/EmptyState";
 import { PageSectionHeader } from "../../../design/patterns/PageSectionHeader";
 import { Card } from "../../../design/primitives/Card";
@@ -144,12 +145,8 @@ export function AdminConsolePanel() {
         description="Track recency of console datasets and installer command."
       >
         <div className="flex flex-wrap gap-2">
-          <span className="text-xs text-textSecondary">
-            Console data: {lastDataRefreshAt ? lastDataRefreshAt.toLocaleString() : "not refreshed yet"}
-          </span>
-          <span className="text-xs text-textSecondary">
-            Installer command: {lastCommandRefreshAt ? lastCommandRefreshAt.toLocaleString() : "not refreshed yet"}
-          </span>
+          <DataFreshnessBadge ts={lastDataRefreshAt} label="Console" />
+          <DataFreshnessBadge ts={lastCommandRefreshAt} label="Installer" />
         </div>
       </Card>
       <Card title="Agent Install (one-command)" description="Copy this command to install hostagent on a host machine.">
@@ -188,32 +185,63 @@ export function AdminConsolePanel() {
         onChange={(next) => updateTab(next)}
         mode="many"
         moreLabel="More"
+        instanceId="admin-console-tabs"
+        ariaLabel="Admin console sections"
       />
 
-      {tab === "overview" ? <AdminDashboardPanel /> : null}
-      {tab === "providers" ? <AdminServersPanel /> : null}
-      {tab === "pods" ? <AdminPodsPanel /> : null}
+      {tab === "overview" ? (
+        <div role="tabpanel" id={getTabPanelElementID("admin-console-tabs", "overview")} aria-labelledby={getTabElementID("admin-console-tabs", "overview")}>
+          <AdminDashboardPanel />
+        </div>
+      ) : null}
+      {tab === "providers" ? (
+        <div role="tabpanel" id={getTabPanelElementID("admin-console-tabs", "providers")} aria-labelledby={getTabElementID("admin-console-tabs", "providers")}>
+          <AdminServersPanel />
+        </div>
+      ) : null}
+      {tab === "pods" ? (
+        <div role="tabpanel" id={getTabPanelElementID("admin-console-tabs", "pods")} aria-labelledby={getTabElementID("admin-console-tabs", "pods")}>
+          <AdminPodsPanel />
+        </div>
+      ) : null}
       {tab === "risk" ? (
-        <Card title="Risk and Sharing Summary" description="Unified view for risk posture and sharing moderation signals.">
-          <div className="grid gap-3 md:grid-cols-3">
-            <div className="rounded-md border border-border bg-elevated p-3 text-xs text-textSecondary">
-              Total risk signals: <span className="font-semibold text-textPrimary">{riskRows.length}</span>
+        <div role="tabpanel" id={getTabPanelElementID("admin-console-tabs", "risk")} aria-labelledby={getTabElementID("admin-console-tabs", "risk")} className="section-stack">
+          <Card title="Risk and Sharing Summary" description="Unified view for risk posture and sharing moderation signals.">
+            <div className="grid gap-3 md:grid-cols-3">
+              <div className="rounded-md border border-border bg-elevated p-3 text-xs text-textSecondary">
+                Total risk signals: <span className="font-semibold text-textPrimary">{riskRows.length}</span>
+              </div>
+              <div className="rounded-md border border-border bg-elevated p-3 text-xs text-textSecondary">
+                High-load providers: <span className="font-semibold text-textPrimary">{highRiskCount}</span>
+              </div>
+              <div className="rounded-md border border-border bg-elevated p-3 text-xs text-textSecondary">
+                Sharing moderation source: <span className="font-semibold text-textPrimary">Admin Sharing panel</span>
+              </div>
             </div>
-            <div className="rounded-md border border-border bg-elevated p-3 text-xs text-textSecondary">
-              High-load providers: <span className="font-semibold text-textPrimary">{highRiskCount}</span>
+            <div className="mt-4">
+              <SharingAdminPanel />
             </div>
-            <div className="rounded-md border border-border bg-elevated p-3 text-xs text-textSecondary">
-              Sharing moderation source: <span className="font-semibold text-textPrimary">Admin Sharing panel</span>
-            </div>
-          </div>
-          <div className="mt-4">
-            <SharingAdminPanel />
-          </div>
-        </Card>
+          </Card>
+          <Card title="Automated Risk Signals" description="Derived risks based on utilization patterns.">
+            <Table
+              dense
+              ariaLabel="Admin risk signals"
+              rowKey={(row) => `${row.provider_id}-${row.issue}`}
+              items={riskRows}
+              emptyState={<EmptyState title="No risks detected" description="No providers with high-load pattern were found." />}
+              columns={[
+                { key: "provider", header: "Provider", render: (row) => row.provider_id },
+                { key: "issue", header: "Issue", render: (row) => row.issue },
+                { key: "score", header: "Score", render: (row) => row.score }
+              ]}
+            />
+          </Card>
+        </div>
       ) : null}
 
       {tab === "allocations" ? (
-        <Card title="Allocation Registry" description="Admin flow of allocations across all providers.">
+        <div role="tabpanel" id={getTabPanelElementID("admin-console-tabs", "allocations")} aria-labelledby={getTabElementID("admin-console-tabs", "allocations")}>
+          <Card title="Allocation Registry" description="Admin flow of allocations across all providers.">
           <Table
             dense
             ariaLabel="Admin allocations"
@@ -229,11 +257,13 @@ export function AdminConsolePanel() {
               { key: "status", header: "Status", render: (row) => (row.released_at ? "released" : "active") }
             ]}
           />
-        </Card>
+          </Card>
+        </div>
       ) : null}
 
       {tab === "billing" ? (
-        <Card title="Billing Registry" description="Accrual stream for reconciliation and payout control.">
+        <div role="tabpanel" id={getTabPanelElementID("admin-console-tabs", "billing")} aria-labelledby={getTabElementID("admin-console-tabs", "billing")}>
+          <Card title="Billing Registry" description="Accrual stream for reconciliation and payout control.">
           <Table
             dense
             ariaLabel="Admin billing accruals"
@@ -248,25 +278,10 @@ export function AdminConsolePanel() {
               { key: "created", header: "Created", render: (row) => new Date(row.created_at).toLocaleString() }
             ]}
           />
-        </Card>
+          </Card>
+        </div>
       ) : null}
 
-      {tab === "risk" ? (
-        <Card title="Automated Risk Signals" description="Derived risks based on utilization patterns.">
-          <Table
-            dense
-            ariaLabel="Admin risk signals"
-            rowKey={(row) => `${row.provider_id}-${row.issue}`}
-            items={riskRows}
-            emptyState={<EmptyState title="No risks detected" description="No providers with high-load pattern were found." />}
-            columns={[
-              { key: "provider", header: "Provider", render: (row) => row.provider_id },
-              { key: "issue", header: "Issue", render: (row) => row.issue },
-              { key: "score", header: "Score", render: (row) => row.score }
-            ]}
-          />
-        </Card>
-      ) : null}
     </section>
   );
 }

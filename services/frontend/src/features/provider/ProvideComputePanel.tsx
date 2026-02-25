@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Tabs } from "../../design/primitives/Tabs";
+import { getTabElementID, getTabPanelElementID, Tabs } from "../../design/primitives/Tabs";
 import { HostPanel } from "../../ui/HostPanel";
 import { SharedVMPanel } from "../resources/shared/SharedVMPanel";
 import { SharedPodsPanel } from "../resources/shared/SharedPodsPanel";
@@ -26,12 +26,34 @@ export function ProvideComputePanel() {
         mode="many"
         collapseAfter={4}
         moreLabel="More"
+        instanceId="provide-compute-tabs"
+        ariaLabel="Provide Compute sections"
       />
-      {tab === "dashboard" ? <ProviderDashboardPanel /> : null}
-      {tab === "allocations" ? <HostPanel /> : null}
-      {tab === "sharedVm" ? <SharedVMPanel /> : null}
-      {tab === "sharedPods" ? <SharedPodsPanel /> : null}
-      {tab === "k8s" ? <K8sClustersPanel /> : null}
+      {tab === "dashboard" ? (
+        <div role="tabpanel" id={getTabPanelElementID("provide-compute-tabs", "dashboard")} aria-labelledby={getTabElementID("provide-compute-tabs", "dashboard")}>
+          <ProviderDashboardPanel />
+        </div>
+      ) : null}
+      {tab === "allocations" ? (
+        <div role="tabpanel" id={getTabPanelElementID("provide-compute-tabs", "allocations")} aria-labelledby={getTabElementID("provide-compute-tabs", "allocations")}>
+          <HostPanel />
+        </div>
+      ) : null}
+      {tab === "sharedVm" ? (
+        <div role="tabpanel" id={getTabPanelElementID("provide-compute-tabs", "sharedVm")} aria-labelledby={getTabElementID("provide-compute-tabs", "sharedVm")}>
+          <SharedVMPanel />
+        </div>
+      ) : null}
+      {tab === "sharedPods" ? (
+        <div role="tabpanel" id={getTabPanelElementID("provide-compute-tabs", "sharedPods")} aria-labelledby={getTabElementID("provide-compute-tabs", "sharedPods")}>
+          <SharedPodsPanel />
+        </div>
+      ) : null}
+      {tab === "k8s" ? (
+        <div role="tabpanel" id={getTabPanelElementID("provide-compute-tabs", "k8s")} aria-labelledby={getTabElementID("provide-compute-tabs", "k8s")}>
+          <K8sClustersPanel />
+        </div>
+      ) : null}
     </section>
   );
 }

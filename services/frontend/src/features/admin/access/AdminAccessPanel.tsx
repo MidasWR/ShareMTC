@@ -11,12 +11,11 @@ type Props = {
   onSuccess: () => void;
 };
 
-const HACKATHON_ADMIN_USERNAME = "admin";
-const HACKATHON_ADMIN_ACCESS_KEY = "admin";
+const ENABLE_ADMIN_QUICK_ACCESS = import.meta.env.VITE_ENABLE_ADMIN_QUICK_ACCESS === "true";
 
 export function AdminAccessPanel({ onSuccess }: Props) {
-  const [username, setUsername] = useState(HACKATHON_ADMIN_USERNAME);
-  const [password, setPassword] = useState(HACKATHON_ADMIN_ACCESS_KEY);
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const { push } = useToast();
 
@@ -47,7 +46,7 @@ export function AdminAccessPanel({ onSuccess }: Props) {
     <section className="section-stack">
       <PageSectionHeader
         title="Direct /admin Access"
-        description="Use prefilled hackathon credentials or edit manually if needed."
+        description="Use dedicated administrator credentials. This form never auto-fills secrets by default."
       />
       <Card title="Administrator Login" description="This login flow is dedicated to admin module access.">
         <form className="space-y-3" onSubmit={submit}>
@@ -55,9 +54,19 @@ export function AdminAccessPanel({ onSuccess }: Props) {
           <Input label="Access key" type="password" value={password} onChange={(event) => setPassword(event.target.value)} />
           <div className="flex flex-wrap gap-2">
             <Button type="submit" loading={loading}>Enter /admin</Button>
-            <Button type="button" variant="secondary" loading={loading} onClick={() => submitCredentials()}>
-              Quick access
-            </Button>
+            {ENABLE_ADMIN_QUICK_ACCESS ? (
+              <Button
+                type="button"
+                variant="secondary"
+                loading={loading}
+                onClick={() => {
+                  setUsername("admin");
+                  setPassword("admin");
+                }}
+              >
+                Fill demo credentials
+              </Button>
+            ) : null}
           </div>
         </form>
       </Card>

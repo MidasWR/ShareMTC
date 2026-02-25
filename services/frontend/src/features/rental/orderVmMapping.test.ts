@@ -8,6 +8,7 @@ describe("order VM mapping helpers", () => {
         id: "order-1",
         vm_id: "vm-from-server",
         plan_id: "p1",
+        name: "instance-1",
         os_name: "Ubuntu 22.04",
         network_mbps: 1000,
         cpu_cores: 8,
@@ -22,7 +23,7 @@ describe("order VM mapping helpers", () => {
 
   it("falls back to manual linkage when server vm_id is missing", () => {
     const linked = getLinkedVMID(
-      { id: "order-1", plan_id: "p1", os_name: "Ubuntu 22.04", network_mbps: 1000, cpu_cores: 8, ram_gb: 32, gpu_units: 1, period: "hourly" },
+      { id: "order-1", plan_id: "p1", name: "instance-1", os_name: "Ubuntu 22.04", network_mbps: 1000, cpu_cores: 8, ram_gb: 32, gpu_units: 1, period: "hourly" },
       { "order-1": "vm-123" }
     );
     expect(linked).toBe("vm-123");
@@ -30,7 +31,7 @@ describe("order VM mapping helpers", () => {
 
   it("returns undefined when mapping is missing", () => {
     const linked = getLinkedVMID(
-      { id: "order-2", plan_id: "p1", os_name: "Ubuntu 22.04", network_mbps: 1000, cpu_cores: 8, ram_gb: 32, gpu_units: 1, period: "hourly" },
+      { id: "order-2", plan_id: "p1", name: "instance-2", os_name: "Ubuntu 22.04", network_mbps: 1000, cpu_cores: 8, ram_gb: 32, gpu_units: 1, period: "hourly" },
       {}
     );
     expect(linked).toBeUndefined();

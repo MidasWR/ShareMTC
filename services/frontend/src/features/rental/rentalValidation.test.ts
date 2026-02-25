@@ -1,30 +1,35 @@
 import { describe, expect, it } from "vitest";
-import { validateServerOrder } from "./rentalValidation";
+import { firstServerOrderError, validateServerOrder } from "./rentalValidation";
+import { SERVER_ORDER_DEFAULTS } from "./defaults";
 
-describe("rental order validation", () => {
-  it("rejects invalid numeric values", () => {
-    const error = validateServerOrder({
-      plan_id: "p1",
-      os_name: "Ubuntu",
-      network_mbps: 0,
-      cpu_cores: 2,
-      ram_gb: 4,
-      gpu_units: 1,
-      period: "hourly"
+describe("rentalValidation", () => {
+  it("returns no errors for valid server order", () => {
+    const errors = validateServerOrder({
+      ...SERVER_ORDER_DEFAULTS,
+      plan_id: "plan-1",
+      name: "demo-vm"
     });
-    expect(error).toBe("Network Mbps must be greater than 0");
+    expect(errors).toEqual({});
   });
 
-  it("accepts valid server order", () => {
-    const error = validateServerOrder({
-      plan_id: "p1",
-      os_name: "Ubuntu",
-      network_mbps: 1000,
-      cpu_cores: 8,
-      ram_gb: 32,
-      gpu_units: 1,
-      period: "monthly"
+  it("reports required instance name", () => {
+    const errors = validateServerOrder({
+      ...SERVER_ORDER_DEFAULTS,
+      plan_id: "plan-1",
+      name: ""
     });
-    expect(error).toBeNull();
+    expect(errors.name).toBe("Instance name is required");
+    expect(firstServerOrderError(errors)).toBe("Instance name is required");
+  });
+
+  it("reports invalid numeric values", () => {
+    const errors = validateServerOrder({
+      ...SERVER_ORDER_DEFAULTS,
+      plan_id: "p1",
+      name: "bad-server",
+      network_mbps: 0
+    });
+    expect(errors.network_mbps).toBe("Network Mbps must be greater than 0");
+    expect(firstServerOrderError(errors)).toBe("Network Mbps must be greater than 0");
   });
 });

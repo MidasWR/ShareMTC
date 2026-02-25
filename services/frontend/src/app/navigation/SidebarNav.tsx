@@ -20,15 +20,16 @@ type Props = {
   onNavigate: (tab: AppTab) => void;
   onLogout: () => void;
   onShortcuts: () => void;
+  className?: string;
 };
 
-export function SidebarNav({ tab, enabledMenu, onNavigate, onLogout, onShortcuts }: Props) {
+export function SidebarNav({ tab, enabledMenu, onNavigate, onLogout, onShortcuts, className }: Props) {
   const t = useTranslation();
   const mainItems = enabledMenu.filter((entry) => entry.group === "main");
   const accountItems = enabledMenu.filter((entry) => entry.group === "account");
 
   return (
-    <aside className="border-b border-border bg-surface flex flex-col h-full lg:min-h-screen lg:border-b-0 lg:border-r">
+    <aside className={cx("border-b border-border bg-surface flex flex-col h-full lg:min-h-screen lg:border-b-0 lg:border-r", className)}>
       <div className="p-4 lg:p-5">
         <div className="flex items-center gap-2">
           <img src="/logo-sharemtc.svg" alt="ShareMTC logo" className="h-6 w-6" />

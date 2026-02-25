@@ -1,6 +1,8 @@
-import { ReactNode } from "react";
+import { ReactNode, useState } from "react";
 import { SidebarNav } from "../navigation/SidebarNav";
 import { AppTab } from "../navigation/menu";
+import { Button } from "../../design/primitives/Button";
+import { Drawer } from "../../design/components/Drawer";
 
 type Props = {
   tab: AppTab;
@@ -15,6 +17,7 @@ type Props = {
 export function AppShell({ tab, enabledMenu, onNavigate, onShortcuts, onLogout, children }: Props) {
   const activeItem = enabledMenu.find((item) => item.id === tab);
   const groupLabel = activeItem?.group === "account" ? "Account" : "Workspace";
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   return (
     <div className="page-shell">
@@ -24,14 +27,41 @@ export function AppShell({ tab, enabledMenu, onNavigate, onShortcuts, onLogout, 
       >
         Skip to content
       </a>
-      <SidebarNav
-        tab={tab}
-        enabledMenu={enabledMenu}
-        onNavigate={onNavigate}
-        onLogout={onLogout}
-        onShortcuts={onShortcuts}
-      />
+      <div className="hidden lg:block">
+        <SidebarNav
+          tab={tab}
+          enabledMenu={enabledMenu}
+          onNavigate={onNavigate}
+          onLogout={onLogout}
+          onShortcuts={onShortcuts}
+        />
+      </div>
+      <Drawer open={mobileNavOpen} title="Navigation" onClose={() => setMobileNavOpen(false)}>
+        <SidebarNav
+          tab={tab}
+          enabledMenu={enabledMenu}
+          className="min-h-0 border-0"
+          onNavigate={(next) => {
+            onNavigate(next);
+            setMobileNavOpen(false);
+          }}
+          onLogout={() => {
+            onLogout();
+            setMobileNavOpen(false);
+          }}
+          onShortcuts={() => {
+            onShortcuts();
+            setMobileNavOpen(false);
+          }}
+        />
+      </Drawer>
       <main id="content" className="page-container section-stack" tabIndex={-1}>
+        <header className="mb-1 flex items-center justify-between lg:hidden">
+          <Button variant="secondary" onClick={() => setMobileNavOpen(true)} aria-label="Open navigation">
+            Menu
+          </Button>
+          <img src="/logo-sharemtc.svg" alt="ShareMTC logo" className="h-6 w-6" />
+        </header>
         <header className="mb-2 flex items-center justify-between gap-2 text-textSecondary">
           <div className="flex items-center gap-2">
             <BadgeLabel label={groupLabel} />
