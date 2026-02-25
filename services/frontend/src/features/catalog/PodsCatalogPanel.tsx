@@ -11,6 +11,7 @@ import { Button } from "../../design/primitives/Button";
 import { useToast } from "../../design/components/Toast";
 import { Badge } from "../../design/primitives/Badge";
 import { listVMTemplates } from "../resources/api/resourcesApi";
+import { resolvePodLogoURL, resolveTemplateLogoURL } from "../../lib/logoResolver";
 
 export function PodsCatalogPanel() {
   const [pods, setPods] = useState<PodCatalogItem[]>([]);
@@ -205,10 +206,13 @@ export function PodsCatalogPanel() {
             <button
               key={item.code}
               type="button"
-              className="h-32 rounded-none border border-border bg-surface p-3 text-left transition-colors hover:border-info/60 hover:bg-elevated/50"
+              className="aspect-[3/2] w-full rounded-none border border-border bg-surface p-3 text-left transition-colors hover:border-info/60 hover:bg-elevated/50"
             >
               <div className="flex items-start justify-between gap-2">
-                <div className="font-semibold">{item.name}</div>
+                <div className="flex items-center gap-2">
+                  <img src={resolveTemplateLogoURL(item.code, item.name)} alt={`${item.name} logo`} className="h-6 w-6 rounded-sm object-contain" />
+                  <div className="font-semibold">{item.name}</div>
+                </div>
                 <Badge variant={(item.availability_tier || "low") === "high" ? "success" : (item.availability_tier || "low") === "medium" ? "warning" : "danger"}>
                   {item.availability_tier || "low"}
                 </Badge>
@@ -229,10 +233,13 @@ export function PodsCatalogPanel() {
             <button
               key={item.code}
               type="button"
-              className="h-32 rounded-none border border-border bg-surface p-3 text-left transition-colors hover:border-brand/60 hover:bg-elevated/40"
+              className="aspect-[3/2] w-full rounded-none border border-border bg-surface p-3 text-left transition-colors hover:border-brand/60 hover:bg-elevated/40"
             >
               <div className="flex items-start justify-between gap-2">
-                <div className="font-medium">{item.name}</div>
+                <div className="flex items-center gap-2">
+                  <img src={resolveTemplateLogoURL(item.code, item.name)} alt={`${item.name} logo`} className="h-6 w-6 rounded-sm object-contain" />
+                  <div className="font-medium">{item.name}</div>
+                </div>
                 <span className="text-xs text-success">{item.network_mbps} Mbps</span>
               </div>
               <div className="mt-2 text-xs text-textSecondary">
@@ -250,13 +257,19 @@ export function PodsCatalogPanel() {
           {filteredPods.map((item) => {
             const hasGPU = item.gpu_model && item.gpu_model !== "None";
             return (
-              <Card key={item.id} title={item.name} description={item.description}>
-                {item.logo_url ? (
-                  <div className="mb-2">
-                    <img src={item.logo_url} alt={`${item.name} logo`} className="h-8 w-8 rounded-sm object-contain" />
+              <article key={item.id} className="aspect-[3/2] rounded-none border border-border bg-surface p-3 flex flex-col">
+                <div className="mb-2 flex items-start justify-between gap-2">
+                  <div>
+                    <div className="text-sm font-semibold">{item.name}</div>
+                    <div className="text-xs text-textSecondary line-clamp-2">{item.description}</div>
                   </div>
-                ) : null}
-                <div className="grid gap-2 text-sm text-textSecondary">
+                  <img
+                    src={item.logo_url || resolvePodLogoURL(item.code, item.gpu_model)}
+                    alt={`${item.name} logo`}
+                    className="h-8 w-8 rounded-sm object-contain"
+                  />
+                </div>
+                <div className="grid gap-2 text-sm text-textSecondary flex-1">
                   <div className="flex items-center gap-2">
                     {hasGPU ? <SiNvidia className="text-success" /> : <FaMicrochip className="text-info" />}
                     {hasGPU ? `${item.gpu_model} (${item.gpu_vram_gb} GB VRAM)` : "No GPU (CPU only)"}
@@ -285,7 +298,7 @@ export function PodsCatalogPanel() {
                 <div className="mt-3 flex justify-end">
                   <Button>Rent this Pod</Button>
                 </div>
-              </Card>
+              </article>
             );
           })}
         </div>

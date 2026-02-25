@@ -8,12 +8,12 @@ import { Button } from "../../../design/primitives/Button";
 import { Table } from "../../../design/components/Table";
 import { EmptyState } from "../../../design/patterns/EmptyState";
 import { useToast } from "../../../design/components/Toast";
+import { resolvePodLogoURL } from "../../../lib/logoResolver";
 
 export function AdminPodsPanel() {
   const [pods, setPods] = useState<PodCatalogItem[]>([]);
   const [templates, setTemplates] = useState<PodTemplate[]>([]);
   const [podName, setPodName] = useState("");
-  const [podLogoURL, setPodLogoURL] = useState("/logos/sharemtc-mark.svg");
   const [hostIP, setHostIP] = useState("");
   const [sshUser, setSSHUser] = useState("root");
   const [sshAuthRef, setSSHAuthRef] = useState("");
@@ -72,7 +72,7 @@ export function AdminPodsPanel() {
         hourly_price_usd: 1.5,
         monthly_price_usd: 820,
         os_name: "Ubuntu 22.04",
-        logo_url: podLogoURL,
+        logo_url: resolvePodLogoURL(`pod-${podName.trim().toLowerCase().replace(/\s+/g, "-")}`, "NVIDIA RTX 4090"),
         host_ip: hostIP,
         ssh_user: sshUser,
         ssh_auth_ref: sshAuthRef,
@@ -131,7 +131,6 @@ export function AdminPodsPanel() {
       <Card title="Manage Catalog Instances" description="Add or remove hardware instances from catalog.">
         <form className="grid gap-2 md:grid-cols-3" onSubmit={createPod}>
           <Input label="Instance Name" value={podName} onChange={(event) => setPodName(event.target.value)} />
-          <Input label="Logo URL" value={podLogoURL} onChange={(event) => setPodLogoURL(event.target.value)} />
           <Input label="Host IP" value={hostIP} onChange={(event) => setHostIP(event.target.value)} />
           <Input label="SSH User" value={sshUser} onChange={(event) => setSSHUser(event.target.value)} />
           <Input label="SSH Auth Ref" value={sshAuthRef} onChange={(event) => setSSHAuthRef(event.target.value)} />

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/MidasWR/ShareMTC/services/resourceservice/internal/adapter/orchestrator"
@@ -131,13 +132,22 @@ func (s *ResourceService) UpsertVMTemplate(ctx context.Context, tpl models.VMTem
 	if tpl.OSFamily == "" {
 		tpl.OSFamily = "linux"
 	}
-	if tpl.LogoURL == "" {
-		tpl.LogoURL = "/logo-sharemtc.png"
-	}
+	tpl.LogoURL = resolveTemplateLogoURL(tpl.Code, tpl.Name)
 	if tpl.OwnerUserID == "" {
 		tpl.OwnerUserID = "system"
 	}
 	return s.repo.UpsertVMTemplate(ctx, tpl)
+}
+
+func resolveTemplateLogoURL(code string, name string) string {
+	key := strings.ToLower(strings.TrimSpace(code + " " + name))
+	if strings.Contains(key, "fastpanel") {
+		return "/logos/fastpanel.svg"
+	}
+	if strings.Contains(key, "aapanel") {
+		return "/logos/aapanel.svg"
+	}
+	return "/logos/sharemtc-mark.svg"
 }
 
 func (s *ResourceService) ListVMTemplates(ctx context.Context, filter models.CatalogFilter) ([]models.VMTemplate, error) {

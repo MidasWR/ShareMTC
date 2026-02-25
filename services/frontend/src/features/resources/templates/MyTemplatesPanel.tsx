@@ -1,6 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useToast } from "../../../design/components/Toast";
-import { Table } from "../../../design/components/Table";
 import { EmptyState } from "../../../design/patterns/EmptyState";
 import { PageSectionHeader } from "../../../design/patterns/PageSectionHeader";
 import { Button } from "../../../design/primitives/Button";
@@ -11,12 +10,12 @@ import { Textarea } from "../../../design/primitives/Textarea";
 import { listVMTemplates, upsertVMTemplate } from "../api/resourcesApi";
 import { VMTemplate } from "../../../types/api";
 import { validateTemplateInput } from "./templateValidation";
+import { resolveTemplateLogoURL } from "../../../lib/logoResolver";
 
 export function MyTemplatesPanel() {
   const [rows, setRows] = useState<VMTemplate[]>([]);
   const [name, setName] = useState("FastPanel");
   const [code, setCode] = useState("fastpanel");
-  const [logoURL, setLogoURL] = useState("/logos/fastpanel.svg");
   const [osName, setOSName] = useState("Ubuntu 22.04");
   const [osFamily, setOSFamily] = useState<"linux" | "windows" | "bsd">("linux");
   const [envJSON, setEnvJSON] = useState("{\"APP_ENV\":\"production\"}");
@@ -63,7 +62,7 @@ export function MyTemplatesPanel() {
         code,
         name,
         description: `${name} template`,
-        logo_url: logoURL,
+        logo_url: resolveTemplateLogoURL(code, name),
         os_name: osName,
         os_family: osFamily,
         env_json: envJSON,
@@ -88,11 +87,10 @@ export function MyTemplatesPanel() {
   return (
     <section className="section-stack">
       <PageSectionHeader title="My Templates" description="Create and manage server installation templates." />
-      <Card title="Template Builder" description="Create production-grade templates with ENV, SSH key, bootstrap code and logo.">
+      <Card title="Template Builder" description="Create production-grade templates with ENV, SSH key, bootstrap code. Logo is auto-assigned by template code.">
         <form className="grid items-end gap-3 md:grid-cols-2" onSubmit={submit}>
           <Input label="Template Code" value={code} onChange={(event) => setCode(event.target.value)} error={formError.includes("code") ? formError : ""} />
           <Input label="Template Name" value={name} onChange={(event) => setName(event.target.value)} error={formError.includes("name") ? formError : ""} />
-          <Input label="Logo URL" value={logoURL} onChange={(event) => setLogoURL(event.target.value)} />
           <Input label="OS Name" value={osName} onChange={(event) => setOSName(event.target.value)} error={formError.includes("OS") ? formError : ""} />
           <Select
             label="OS Family"
@@ -132,22 +130,34 @@ export function MyTemplatesPanel() {
         description="Saved templates available for VM creation."
         actions={<Button variant="secondary" onClick={refresh} loading={loading}>Refresh</Button>}
       >
-        <div className="mt-3">
-          <Table
-            dense
-            ariaLabel="VM templates table"
-            rowKey={(row) => row.id ?? row.code}
-            items={rows}
-            emptyState={<EmptyState title="No templates yet" description="Create your first server template." />}
-            columns={[
-              { key: "code", header: "Code", render: (row) => row.code },
-              { key: "name", header: "Name", render: (row) => row.name },
-              { key: "os", header: "OS", render: (row) => row.os_name },
-              { key: "logo", header: "Logo", render: (row) => row.logo_url || "-" },
-              { key: "shape", header: "Shape", render: (row) => `${row.cpu_cores} CPU / ${row.ram_mb} MB / ${row.gpu_units} GPU` }
-            ]}
-          />
-        </div>
+        {rows.length === 0 ? (
+          <EmptyState title="No templates yet" description="Create your first server template." />
+        ) : (
+          <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {rows.map((row) => (
+              <article key={row.id ?? row.code} className="aspect-[3/2] rounded-none border border-border bg-surface p-3 flex flex-col">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <img
+                      src={row.logo_url || resolveTemplateLogoURL(row.code, row.name)}
+                      alt={`${row.name} logo`}
+                      className="h-8 w-8 rounded-sm object-contain"
+                    />
+                    <div>
+                      <div className="text-sm font-semibold">{row.name}</div>
+                      <div className="text-xs text-textMuted">{row.code}</div>
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-3 space-y-1 text-xs text-textSecondary">
+                  <div>OS: {row.os_name}</div>
+                  <div>Shape: {row.cpu_cores} CPU / {row.ram_mb} MB / {row.gpu_units} GPU</div>
+                  <div>Network: {row.network_mbps} Mbps</div>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
       </Card>
     </section>
   );

@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"strings"
 
 	"github.com/MidasWR/ShareMTC/services/adminservice/internal/models"
 )
@@ -54,10 +55,18 @@ func (s *ProviderService) ProviderMetrics(ctx context.Context, providerID string
 }
 
 func (s *ProviderService) ListPodCatalog(ctx context.Context) ([]models.PodCatalogItem, error) {
-	return s.repo.ListPodCatalog(ctx)
+	items, err := s.repo.ListPodCatalog(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for i := range items {
+		items[i].LogoURL = resolvePodLogoURL(items[i].Code, items[i].GPUModel)
+	}
+	return items, nil
 }
 
 func (s *ProviderService) UpsertPodCatalog(ctx context.Context, item models.PodCatalogItem) (models.PodCatalogItem, error) {
+	item.LogoURL = resolvePodLogoURL(item.Code, item.GPUModel)
 	return s.repo.UpsertPodCatalog(ctx, item)
 }
 
@@ -75,4 +84,12 @@ func (s *ProviderService) UpsertPodTemplate(ctx context.Context, item models.Pod
 
 func (s *ProviderService) DeletePodTemplate(ctx context.Context, id string) error {
 	return s.repo.DeletePodTemplate(ctx, id)
+}
+
+func resolvePodLogoURL(code string, gpuModel string) string {
+	key := strings.ToLower(strings.TrimSpace(code + " " + gpuModel))
+	if strings.Contains(key, "nvidia") || strings.Contains(key, "rtx") || strings.Contains(key, "gpu") {
+		return "/logos/sharemtc-mark.svg"
+	}
+	return "/logos/sharemtc-mark.svg"
 }
