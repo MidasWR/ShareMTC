@@ -2,6 +2,52 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --color-canvas: 10 10 12;
+  --color-surface: 21 21 26;
+  --color-elevated: 31 31 38;
+  --color-border: 58 58 69;
+  --color-border-strong: 77 77 90;
+  --color-text-primary: 250 250 250;
+  --color-text-secondary: 193 194 205;
+  --color-text-muted: 139 142 160;
+  --color-brand: 228 17 32;
+  --color-brand-hover: 199 15 28;
+  --brand-rgb: 228, 17, 32;
+  --color-success: 16 185 129;
+  --color-warning: 245 158 11;
+  --color-danger: 239 68 68;
+  --color-info: 56 189 248;
+}
+
+:root[data-brand-theme="mts"] {
+  --color-canvas: 10 10 12;
+  --color-surface: 21 21 26;
+  --color-elevated: 31 31 38;
+  --color-border: 58 58 69;
+  --color-border-strong: 77 77 90;
+  --color-text-primary: 250 250 250;
+  --color-text-secondary: 193 194 205;
+  --color-text-muted: 139 142 160;
+  --color-brand: 228 17 32;
+  --color-brand-hover: 199 15 28;
+  --brand-rgb: 228, 17, 32;
+}
+
+:root[data-brand-theme="neon"] {
+  --color-canvas: 0 0 0;
+  --color-surface: 9 9 11;
+  --color-elevated: 18 18 20;
+  --color-border: 31 31 34;
+  --color-border-strong: 39 39 42;
+  --color-text-primary: 250 250 250;
+  --color-text-secondary: 161 161 170;
+  --color-text-muted: 113 113 122;
+  --color-brand: 0 255 65;
+  --color-brand-hover: 0 214 50;
+  --brand-rgb: 0, 255, 65;
+}
+
 body {
   @apply bg-canvas text-textPrimary min-h-screen antialiased;
 }
@@ -11,7 +57,7 @@ body {
 }
 
 * {
-  scrollbar-color: #27272A #000000;
+  scrollbar-color: rgb(var(--color-border-strong)) rgb(var(--color-canvas));
 }
 
 *::-webkit-scrollbar {
@@ -20,11 +66,11 @@ body {
 }
 
 *::-webkit-scrollbar-track {
-  background: #000000;
+  background: rgb(var(--color-canvas));
 }
 
 *::-webkit-scrollbar-thumb {
-  background: #27272A;
+  background: rgb(var(--color-border-strong));
   border-radius: 999px;
 }
 

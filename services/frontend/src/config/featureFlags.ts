@@ -4,6 +4,7 @@ type FeatureFlags = {
   adminSharing: boolean;
   providerDashboard: boolean;
   agentOnboarding: boolean;
+  defaultBrandTheme: "mts" | "neon";
 };
 
 function envFlag(value: string | undefined, fallback: boolean): boolean {
@@ -16,5 +17,6 @@ export const featureFlags: FeatureFlags = {
   adminServers: envFlag(import.meta.env.VITE_FF_ADMIN_SERVERS, true),
   adminSharing: envFlag(import.meta.env.VITE_FF_ADMIN_SHARING, true),
   providerDashboard: envFlag(import.meta.env.VITE_FF_PROVIDER_DASHBOARD, true),
-  agentOnboarding: envFlag(import.meta.env.VITE_FF_AGENT_ONBOARDING, true)
+  agentOnboarding: envFlag(import.meta.env.VITE_FF_AGENT_ONBOARDING, true),
+  defaultBrandTheme: import.meta.env.VITE_DEFAULT_BRAND_THEME === "neon" ? "neon" : "mts"
 };

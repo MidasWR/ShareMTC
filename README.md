@@ -56,14 +56,31 @@ ShareMTC is a compute marketplace and control plane where providers expose CPU/R
 - **Core Dashboard** - provider health ratio, allocation pressure, and revenue trend chart.
 - **Provider Dashboard** - provider-specific allocations, earnings, and operational state.
 - **Admin Dashboard** - top revenue providers, global metrics, and risk feed.
-- **Admin Console** - tabbed admin module for overview/providers/allocations/billing/risk.
+- **Admin Console** - tabbed admin module for overview/providers/allocations/billing/risk with adaptive `More` behavior on narrow screens.
 
 ### Navigation and localization
 
-- Core navigation now uses product tabs: `My Templates`, `VM`, `Shared VM`, `PODs`, `Shared PODs`, `Kubernetes Clusters`, `My Servers`.
-- `overview` was removed from Core and routing defaults to `myTemplates`.
-- Sidebar route icons were added for all core/admin/provider sections.
+- Sidebar is flattened to five product groups: `Marketplace`, `My Compute`, `Provide Compute`, `Billing`, `Admin` (plus `Settings` in account area).
+- Legacy links using old `?section=` values are mapped to new top-level groups to preserve demo deep-links.
+- Operational screens were moved into nested tabs within group workspaces (`My Compute`, `Provide Compute`, `Admin`) instead of one-level sidebar sprawl.
 - UI language defaults to English, and visible panel copy is aligned to EN.
+
+### Marketplace demo flow (single screen)
+
+- `Marketplace` now presents the core hackathon scenario on one canvas:
+  - catalog with filters,
+  - compact deploy form,
+  - `My Instances` table.
+- Deploy form shows explicit summary (`You are going to deploy...`) before submission.
+- Advanced infra fields are grouped in `Advanced` details to reduce cognitive load in the first path.
+
+### Brand themes
+
+- Frontend design tokens now support two brand themes:
+  - `mts` (default demo theme),
+  - `neon` (optional geek theme).
+- Theme is applied through `data-brand-theme` and CSS variables, then consumed by Tailwind color tokens.
+- User can switch brand theme in `Settings -> Personalization`.
 
 ### RunPod-style UX direction
 
@@ -94,6 +111,7 @@ Priority is assigned using `S/F/B` together, with `S0` always in Wave 1.
 Detailed audit findings and Wave 1/2/3 implementation plan are tracked in:
 
 - `reports/10_frontend_core_ux_audit_roadmap.md`
+- `reports/12_frontend_tabs_navigation_marketplace_demo.md`
 
 ### Security model
 
@@ -102,6 +120,19 @@ Detailed audit findings and Wave 1/2/3 implementation plan are tracked in:
   - `RequireAnyRole("admin", "super-admin", "ops-admin")` for admin-only endpoints
 - Frontend HTTP client attaches `Authorization: Bearer <token>` automatically.
 - `401/403` responses clear local session state to prevent stale privilege usage.
+
+### Execution boundary (MVP)
+
+- Current scope is **marketplace + telemetry + control plane**.
+- Resource limits are applied via cgroups accounting and lifecycle orchestration APIs.
+- This MVP does **not** claim hardened sandbox execution for untrusted workloads yet.
+- Next stage for untrusted execution is explicit isolation (sandbox VM/TEE runtime).
+
+### Provider node platform support
+
+- **Linux provider node is the supported runtime for hostagent telemetry collection.**
+- macOS/Windows hostagent binaries are published as experimental artifacts for integration testing.
+- The Linux installer (`installer/hostagent-node-installer.sh`) exits on non-Linux systems.
 
 ## API overview (new analytics endpoints)
 
@@ -223,9 +254,9 @@ npm run test:e2e
 - optional stage skipping (`SKIP=1,2,...`)
 - image build/push, chart packaging, release publishing
 - hostagent multi-platform binaries for GitHub Releases assets:
-  - `hostagent-linux-amd64`
-  - `hostagent-darwin-amd64`
-  - `hostagent-windows-amd64.exe`
+  - `hostagent-linux-amd64` (supported provider runtime)
+  - `hostagent-darwin-amd64` (experimental)
+  - `hostagent-windows-amd64.exe` (experimental)
 - optional auto commit/push before release
 
 ```bash
@@ -249,3 +280,4 @@ Latest upgrade reports:
 - `reports/7_core_vm_k8s_fullstack_iteration.md`
 - `reports/8_runpod_style_core_ux_iteration.md`
 - `reports/9_phase1_templates_sharing_pipeline.md`
+- `reports/11_marketplace_alignment_linux_first_security.md`

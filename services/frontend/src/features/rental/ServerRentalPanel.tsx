@@ -21,7 +21,7 @@ import { buildVmSelectOptions, getLinkedVMID } from "./orderVmMapping";
 import { validateServerOrder } from "./rentalValidation";
 
 type Props = {
-  onNavigate: (tab: AppTab) => void;
+  onNavigate?: (tab: AppTab) => void;
 };
 
 export function ServerRentalPanel({ onNavigate }: Props) {
@@ -41,7 +41,7 @@ export function ServerRentalPanel({ onNavigate }: Props) {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"" | "active" | "queued" | "failed">("");
   const [typeFilter, setTypeFilter] = useState<"" | "hourly" | "monthly">("");
-  const [createTarget, setCreateTarget] = useState<AppTab>("vm");
+  const [createTarget, setCreateTarget] = useState<AppTab>("myCompute");
   const [vmByOrder, setVmByOrder] = useState<Record<string, string>>({});
   const [vmOptions, setVmOptions] = useState<Array<{ value: string; label: string }>>([]);
   const [sharedOffers, setSharedOffers] = useState<SharedInventoryOffer[]>([]);
@@ -229,14 +229,14 @@ export function ServerRentalPanel({ onNavigate }: Props) {
                 value={createTarget}
                 onChange={(event) => setCreateTarget(event.target.value as AppTab)}
                 options={[
-                  { value: "vm", label: "VM" },
-                  { value: "sharedVm", label: "Shared VM" },
-                  { value: "pods", label: "PODs" },
-                  { value: "sharedPods", label: "Shared PODs" },
-                  { value: "k8sClusters", label: "Kubernetes Cluster" }
+                  { value: "myCompute", label: "My Compute workspace" },
+                  { value: "provideCompute", label: "Provide Compute workspace" },
+                  { value: "marketplace", label: "Marketplace" }
                 ]}
               />
-              <Button onClick={() => onNavigate(createTarget)}>Create</Button>
+              <Button onClick={() => onNavigate?.(createTarget)} disabled={!onNavigate}>
+                Open
+              </Button>
             </>
           }
         />

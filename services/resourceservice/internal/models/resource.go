@@ -3,13 +3,16 @@ package models
 import "time"
 
 type HostResource struct {
-	ID           string    `json:"id"`
-	ProviderID   string    `json:"provider_id"`
-	CPUFreeCores int       `json:"cpu_free_cores"`
-	RAMFreeMB    int       `json:"ram_free_mb"`
-	GPUFreeUnits int       `json:"gpu_free_units"`
-	NetworkMbps  int       `json:"network_mbps"`
-	HeartbeatAt  time.Time `json:"heartbeat_at"`
+	ID               string    `json:"id"`
+	ProviderID       string    `json:"provider_id"`
+	CPUFreeCores     int       `json:"cpu_free_cores"`
+	RAMFreeMB        int       `json:"ram_free_mb"`
+	GPUFreeUnits     int       `json:"gpu_free_units"`
+	GPUTotalUnits    int       `json:"gpu_total_units"`
+	GPUMemoryTotalMB int       `json:"gpu_memory_total_mb"`
+	GPUMemoryUsedMB  int       `json:"gpu_memory_used_mb"`
+	NetworkMbps      int       `json:"network_mbps"`
+	HeartbeatAt      time.Time `json:"heartbeat_at"`
 }
 
 type Allocation struct {
@@ -68,58 +71,58 @@ const (
 )
 
 type VM struct {
-	ID          string    `json:"id"`
-	UserID      string    `json:"user_id"`
-	ProviderID  string    `json:"provider_id"`
-	Name        string    `json:"name"`
-	Template    string    `json:"template"`
-	OSName      string    `json:"os_name"`
-	IPAddress   string    `json:"ip_address"`
-	Region      string    `json:"region"`
-	CloudType   string    `json:"cloud_type"`
-	CPUCores    int       `json:"cpu_cores"`
-	VCPU        int       `json:"vcpu"`
-	RAMMB       int       `json:"ram_mb"`
-	SystemRAMGB int       `json:"system_ram_gb"`
-	GPUUnits    int       `json:"gpu_units"`
-	VRAMGB      int       `json:"vram_gb"`
-	NetworkMbps int       `json:"network_mbps"`
+	ID                      string    `json:"id"`
+	UserID                  string    `json:"user_id"`
+	ProviderID              string    `json:"provider_id"`
+	Name                    string    `json:"name"`
+	Template                string    `json:"template"`
+	OSName                  string    `json:"os_name"`
+	IPAddress               string    `json:"ip_address"`
+	Region                  string    `json:"region"`
+	CloudType               string    `json:"cloud_type"`
+	CPUCores                int       `json:"cpu_cores"`
+	VCPU                    int       `json:"vcpu"`
+	RAMMB                   int       `json:"ram_mb"`
+	SystemRAMGB             int       `json:"system_ram_gb"`
+	GPUUnits                int       `json:"gpu_units"`
+	VRAMGB                  int       `json:"vram_gb"`
+	NetworkMbps             int       `json:"network_mbps"`
 	NetworkVolumeSupported  bool      `json:"network_volume_supported"`
 	GlobalNetworkingSupport bool      `json:"global_networking_supported"`
 	AvailabilityTier        string    `json:"availability_tier"`
 	MaxInstances            int       `json:"max_instances"`
-	Status      VMStatus  `json:"status"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	Status                  VMStatus  `json:"status"`
+	CreatedAt               time.Time `json:"created_at"`
+	UpdatedAt               time.Time `json:"updated_at"`
 }
 
 type VMTemplate struct {
-	ID          string    `json:"id"`
-	Code        string    `json:"code"`
-	Name        string    `json:"name"`
-	Description string    `json:"description"`
-	LogoURL     string    `json:"logo_url"`
-	EnvJSON     string    `json:"env_json"`
-	SSHPublicKey string   `json:"ssh_public_key"`
-	BootstrapScript string `json:"bootstrap_script"`
-	OSFamily    string    `json:"os_family"`
-	IsPublic    bool      `json:"is_public"`
-	OwnerUserID string    `json:"owner_user_id"`
-	OSName      string    `json:"os_name"`
-	Region      string    `json:"region"`
-	CloudType   string    `json:"cloud_type"`
-	CPUCores    int       `json:"cpu_cores"`
-	VCPU        int       `json:"vcpu"`
-	RAMMB       int       `json:"ram_mb"`
-	SystemRAMGB int       `json:"system_ram_gb"`
-	GPUUnits    int       `json:"gpu_units"`
-	VRAMGB      int       `json:"vram_gb"`
-	NetworkMbps int       `json:"network_mbps"`
+	ID                      string    `json:"id"`
+	Code                    string    `json:"code"`
+	Name                    string    `json:"name"`
+	Description             string    `json:"description"`
+	LogoURL                 string    `json:"logo_url"`
+	EnvJSON                 string    `json:"env_json"`
+	SSHPublicKey            string    `json:"ssh_public_key"`
+	BootstrapScript         string    `json:"bootstrap_script"`
+	OSFamily                string    `json:"os_family"`
+	IsPublic                bool      `json:"is_public"`
+	OwnerUserID             string    `json:"owner_user_id"`
+	OSName                  string    `json:"os_name"`
+	Region                  string    `json:"region"`
+	CloudType               string    `json:"cloud_type"`
+	CPUCores                int       `json:"cpu_cores"`
+	VCPU                    int       `json:"vcpu"`
+	RAMMB                   int       `json:"ram_mb"`
+	SystemRAMGB             int       `json:"system_ram_gb"`
+	GPUUnits                int       `json:"gpu_units"`
+	VRAMGB                  int       `json:"vram_gb"`
+	NetworkMbps             int       `json:"network_mbps"`
 	NetworkVolumeSupported  bool      `json:"network_volume_supported"`
 	GlobalNetworkingSupport bool      `json:"global_networking_supported"`
 	AvailabilityTier        string    `json:"availability_tier"`
 	MaxInstances            int       `json:"max_instances"`
-	CreatedAt   time.Time `json:"created_at"`
+	CreatedAt               time.Time `json:"created_at"`
 }
 
 type SharedInventoryStatus string

@@ -5,7 +5,7 @@ import { AppTab } from "../navigation/menu";
 type Props = {
   tab: AppTab;
   activeLabel: string;
-  enabledMenu: Array<{ id: AppTab; label: string; group: "core" | "provider" | "admin" | "ops" }>;
+  enabledMenu: Array<{ id: AppTab; label: string; group: "main" | "account" }>;
   onNavigate: (tab: AppTab) => void;
   onShortcuts: () => void;
   onLogout: () => void;
@@ -23,7 +23,6 @@ export function AppShell({ tab, enabledMenu, onNavigate, onShortcuts, onLogout, 
       </a>
       <SidebarNav
         tab={tab}
-        groups={["core", "provider", "admin", "ops"]}
         enabledMenu={enabledMenu}
         onNavigate={onNavigate}
         onLogout={onLogout}

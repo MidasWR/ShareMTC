@@ -27,9 +27,15 @@ func (r *Repo) Migrate(ctx context.Context) error {
 			cpu_free_cores INTEGER NOT NULL,
 			ram_free_mb INTEGER NOT NULL,
 			gpu_free_units INTEGER NOT NULL,
+			gpu_total_units INTEGER NOT NULL DEFAULT 0,
+			gpu_memory_total_mb INTEGER NOT NULL DEFAULT 0,
+			gpu_memory_used_mb INTEGER NOT NULL DEFAULT 0,
 			network_mbps INTEGER NOT NULL,
 			heartbeat_at TIMESTAMPTZ NOT NULL
 		);
+		ALTER TABLE host_resources ADD COLUMN IF NOT EXISTS gpu_total_units INTEGER NOT NULL DEFAULT 0;
+		ALTER TABLE host_resources ADD COLUMN IF NOT EXISTS gpu_memory_total_mb INTEGER NOT NULL DEFAULT 0;
+		ALTER TABLE host_resources ADD COLUMN IF NOT EXISTS gpu_memory_used_mb INTEGER NOT NULL DEFAULT 0;
 		CREATE TABLE IF NOT EXISTS allocations (
 			id TEXT PRIMARY KEY,
 			provider_id TEXT NOT NULL,
@@ -197,25 +203,30 @@ func (r *Repo) UpsertHostResource(ctx context.Context, resource models.HostResou
 		resource.ID = uuid.NewString()
 	}
 	_, err := r.db.Exec(ctx, `
-		INSERT INTO host_resources (id, provider_id, cpu_free_cores, ram_free_mb, gpu_free_units, network_mbps, heartbeat_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		INSERT INTO host_resources (
+			id, provider_id, cpu_free_cores, ram_free_mb, gpu_free_units, gpu_total_units, gpu_memory_total_mb, gpu_memory_used_mb, network_mbps, heartbeat_at
+		)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 		ON CONFLICT (provider_id) DO UPDATE SET
 			cpu_free_cores = EXCLUDED.cpu_free_cores,
 			ram_free_mb = EXCLUDED.ram_free_mb,
 			gpu_free_units = EXCLUDED.gpu_free_units,
+			gpu_total_units = EXCLUDED.gpu_total_units,
+			gpu_memory_total_mb = EXCLUDED.gpu_memory_total_mb,
+			gpu_memory_used_mb = EXCLUDED.gpu_memory_used_mb,
 			network_mbps = EXCLUDED.network_mbps,
 			heartbeat_at = EXCLUDED.heartbeat_at
-	`, resource.ID, resource.ProviderID, resource.CPUFreeCores, resource.RAMFreeMB, resource.GPUFreeUnits, resource.NetworkMbps, resource.HeartbeatAt)
+	`, resource.ID, resource.ProviderID, resource.CPUFreeCores, resource.RAMFreeMB, resource.GPUFreeUnits, resource.GPUTotalUnits, resource.GPUMemoryTotalMB, resource.GPUMemoryUsedMB, resource.NetworkMbps, resource.HeartbeatAt)
 	return err
 }
 
 func (r *Repo) GetHostResource(ctx context.Context, providerID string) (models.HostResource, error) {
 	var out models.HostResource
 	err := r.db.QueryRow(ctx, `
-		SELECT id, provider_id, cpu_free_cores, ram_free_mb, gpu_free_units, network_mbps, heartbeat_at
+		SELECT id, provider_id, cpu_free_cores, ram_free_mb, gpu_free_units, gpu_total_units, gpu_memory_total_mb, gpu_memory_used_mb, network_mbps, heartbeat_at
 		FROM host_resources WHERE provider_id = $1
 	`, providerID).Scan(
-		&out.ID, &out.ProviderID, &out.CPUFreeCores, &out.RAMFreeMB, &out.GPUFreeUnits, &out.NetworkMbps, &out.HeartbeatAt,
+		&out.ID, &out.ProviderID, &out.CPUFreeCores, &out.RAMFreeMB, &out.GPUFreeUnits, &out.GPUTotalUnits, &out.GPUMemoryTotalMB, &out.GPUMemoryUsedMB, &out.NetworkMbps, &out.HeartbeatAt,
 	)
 	return out, err
 }

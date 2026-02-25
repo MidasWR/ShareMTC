@@ -58,13 +58,21 @@ type CGroupApplier interface {
 }
 
 type ResourceService struct {
-	repo         Repository
-	cgroups      CGroupApplier
-	orchestrator orchestrator.Runtime
+	repo            Repository
+	cgroups         CGroupApplier
+	orchestrator    orchestrator.Runtime
+	heartbeatMaxAge time.Duration
 }
 
-func NewResourceService(repo Repository, cgroups CGroupApplier, runtime orchestrator.Runtime) *ResourceService {
-	return &ResourceService{repo: repo, cgroups: cgroups, orchestrator: runtime}
+// NewResourceService wires control-plane components for telemetry, allocation accounting,
+// and lifecycle APIs. It is not a hardened sandbox runtime for untrusted code execution.
+func NewResourceService(repo Repository, cgroups CGroupApplier, runtime orchestrator.Runtime, heartbeatMaxAge time.Duration) *ResourceService {
+	if heartbeatMaxAge <= 0 {
+		heartbeatMaxAge = 30 * time.Second
+	}
+	return &ResourceService{
+		repo: repo, cgroups: cgroups, orchestrator: runtime, heartbeatMaxAge: heartbeatMaxAge,
+	}
 }
 
 func (s *ResourceService) UpdateHeartbeat(ctx context.Context, resource models.HostResource) error {
@@ -75,6 +83,15 @@ func (s *ResourceService) Allocate(ctx context.Context, alloc models.Allocation)
 	host, err := s.repo.GetHostResource(ctx, alloc.ProviderID)
 	if err != nil {
 		return models.Allocation{}, err
+	}
+	if host.ProviderID == "" {
+		return models.Allocation{}, errors.New("host heartbeat not found")
+	}
+	if host.HeartbeatAt.IsZero() || time.Since(host.HeartbeatAt) > s.heartbeatMaxAge {
+		return models.Allocation{}, errors.New("host heartbeat is stale")
+	}
+	if host.CPUFreeCores < 0 || host.RAMFreeMB < 0 || host.GPUFreeUnits < 0 {
+		return models.Allocation{}, errors.New("host heartbeat contains invalid resource values")
 	}
 	if host.CPUFreeCores < alloc.CPUCores || host.RAMFreeMB < alloc.RAMMB || host.GPUFreeUnits < alloc.GPUUnits {
 		return models.Allocation{}, errors.New("insufficient free resources")

@@ -1,10 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { AppTab, menu, isTab } from "../navigation/menu";
-import { featureFlags } from "../../config/featureFlags";
+import { AppTab, menu, isTab, mapLegacySection } from "../navigation/menu";
 
-function canAccess(item: (typeof menu)[number], isAdmin: boolean) {
-  if (item.flag && !featureFlags[item.flag]) return false;
-  if (item.requiresAdmin && !isAdmin) return false;
+function canAccess(item: (typeof menu)[number], _isAdmin: boolean) {
+  if (item.id === "admin") return true;
   return true;
 }
 
@@ -16,7 +14,9 @@ export function useSectionRouting(isAdmin: boolean) {
       const item = menu.find((entry) => entry.id === fromURL);
       if (item && canAccess(item, isAdmin)) return fromURL;
     }
-    return "myTemplates";
+    const mappedLegacy = mapLegacySection(fromURL);
+    if (mappedLegacy) return mappedLegacy;
+    return "marketplace";
   });
 
   function canAccessTab(nextTab: AppTab) {
@@ -50,7 +50,7 @@ export function useSectionRouting(isAdmin: boolean) {
 
   useEffect(() => {
     if (!canAccessTab(tab)) {
-      navigateToTab("myTemplates", false);
+      navigateToTab("marketplace", false);
     }
   }, [tab, enabledMenu]);
 
@@ -58,6 +58,8 @@ export function useSectionRouting(isAdmin: boolean) {
     function onPopState() {
       const fromURL = new URLSearchParams(window.location.search).get("section");
       if (isTab(fromURL) && canAccessTab(fromURL)) setTab(fromURL);
+      const mappedLegacy = mapLegacySection(fromURL);
+      if (mappedLegacy && canAccessTab(mappedLegacy)) setTab(mappedLegacy);
     }
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);

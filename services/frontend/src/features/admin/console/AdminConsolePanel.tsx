@@ -148,6 +148,8 @@ export function AdminConsolePanel() {
         ]}
         value={tab}
         onChange={(next) => setTab(next)}
+        collapseAfter={4}
+        moreLabel="More"
       />
 
       {tab === "overview" ? <AdminDashboardPanel /> : null}

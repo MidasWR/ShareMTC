@@ -6,13 +6,14 @@ import { PageSectionHeader } from "../../../design/patterns/PageSectionHeader";
 import { Button } from "../../../design/primitives/Button";
 import { Card } from "../../../design/primitives/Card";
 import { Input } from "../../../design/primitives/Input";
-import { createVM, listVMs, rebootVM, startVM, stopVM, terminateVM } from "../api/resourcesApi";
-import { VM } from "../../../types/api";
+import { createVM, listVMTemplates, listVMs, rebootVM, startVM, stopVM, terminateVM } from "../api/resourcesApi";
+import { VM, VMTemplate } from "../../../types/api";
 import { StatusBadge } from "../../../design/patterns/StatusBadge";
 import { ActionDropdown } from "../../../design/components/ActionDropdown";
 
 export function VMPanel() {
   const [rows, setRows] = useState<VM[]>([]);
+  const [templates, setTemplates] = useState<VMTemplate[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [providerID, setProviderID] = useState("provider-default");
@@ -25,11 +26,23 @@ export function VMPanel() {
   const [networkMbps, setNetworkMbps] = useState(500);
   const { push } = useToast();
 
+  const selectedTemplate = templates.find((item) => item.code === template);
+
+  const region = selectedTemplate?.region || "any";
+  const cloudType = selectedTemplate?.cloud_type || "secure";
+  const availabilityTier = selectedTemplate?.availability_tier || "medium";
+  const systemRamGB = selectedTemplate?.system_ram_gb || 16;
+  const vramGB = selectedTemplate?.vram_gb || 24;
+  const maxInstances = selectedTemplate?.max_instances || 8;
+  const networkVolumeSupported = selectedTemplate?.network_volume_supported ?? true;
+  const globalNetworkingSupported = selectedTemplate?.global_networking_supported ?? false;
+
   async function refresh() {
     setLoading(true);
     try {
-      const data = await listVMs({ search });
+      const [data, templateRows] = await Promise.all([listVMs({ search }), listVMTemplates()]);
       setRows(data);
+      setTemplates(templateRows);
     } catch (error) {
       push("error", error instanceof Error ? error.message : "Failed to load VMs");
     } finally {
@@ -57,19 +70,19 @@ export function VMPanel() {
         name: name.trim(),
         template,
         os_name: osName,
-        region: "any",
-        cloud_type: "secure",
+        region,
+        cloud_type: cloudType,
         cpu_cores: cpuCores,
         vcpu: cpuCores,
         ram_mb: ramMb,
-        system_ram_gb: 16,
+        system_ram_gb: systemRamGB,
         gpu_units: gpuUnits,
-        vram_gb: 24,
+        vram_gb: vramGB,
         network_mbps: networkMbps,
-        network_volume_supported: true,
-        global_networking_supported: false,
-        availability_tier: "medium",
-        max_instances: 8
+        network_volume_supported: networkVolumeSupported,
+        global_networking_supported: globalNetworkingSupported,
+        availability_tier: availabilityTier,
+        max_instances: maxInstances
       });
       await refresh();
       push("success", "VM created successfully");
@@ -109,6 +122,17 @@ export function VMPanel() {
           <Input type="number" min={1} step={512} label="RAM (MB)" value={`${ramMb}`} onChange={(event) => setRamMb(Number(event.target.value) || 0)} />
           <Input type="number" min={0} step={1} label="GPU Units" value={`${gpuUnits}`} onChange={(event) => setGpuUnits(Number(event.target.value) || 0)} />
           <Input type="number" min={1} step={100} label="Network (Mbps)" value={`${networkMbps}`} onChange={(event) => setNetworkMbps(Number(event.target.value) || 0)} />
+          <details className="xl:col-span-4 rounded-md border border-border bg-canvas p-3 text-sm text-textSecondary">
+            <summary className="cursor-pointer text-textPrimary">You are going to deploy</summary>
+            <div className="mt-2 space-y-1 text-xs">
+              <div>Template: {selectedTemplate?.name || template} ({template})</div>
+              <div>Shape: {cpuCores} CPU / {ramMb} MB / {gpuUnits} GPU</div>
+              <div>Network: {networkMbps} Mbps</div>
+              <div>Region: {region} · Cloud: {cloudType} · Availability: {availabilityTier}</div>
+              <div>System RAM: {systemRamGB} GB · VRAM: {vramGB} GB · Max instances: {maxInstances}</div>
+              <div>Network volume: {networkVolumeSupported ? "supported" : "not supported"} · Global networking: {globalNetworkingSupported ? "enabled" : "disabled"}</div>
+            </div>
+          </details>
           <Button onClick={createNewVM} loading={loading}>Create</Button>
         </div>
       </Card>

@@ -6,6 +6,11 @@ if [[ "${EUID}" -ne 0 ]]; then
   exit 1
 fi
 
+if [[ "$(uname -s)" != "Linux" ]]; then
+  echo "This installer supports Linux provider nodes only (MVP Linux-first)."
+  exit 1
+fi
+
 if ! command -v docker >/dev/null 2>&1; then
   echo "Docker is required but not installed."
   exit 1

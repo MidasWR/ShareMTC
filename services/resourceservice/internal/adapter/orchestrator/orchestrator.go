@@ -28,6 +28,8 @@ type Runtime interface {
 
 type InternalRuntime struct{}
 
+// InternalRuntime returns synthetic cluster state for control-plane lifecycle flow.
+// It does not provide workload isolation and must not be presented as secure execution.
 func NewInternalRuntime() *InternalRuntime {
 	return &InternalRuntime{}
 }

@@ -115,7 +115,9 @@ build-agent-binaries:
 	@if [ "$(call has_skip,6)" = "6" ]; then \
 		echo "Skipping hostagent binaries build"; \
 	else \
+		echo "Building Linux hostagent binary (supported provider runtime)." && \
 		CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o "$(HOSTAGENT_LINUX_ASSET)" ./services/hostagent/cmd && \
+		echo "Building darwin/windows binaries as experimental artifacts (Linux-first telemetry runtime)." && \
 		CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -o "$(HOSTAGENT_DARWIN_ASSET)" ./services/hostagent/cmd && \
 		CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o "$(HOSTAGENT_WINDOWS_ASSET)" ./services/hostagent/cmd; \
 	fi

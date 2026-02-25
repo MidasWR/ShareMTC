@@ -12,7 +12,7 @@ import { EmptyState } from "../../design/patterns/EmptyState";
 import { useSettings } from "../../app/providers/SettingsProvider";
 
 export function SettingsPanel() {
-  const { settings, updateSettingsState } = useSettings();
+  const { settings, updateSettingsState, brandTheme, updateBrandTheme } = useSettings();
   const [sshKeys, setSSHKeys] = useState<SSHKey[]>([]);
   const [keyName, setKeyName] = useState("");
   const [keyValue, setKeyValue] = useState("");
@@ -83,7 +83,7 @@ export function SettingsPanel() {
     <section className="section-stack">
       <PageSectionHeader title="Personalization & SSH Access" description="User interface preferences and SSH public key management." />
       <Card title="Personalization" description="Theme, language, and timezone settings.">
-        <form className="grid gap-3 md:grid-cols-3" onSubmit={saveSettings}>
+        <form className="grid gap-3 md:grid-cols-4" onSubmit={saveSettings}>
           <Select
             label="Theme"
             value={settings.theme}
@@ -107,7 +107,16 @@ export function SettingsPanel() {
             value={settings.timezone}
             onChange={(event) => updateSettingsState({ timezone: event.target.value })}
           />
-          <div className="md:col-span-3">
+          <Select
+            label="Brand theme"
+            value={brandTheme}
+            onChange={(event) => updateBrandTheme(event.target.value as "mts" | "neon")}
+            options={[
+              { value: "mts", label: "MTS (demo default)" },
+              { value: "neon", label: "Neon" }
+            ]}
+          />
+          <div className="md:col-span-4">
             <Button type="submit" loading={loading}>Save settings</Button>
           </div>
         </form>

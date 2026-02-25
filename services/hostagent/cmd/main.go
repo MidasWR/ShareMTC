@@ -78,6 +78,9 @@ func main() {
 			Int("cpu_free_cores", metric.CPUFreeCores).
 			Int("ram_free_mb", metric.RAMFreeMB).
 			Int("gpu_free_units", metric.GPUFreeUnits).
+			Int("gpu_total_units", metric.GPUTotalUnits).
+			Int("gpu_memory_total_mb", metric.GPUMemoryTotalMB).
+			Int("gpu_memory_used_mb", metric.GPUMemoryUsedMB).
 			Int("network_mbps", metric.NetworkMbps).
 			Msg("metric sent")
 	}

@@ -14,6 +14,13 @@ const translations = {
       logout: "Log out"
     },
     menu: {
+      marketplace: "Marketplace",
+      myCompute: "My Compute",
+      provideCompute: "Provide Compute",
+      billing: "Billing",
+      admin: "Admin",
+      settings: "Settings",
+      // Legacy labels stay for deep screens and old links.
       myTemplates: "My Templates",
       vm: "GPU Servers",
       sharedVm: "Shared VM",
@@ -22,8 +29,6 @@ const translations = {
       myServers: "Manage Servers",
       coreDashboard: "Platform Dashboard",
       pods: "PODs",
-      billing: "Billing",
-      settings: "Settings",
       providerDashboard: "Provider Dashboard",
       agentOnboarding: "Agent Onboarding",
       adminAccess: "Admin Login",
@@ -46,6 +51,12 @@ const translations = {
       logout: "Log out"
     },
     menu: {
+      marketplace: "Marketplace",
+      myCompute: "My Compute",
+      provideCompute: "Provide Compute",
+      billing: "Billing",
+      admin: "Admin",
+      settings: "Settings",
       myTemplates: "My Templates",
       vm: "GPU Servers",
       sharedVm: "Shared VM",
@@ -54,8 +65,6 @@ const translations = {
       myServers: "Manage Servers",
       coreDashboard: "Platform Dashboard",
       pods: "PODs",
-      billing: "Billing",
-      settings: "Settings",
       providerDashboard: "Provider Dashboard",
       agentOnboarding: "Agent Onboarding",
       adminAccess: "Admin Login",

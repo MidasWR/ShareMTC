@@ -11,16 +11,16 @@ import (
 )
 
 type repoStub struct {
-	resource      models.HostResource
-	vm            models.VM
-	sharedVMs     []models.SharedVM
-	sharedPods    []models.SharedPod
-	k8sByID       map[string]models.KubernetesCluster
-	templates     []models.VMTemplate
-	healthChecks  []models.HealthCheck
-	metricPoints  []models.MetricPoint
-	sharedOffers  []models.SharedInventoryOffer
-	agentLogs     []models.AgentLog
+	resource     models.HostResource
+	vm           models.VM
+	sharedVMs    []models.SharedVM
+	sharedPods   []models.SharedPod
+	k8sByID      map[string]models.KubernetesCluster
+	templates    []models.VMTemplate
+	healthChecks []models.HealthCheck
+	metricPoints []models.MetricPoint
+	sharedOffers []models.SharedInventoryOffer
+	agentLogs    []models.AgentLog
 }
 
 func (r *repoStub) UpsertHostResource(_ context.Context, resource models.HostResource) error {
@@ -247,9 +247,10 @@ func TestAllocateChecksFreeResources(t *testing.T) {
 			CPUFreeCores: 4,
 			RAMFreeMB:    4096,
 			GPUFreeUnits: 1,
+			HeartbeatAt:  time.Now().UTC(),
 		},
 	}
-	svc := NewResourceService(repo, cgStub{}, orchestratorStub{})
+	svc := NewResourceService(repo, cgStub{}, orchestratorStub{}, 30*time.Second)
 
 	_, err := svc.Allocate(context.Background(), models.Allocation{
 		ProviderID: "p1",
@@ -262,9 +263,55 @@ func TestAllocateChecksFreeResources(t *testing.T) {
 	}
 }
 
+func TestAllocateRejectsStaleHeartbeat(t *testing.T) {
+	repo := &repoStub{
+		resource: models.HostResource{
+			ProviderID:   "p1",
+			CPUFreeCores: 8,
+			RAMFreeMB:    8192,
+			GPUFreeUnits: 1,
+			HeartbeatAt:  time.Now().UTC().Add(-2 * time.Minute),
+		},
+	}
+	svc := NewResourceService(repo, cgStub{}, orchestratorStub{}, 30*time.Second)
+
+	_, err := svc.Allocate(context.Background(), models.Allocation{
+		ProviderID: "p1",
+		CPUCores:   1,
+		RAMMB:      512,
+		GPUUnits:   0,
+	})
+	if err == nil {
+		t.Fatal("expected stale heartbeat error")
+	}
+}
+
+func TestAllocateRejectsInvalidHeartbeatValues(t *testing.T) {
+	repo := &repoStub{
+		resource: models.HostResource{
+			ProviderID:   "p1",
+			CPUFreeCores: -1,
+			RAMFreeMB:    8192,
+			GPUFreeUnits: 1,
+			HeartbeatAt:  time.Now().UTC(),
+		},
+	}
+	svc := NewResourceService(repo, cgStub{}, orchestratorStub{}, 30*time.Second)
+
+	_, err := svc.Allocate(context.Background(), models.Allocation{
+		ProviderID: "p1",
+		CPUCores:   1,
+		RAMMB:      512,
+		GPUUnits:   0,
+	})
+	if err == nil {
+		t.Fatal("expected invalid heartbeat value error")
+	}
+}
+
 func TestVMLifecycle(t *testing.T) {
 	repo := &repoStub{}
-	svc := NewResourceService(repo, cgStub{}, orchestratorStub{})
+	svc := NewResourceService(repo, cgStub{}, orchestratorStub{}, 30*time.Second)
 	ctx := context.Background()
 
 	vm, err := svc.CreateVM(ctx, models.VM{
@@ -324,7 +371,7 @@ func TestVMLifecycle(t *testing.T) {
 
 func TestCreateKubernetesCluster(t *testing.T) {
 	repo := &repoStub{k8sByID: map[string]models.KubernetesCluster{}}
-	svc := NewResourceService(repo, cgStub{}, orchestratorStub{})
+	svc := NewResourceService(repo, cgStub{}, orchestratorStub{}, 30*time.Second)
 
 	cluster, err := svc.CreateKubernetesCluster(context.Background(), models.KubernetesCluster{
 		UserID:     "u1",
@@ -347,7 +394,7 @@ func TestCreateKubernetesCluster(t *testing.T) {
 
 func TestSharedInventoryReserveFlow(t *testing.T) {
 	repo := &repoStub{}
-	svc := NewResourceService(repo, cgStub{}, orchestratorStub{})
+	svc := NewResourceService(repo, cgStub{}, orchestratorStub{}, 30*time.Second)
 
 	offer, err := svc.UpsertSharedInventoryOffer(context.Background(), models.SharedInventoryOffer{
 		ProviderID:   "p1",
@@ -381,7 +428,7 @@ func TestSharedInventoryReserveFlow(t *testing.T) {
 
 func TestAgentLogRecord(t *testing.T) {
 	repo := &repoStub{}
-	svc := NewResourceService(repo, cgStub{}, orchestratorStub{})
+	svc := NewResourceService(repo, cgStub{}, orchestratorStub{}, 30*time.Second)
 
 	entry, err := svc.RecordAgentLog(context.Background(), models.AgentLog{
 		ProviderID: "p1",

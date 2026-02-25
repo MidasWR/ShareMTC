@@ -1,4 +1,6 @@
 /** @type {import('tailwindcss').Config} */
+const withOpacity = (variable) => `rgb(var(${variable}) / <alpha-value>)`;
+
 export default {
   content: ["./index.html", "./src/**/*.{ts,tsx}"],
   theme: {
@@ -8,20 +10,20 @@ export default {
         mono: ["JetBrains Mono", "ui-monospace", "SFMono-Regular", "monospace"]
       },
       colors: {
-        canvas: "#000000",
-        surface: "#09090B",
-        elevated: "#121214",
-        border: "#1F1F22",
-        borderStrong: "#27272A",
-        textPrimary: "#FAFAFA",
-        textSecondary: "#A1A1AA",
-        textMuted: "#71717A",
-        brand: "#00FF41",
-        brandHover: "#00D632",
-        success: "#10B981",
-        warning: "#F59E0B",
-        danger: "#EF4444",
-        info: "#38BDF8"
+        canvas: withOpacity("--color-canvas"),
+        surface: withOpacity("--color-surface"),
+        elevated: withOpacity("--color-elevated"),
+        border: withOpacity("--color-border"),
+        borderStrong: withOpacity("--color-border-strong"),
+        textPrimary: withOpacity("--color-text-primary"),
+        textSecondary: withOpacity("--color-text-secondary"),
+        textMuted: withOpacity("--color-text-muted"),
+        brand: withOpacity("--color-brand"),
+        brandHover: withOpacity("--color-brand-hover"),
+        success: withOpacity("--color-success"),
+        warning: withOpacity("--color-warning"),
+        danger: withOpacity("--color-danger"),
+        info: withOpacity("--color-info")
       },
       borderRadius: {
         sm: "4px",
@@ -32,11 +34,11 @@ export default {
         sm: "0 1px 2px rgba(0, 0, 0, 0.5)",
         md: "0 8px 24px rgba(0, 0, 0, 0.6)",
         lg: "0 16px 48px rgba(0, 0, 0, 0.8)",
-        brand: "0 0 10px rgba(0, 255, 65, 0.4)",
-        brandStrong: "0 0 20px rgba(0, 255, 65, 0.6)"
+        brand: "0 0 10px rgba(var(--brand-rgb), 0.4)",
+        brandStrong: "0 0 20px rgba(var(--brand-rgb), 0.6)"
       },
       dropShadow: {
-        brand: "0 0 8px rgba(0, 255, 65, 0.5)"
+        brand: "0 0 8px rgba(var(--brand-rgb), 0.5)"
       },
       spacing: {
         18: "4.5rem"

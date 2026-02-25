@@ -36,7 +36,8 @@ func main() {
 	if err := repo.Migrate(context.Background()); err != nil {
 		logger.Fatal().Err(err).Msg("migration failed")
 	}
-	svc := service.NewResourceService(repo, cgroups.NewV2Applier(""), orchestrator.NewInternalRuntime())
+	// MVP runtime: control-plane telemetry and lifecycle orchestration, not secure sandbox execution.
+	svc := service.NewResourceService(repo, cgroups.NewV2Applier(""), orchestrator.NewInternalRuntime(), cfg.HeartbeatMaxAge)
 	handler := httpadapter.NewHandler(svc)
 
 	r := chi.NewRouter()

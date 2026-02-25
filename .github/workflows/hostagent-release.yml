@@ -43,6 +43,7 @@ jobs:
 
       - name: Build hostagent binaries
         run: |
+          echo "Linux-first note: linux binary is production-ready, darwin/windows are experimental telemetry artifacts."
           mkdir -p dist
           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o dist/hostagent-linux-amd64 ./services/hostagent/cmd
           CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -o dist/hostagent-darwin-amd64 ./services/hostagent/cmd

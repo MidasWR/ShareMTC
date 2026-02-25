@@ -2,6 +2,7 @@ package httpadapter
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -23,9 +24,18 @@ func NewHandler(svc *service.ResourceService) *Handler {
 }
 
 func (h *Handler) Heartbeat(w http.ResponseWriter, r *http.Request) {
+	claims := sdkauth.ClaimsFromContext(r.Context())
+	if claims == nil {
+		httpx.Error(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
 	var req models.HostResource
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		httpx.Error(w, http.StatusBadRequest, "invalid json")
+		return
+	}
+	if err := validateAgentIdentity(claims, req.ProviderID); err != nil {
+		httpx.Error(w, http.StatusForbidden, err.Error())
 		return
 	}
 	if err := h.svc.UpdateHeartbeat(r.Context(), req); err != nil {
@@ -214,10 +224,10 @@ func (h *Handler) TerminateVM(w http.ResponseWriter, r *http.Request) {
 }
 
 type shareRequest struct {
-	VMID        string                    `json:"vm_id"`
-	PodCode     string                    `json:"pod_code"`
-	SharedWith  []string                  `json:"shared_with"`
-	AccessLevel models.SharedAccessLevel  `json:"access_level"`
+	VMID        string                   `json:"vm_id"`
+	PodCode     string                   `json:"pod_code"`
+	SharedWith  []string                 `json:"shared_with"`
+	AccessLevel models.SharedAccessLevel `json:"access_level"`
 }
 
 type sharedInventoryReserveRequest struct {
@@ -450,9 +460,18 @@ func (h *Handler) MetricSummaries(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) RecordAgentLog(w http.ResponseWriter, r *http.Request) {
+	claims := sdkauth.ClaimsFromContext(r.Context())
+	if claims == nil {
+		httpx.Error(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
 	var req agentLogRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		httpx.Error(w, http.StatusBadRequest, "invalid json")
+		return
+	}
+	if err := validateAgentIdentity(claims, req.ProviderID); err != nil {
+		httpx.Error(w, http.StatusForbidden, err.Error())
 		return
 	}
 	item, err := h.svc.RecordAgentLog(r.Context(), models.AgentLog{
@@ -569,5 +588,22 @@ func readCatalogFilter(r *http.Request) models.CatalogFilter {
 		NetworkVolumeSupported:    strings.TrimSpace(r.URL.Query().Get("network_volume_supported")),
 		GlobalNetworkingSupported: strings.TrimSpace(r.URL.Query().Get("global_networking_supported")),
 		MinVRAMGB:                 intQuery(r, "min_vram_gb", 0),
+	}
+}
+
+func validateAgentIdentity(claims *sdkauth.Claims, providerID string) error {
+	if strings.TrimSpace(providerID) == "" {
+		return errors.New("provider_id is required")
+	}
+	switch claims.Role {
+	case "admin", "super-admin", "ops-admin":
+		return nil
+	case "agent":
+		if claims.UserID == providerID {
+			return nil
+		}
+		return errors.New("agent token does not match provider_id")
+	default:
+		return errors.New("insufficient role for agent telemetry")
 	}
 }

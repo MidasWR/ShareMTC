@@ -12,6 +12,8 @@ type V2Applier struct {
 	root string
 }
 
+// NewV2Applier enforces coarse CPU/RAM limits for allocations.
+// It is an accounting guardrail for the control plane, not a sandbox boundary.
 func NewV2Applier(root string) *V2Applier {
 	if root == "" {
 		root = "/sys/fs/cgroup/host"

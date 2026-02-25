@@ -2,6 +2,8 @@ package config
 
 import (
 	"os"
+	"strconv"
+	"time"
 
 	sdkconfig "github.com/MidasWR/ShareMTC/services/sdk/config"
 )
@@ -11,6 +13,7 @@ type Config struct {
 	PostgresDSN     string
 	MidasWriterAddr string
 	JWTSecret       string
+	HeartbeatMaxAge time.Duration
 }
 
 func Load() Config {
@@ -19,6 +22,7 @@ func Load() Config {
 		PostgresDSN:     postgresDSN(),
 		MidasWriterAddr: os.Getenv("MIDAS_WRITER_ADDR"),
 		JWTSecret:       env("JWT_SECRET", "change-me-in-production"),
+		HeartbeatMaxAge: time.Duration(envInt("HEARTBEAT_MAX_AGE_SECONDS", 30)) * time.Second,
 	}
 }
 
@@ -28,6 +32,18 @@ func env(name, fallback string) string {
 		return fallback
 	}
 	return v
+}
+
+func envInt(name string, fallback int) int {
+	value := os.Getenv(name)
+	if value == "" {
+		return fallback
+	}
+	parsed, err := strconv.Atoi(value)
+	if err != nil {
+		return fallback
+	}
+	return parsed
 }
 
 func postgresDSN() string {

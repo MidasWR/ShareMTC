@@ -1,10 +1,15 @@
 import { createContext, ReactNode, useContext, useEffect, useState } from "react";
 import { getUserSettings } from "../../features/auth/api/authApi";
+import { featureFlags } from "../../config/featureFlags";
 import { UserSettings } from "../../types/api";
+
+export type BrandTheme = "mts" | "neon";
 
 type SettingsContextType = {
   settings: UserSettings;
   updateSettingsState: (partial: Partial<UserSettings>) => void;
+  brandTheme: BrandTheme;
+  updateBrandTheme: (next: BrandTheme) => void;
 };
 
 const defaultSettings: UserSettings = {
@@ -17,6 +22,11 @@ const SettingsContext = createContext<SettingsContextType | null>(null);
 
 export function SettingsProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<UserSettings>(defaultSettings);
+  const [brandTheme, setBrandTheme] = useState<BrandTheme>(() => {
+    const saved = window.localStorage.getItem("brandTheme");
+    if (saved === "neon" || saved === "mts") return saved;
+    return featureFlags.defaultBrandTheme;
+  });
 
   useEffect(() => {
     async function load() {
@@ -42,12 +52,22 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     root.setAttribute("lang", settings.language);
   }, [settings.theme, settings.language]);
 
+  useEffect(() => {
+    const root = document.documentElement;
+    root.setAttribute("data-brand-theme", brandTheme);
+    window.localStorage.setItem("brandTheme", brandTheme);
+  }, [brandTheme]);
+
   function updateSettingsState(partial: Partial<UserSettings>) {
     setSettings((prev) => ({ ...prev, ...partial }));
   }
 
+  function updateBrandTheme(next: BrandTheme) {
+    setBrandTheme(next);
+  }
+
   return (
-    <SettingsContext.Provider value={{ settings, updateSettingsState }}>
+    <SettingsContext.Provider value={{ settings, updateSettingsState, brandTheme, updateBrandTheme }}>
       {children}
     </SettingsContext.Provider>
   );
