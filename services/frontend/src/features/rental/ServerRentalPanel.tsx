@@ -167,11 +167,14 @@ export function ServerRentalPanel({ onNavigate }: Props) {
   const filteredOrders = useMemo(() => {
     const q = search.trim().toLowerCase();
     return orders.filter((row) => {
+      const id = String(row.id || "").toLowerCase();
+      const planID = String(row.plan_id || "").toLowerCase();
+      const osName = String(row.os_name || "").toLowerCase();
       const queryOk =
         q.length === 0 ||
-        (row.id || "").toLowerCase().includes(q) ||
-        row.plan_id.toLowerCase().includes(q) ||
-        row.os_name.toLowerCase().includes(q);
+        id.includes(q) ||
+        planID.includes(q) ||
+        osName.includes(q);
       const statusOk = !statusFilter || (row.status || "").toLowerCase() === statusFilter;
       const typeOk = !typeFilter || row.period === typeFilter;
       return queryOk && statusOk && typeOk;

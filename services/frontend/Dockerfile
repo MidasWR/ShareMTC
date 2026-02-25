@@ -7,6 +7,7 @@ COPY services/frontend/vite.config.ts ./
 COPY services/frontend/tailwind.config.js ./
 COPY services/frontend/postcss.config.js ./
 COPY services/frontend/index.html ./
+COPY services/frontend/public ./public
 COPY services/frontend/src ./src
 ENV npm_config_jobs=1
 RUN npm ci --no-audit --no-fund && npm run build

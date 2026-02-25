@@ -135,24 +135,24 @@ export function MyTemplatesPanel() {
         ) : (
           <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {rows.map((row) => (
-              <article key={row.id ?? row.code} className="aspect-[3/2] rounded-none border border-border bg-surface p-3 flex flex-col">
+              <article key={row.id ?? row.code ?? row.name} className="aspect-[3/2] rounded-none border border-border bg-surface p-3 flex flex-col">
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-center gap-2">
                     <img
                       src={row.logo_url || resolveTemplateLogoURL(row.code, row.name)}
-                      alt={`${row.name} logo`}
+                      alt={`${row.name || "Template"} logo`}
                       className="h-8 w-8 rounded-sm object-contain"
                     />
                     <div>
-                      <div className="text-sm font-semibold">{row.name}</div>
-                      <div className="text-xs text-textMuted">{row.code}</div>
+                      <div className="text-sm font-semibold">{row.name || "Unnamed template"}</div>
+                      <div className="text-xs text-textMuted">{row.code || "-"}</div>
                     </div>
                   </div>
                 </div>
                 <div className="mt-3 space-y-1 text-xs text-textSecondary">
-                  <div>OS: {row.os_name}</div>
-                  <div>Shape: {row.cpu_cores} CPU / {row.ram_mb} MB / {row.gpu_units} GPU</div>
-                  <div>Network: {row.network_mbps} Mbps</div>
+                  <div>OS: {row.os_name || "-"}</div>
+                  <div>Shape: {row.cpu_cores || 0} CPU / {row.ram_mb || 0} MB / {row.gpu_units || 0} GPU</div>
+                  <div>Network: {row.network_mbps || 0} Mbps</div>
                 </div>
               </article>
             ))}
