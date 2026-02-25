@@ -7,9 +7,15 @@ import { Card } from "../../design/primitives/Card";
 import { Input } from "../../design/primitives/Input";
 import { Select } from "../../design/primitives/Select";
 import { Button } from "../../design/primitives/Button";
+import { Textarea } from "../../design/primitives/Textarea";
 import { Table } from "../../design/components/Table";
 import { EmptyState } from "../../design/patterns/EmptyState";
 import { useSettings } from "../../app/providers/SettingsProvider";
+
+function truncateSSHKey(value: string, head = 28, tail = 16) {
+  if (value.length <= head + tail + 1) return value;
+  return `${value.slice(0, head)}...${value.slice(-tail)}`;
+}
 
 export function SettingsPanel() {
   const { settings, updateSettingsState, brandTheme, updateBrandTheme } = useSettings();
@@ -79,6 +85,15 @@ export function SettingsPanel() {
     }
   }
 
+  async function copySSHKey(value: string) {
+    try {
+      await navigator.clipboard.writeText(value);
+      push("success", "SSH key copied");
+    } catch {
+      push("error", "Clipboard access is not available");
+    }
+  }
+
   return (
     <section className="section-stack">
       <PageSectionHeader title="Personalization & SSH Access" description="User interface preferences and SSH public key management." />
@@ -99,7 +114,8 @@ export function SettingsPanel() {
             value={settings.language}
             onChange={(event) => updateSettingsState({ language: event.target.value })}
             options={[
-              { value: "en", label: "English" }
+              { value: "en", label: "English" },
+              { value: "ru", label: "Русский" }
             ]}
           />
           <Input
@@ -125,7 +141,13 @@ export function SettingsPanel() {
       <Card title="SSH Access Keys" description="Public keys used to access rented servers and PODs.">
         <form className="space-y-3" onSubmit={addSSHKey}>
           <Input label="Key name" value={keyName} onChange={(event) => setKeyName(event.target.value)} placeholder="Work laptop" />
-          <Input label="Public SSH key" value={keyValue} onChange={(event) => setKeyValue(event.target.value)} placeholder="ssh-ed25519 AAAA..." />
+          <Textarea
+            label="Public SSH key"
+            value={keyValue}
+            onChange={(event) => setKeyValue(event.target.value)}
+            placeholder="ssh-ed25519 AAAA..."
+            className="font-mono"
+          />
           <Button type="submit" loading={loading}>Add key</Button>
         </form>
         <div className="mt-4">
@@ -136,7 +158,18 @@ export function SettingsPanel() {
             emptyState={<EmptyState title="No SSH keys yet" description="Add at least one key to access machines." />}
             columns={[
               { key: "name", header: "Name", render: (row) => row.name },
-              { key: "key", header: "Key", render: (row) => <span className="font-mono text-xs">{row.public_key}</span> },
+              {
+                key: "key",
+                header: "Key",
+                render: (row) => (
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-xs">{truncateSSHKey(row.public_key)}</span>
+                    <Button variant="ghost" size="sm" onClick={() => copySSHKey(row.public_key)}>
+                      Copy
+                    </Button>
+                  </div>
+                )
+              },
               { key: "created", header: "Created", render: (row) => (row.created_at ? new Date(row.created_at).toLocaleString() : "-") },
               { key: "actions", header: "Actions", render: (row) => <Button variant="ghost" size="sm" onClick={() => removeSSHKey(row.id)}>Delete</Button> }
             ]}

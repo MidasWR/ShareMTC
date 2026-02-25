@@ -149,8 +149,9 @@ export function MarketplacePanel() {
               <button
                 key={item.code}
                 type="button"
+                aria-pressed={selectedCode === item.code}
                 className={`rounded-md border p-3 text-left transition-colors ${
-                  selectedCode === item.code ? "border-brand bg-brand/10" : "border-border bg-surface hover:border-brand/40"
+                  selectedCode === item.code ? "focus-ring border-brand bg-brand/10" : "focus-ring border-border bg-surface hover:border-brand/40"
                 }`}
                 onClick={() => selectTemplate(item)}
               >
@@ -162,7 +163,9 @@ export function MarketplacePanel() {
                       <div className="text-xs text-textMuted">{item.code}</div>
                     </div>
                   </div>
-                  <span className="text-xs text-textSecondary">{item.availability_tier || "medium"}</span>
+                  <span className="text-xs text-textSecondary">
+                    {selectedCode === item.code ? "Selected" : item.availability_tier || "medium"}
+                  </span>
                 </div>
                 <div className="mt-2 text-xs text-textSecondary">
                   {(item.vram_gb ?? 0)} GB VRAM · {item.cpu_cores} CPU · {toRamGB(item.ram_mb)} GB RAM

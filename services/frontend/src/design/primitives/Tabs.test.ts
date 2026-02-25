@@ -22,4 +22,10 @@ describe("tabs helpers", () => {
     expect(nextTabByArrow(items, "two", "ArrowRight")).toBe("three");
     expect(nextTabByArrow(items, "one", "ArrowLeft")).toBe("five");
   });
+
+  it("keeps all tabs visible when collapseAfter is unbounded", () => {
+    const { visibleItems, overflowItems } = splitTabItems(items, Number.POSITIVE_INFINITY);
+    expect(visibleItems).toHaveLength(5);
+    expect(overflowItems).toHaveLength(0);
+  });
 });

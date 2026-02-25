@@ -1,4 +1,4 @@
-import { InputHTMLAttributes } from "react";
+import { InputHTMLAttributes, useId } from "react";
 import { cx } from "../utils/cx";
 
 type InputProps = InputHTMLAttributes<HTMLInputElement> & {
@@ -8,7 +8,11 @@ type InputProps = InputHTMLAttributes<HTMLInputElement> & {
 };
 
 export function Input({ className, error, label, helpText, id, ...props }: InputProps) {
-  const inputId = id ?? props.name;
+  const generatedId = useId();
+  const inputId = id ?? props.name ?? `input-${generatedId}`;
+  const errorId = `${inputId}-error`;
+  const helpId = `${inputId}-help`;
+  const describedBy = error ? errorId : helpText ? helpId : undefined;
   return (
     <label className="block space-y-1.5">
       {label ? <span className="text-sm font-medium text-textSecondary">{label}</span> : null}
@@ -20,9 +24,10 @@ export function Input({ className, error, label, helpText, id, ...props }: Input
           className
         )}
         aria-invalid={Boolean(error)}
+        aria-describedby={describedBy}
         {...props}
       />
-      {error ? <p className="text-xs text-danger">{error}</p> : helpText ? <p className="text-xs text-textMuted">{helpText}</p> : null}
+      {error ? <p id={errorId} className="text-xs text-danger">{error}</p> : helpText ? <p id={helpId} className="text-xs text-textMuted">{helpText}</p> : null}
     </label>
   );
 }

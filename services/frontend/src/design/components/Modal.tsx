@@ -23,9 +23,14 @@ export function Modal({
   children
 }: ModalProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      triggerRef.current?.focus();
+      return;
+    }
+    triggerRef.current = document.activeElement as HTMLElement | null;
     const container = containerRef.current;
     if (!container) return;
     const overlay = container;

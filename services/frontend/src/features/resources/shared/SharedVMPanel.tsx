@@ -8,6 +8,7 @@ import { Card } from "../../../design/primitives/Card";
 import { Input } from "../../../design/primitives/Input";
 import { listSharedOffers, listSharedVMs, shareVM, upsertSharedOffer } from "../api/resourcesApi";
 import { SharedInventoryOffer, SharedVM } from "../../../types/api";
+import { SHARED_VM_OFFER_DEFAULTS } from "../defaults";
 
 export function SharedVMPanel() {
   const [rows, setRows] = useState<SharedVM[]>([]);
@@ -42,17 +43,17 @@ export function SharedVMPanel() {
       const qty = Math.max(1, Number(shareQty) || 1);
       await shareVM({ vm_id: vmID, shared_with: sharedWith, access_level: "read" });
       await upsertSharedOffer({
-        provider_id: "provider-default",
+        provider_id: SHARED_VM_OFFER_DEFAULTS.providerID,
         resource_type: "vm",
         title: `Shared VM ${vmID}`,
         description: "Shared VM capacity published from owner",
-        cpu_cores: 4,
-        ram_mb: 8192,
-        gpu_units: 1,
-        network_mbps: 500,
+        cpu_cores: SHARED_VM_OFFER_DEFAULTS.cpuCores,
+        ram_mb: SHARED_VM_OFFER_DEFAULTS.ramMB,
+        gpu_units: SHARED_VM_OFFER_DEFAULTS.gpuUnits,
+        network_mbps: SHARED_VM_OFFER_DEFAULTS.networkMbps,
         quantity: qty,
         available_qty: qty,
-        price_hourly_usd: 0.79,
+        price_hourly_usd: SHARED_VM_OFFER_DEFAULTS.priceHourlyUSD,
         status: "active"
       });
       setVmID("");
@@ -71,6 +72,9 @@ export function SharedVMPanel() {
     <section className="section-stack">
       <PageSectionHeader title="Shared VM" description="Manage shared VM access and visibility." />
       <Card title="Quick Share VM" description="Compact sharing form for user access.">
+        <div className="mb-3 text-xs text-textMuted">
+          Offer defaults source: <span className="font-medium text-textPrimary">Marketplace preset</span>
+        </div>
         <div className="grid items-end gap-3 md:grid-cols-[1fr_1fr_120px_auto]">
           <Input label="VM ID" value={vmID} onChange={(event) => setVmID(event.target.value)} />
           <Input label="Share with" value={targets} onChange={(event) => setTargets(event.target.value)} placeholder="user1,user2" />

@@ -21,11 +21,11 @@
 }
 
 :root[data-brand-theme="mts"] {
-  --color-canvas: 10 10 12;
-  --color-surface: 21 21 26;
-  --color-elevated: 31 31 38;
-  --color-border: 58 58 69;
-  --color-border-strong: 77 77 90;
+  --color-canvas: 18 19 24;
+  --color-surface: 31 33 42;
+  --color-elevated: 43 46 58;
+  --color-border: 76 80 97;
+  --color-border-strong: 101 106 126;
   --color-text-primary: 250 250 250;
   --color-text-secondary: 193 194 205;
   --color-text-muted: 139 142 160;
@@ -75,7 +75,7 @@ body {
 }
 
 .glass {
-  @apply bg-surface/95 backdrop-blur border border-border shadow-md;
+  @apply rounded-xl border border-border bg-surface/95 shadow-md backdrop-blur;
 }
 
 .focus-ring {
@@ -103,7 +103,7 @@ body {
 }
 
 .surface-card {
-  @apply border border-border rounded-none bg-surface shadow-sm;
+  @apply rounded-lg border border-border bg-surface shadow-sm;
 }
 
 .neon-glow {

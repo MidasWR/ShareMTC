@@ -23,6 +23,9 @@ export function ProvideComputePanel() {
         ]}
         value={tab}
         onChange={setTab}
+        mode="many"
+        collapseAfter={4}
+        moreLabel="More"
       />
       {tab === "dashboard" ? <ProviderDashboardPanel /> : null}
       {tab === "allocations" ? <HostPanel /> : null}

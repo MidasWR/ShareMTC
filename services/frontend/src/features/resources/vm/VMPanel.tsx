@@ -6,10 +6,12 @@ import { PageSectionHeader } from "../../../design/patterns/PageSectionHeader";
 import { Button } from "../../../design/primitives/Button";
 import { Card } from "../../../design/primitives/Card";
 import { Input } from "../../../design/primitives/Input";
+import { Select } from "../../../design/primitives/Select";
 import { createVM, listVMTemplates, listVMs, rebootVM, startVM, stopVM, terminateVM } from "../api/resourcesApi";
 import { VM, VMTemplate } from "../../../types/api";
 import { StatusBadge } from "../../../design/patterns/StatusBadge";
 import { ActionDropdown } from "../../../design/components/ActionDropdown";
+import { VM_TEMPLATE_FALLBACK } from "../defaults";
 
 export function VMPanel() {
   const [rows, setRows] = useState<VM[]>([]);
@@ -24,18 +26,19 @@ export function VMPanel() {
   const [ramMb, setRamMb] = useState(8192);
   const [gpuUnits, setGpuUnits] = useState(1);
   const [networkMbps, setNetworkMbps] = useState(500);
+  const [manualOverride, setManualOverride] = useState(false);
+  const [region, setRegion] = useState<string>(VM_TEMPLATE_FALLBACK.region);
+  const [cloudType, setCloudType] = useState<"secure" | "community">(VM_TEMPLATE_FALLBACK.cloudType);
+  const [availabilityTier, setAvailabilityTier] = useState<"low" | "medium" | "high">(VM_TEMPLATE_FALLBACK.availabilityTier);
+  const [systemRamGB, setSystemRamGB] = useState<number>(VM_TEMPLATE_FALLBACK.systemRamGB);
+  const [vramGB, setVramGB] = useState<number>(VM_TEMPLATE_FALLBACK.vramGB);
+  const [maxInstances, setMaxInstances] = useState<number>(VM_TEMPLATE_FALLBACK.maxInstances);
+  const [networkVolumeSupported, setNetworkVolumeSupported] = useState<boolean>(VM_TEMPLATE_FALLBACK.networkVolumeSupported);
+  const [globalNetworkingSupported, setGlobalNetworkingSupported] = useState<boolean>(VM_TEMPLATE_FALLBACK.globalNetworkingSupported);
   const { push } = useToast();
 
   const selectedTemplate = templates.find((item) => item.code === template);
-
-  const region = selectedTemplate?.region || "any";
-  const cloudType = selectedTemplate?.cloud_type || "secure";
-  const availabilityTier = selectedTemplate?.availability_tier || "medium";
-  const systemRamGB = selectedTemplate?.system_ram_gb || 16;
-  const vramGB = selectedTemplate?.vram_gb || 24;
-  const maxInstances = selectedTemplate?.max_instances || 8;
-  const networkVolumeSupported = selectedTemplate?.network_volume_supported ?? true;
-  const globalNetworkingSupported = selectedTemplate?.global_networking_supported ?? false;
+  const configSource = manualOverride ? "Manual override" : "From Template/Offer";
 
   async function refresh() {
     setLoading(true);
@@ -53,6 +56,18 @@ export function VMPanel() {
   useEffect(() => {
     refresh();
   }, []);
+
+  useEffect(() => {
+    if (manualOverride) return;
+    setRegion(selectedTemplate?.region || VM_TEMPLATE_FALLBACK.region);
+    setCloudType(selectedTemplate?.cloud_type || VM_TEMPLATE_FALLBACK.cloudType);
+    setAvailabilityTier(selectedTemplate?.availability_tier || VM_TEMPLATE_FALLBACK.availabilityTier);
+    setSystemRamGB(selectedTemplate?.system_ram_gb || VM_TEMPLATE_FALLBACK.systemRamGB);
+    setVramGB(selectedTemplate?.vram_gb || VM_TEMPLATE_FALLBACK.vramGB);
+    setMaxInstances(selectedTemplate?.max_instances || VM_TEMPLATE_FALLBACK.maxInstances);
+    setNetworkVolumeSupported(selectedTemplate?.network_volume_supported ?? VM_TEMPLATE_FALLBACK.networkVolumeSupported);
+    setGlobalNetworkingSupported(selectedTemplate?.global_networking_supported ?? VM_TEMPLATE_FALLBACK.globalNetworkingSupported);
+  }, [selectedTemplate, manualOverride]);
 
   async function createNewVM() {
     if (!providerID.trim() || !name.trim()) {
@@ -113,6 +128,9 @@ export function VMPanel() {
     <section className="section-stack">
       <PageSectionHeader title="VM" description="Create, control, and inspect dedicated virtual machines." />
       <Card title="Quick Create VM" description="Create VM with visible baseline parameters before provisioning.">
+        <p className="mb-3 text-xs text-textMuted">
+          Configuration source: <span className="font-medium text-textPrimary">{configSource}</span>
+        </p>
         <div className="grid items-end gap-3 md:grid-cols-2 xl:grid-cols-4">
           <Input label="Provider ID" value={providerID} onChange={(event) => setProviderID(event.target.value)} />
           <Input label="VM Name" value={name} onChange={(event) => setName(event.target.value)} />
@@ -123,8 +141,92 @@ export function VMPanel() {
           <Input type="number" min={0} step={1} label="GPU Units" value={`${gpuUnits}`} onChange={(event) => setGpuUnits(Number(event.target.value) || 0)} />
           <Input type="number" min={1} step={100} label="Network (Mbps)" value={`${networkMbps}`} onChange={(event) => setNetworkMbps(Number(event.target.value) || 0)} />
           <details className="xl:col-span-4 rounded-md border border-border bg-canvas p-3 text-sm text-textSecondary">
-            <summary className="cursor-pointer text-textPrimary">You are going to deploy</summary>
+            <summary className="cursor-pointer text-textPrimary">Advanced configuration</summary>
+            <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <label className="flex items-center gap-2 text-xs text-textSecondary xl:col-span-4">
+                <input
+                  type="checkbox"
+                  checked={manualOverride}
+                  onChange={(event) => setManualOverride(event.target.checked)}
+                  className="h-4 w-4 rounded border-border bg-canvas"
+                />
+                Manual override template defaults
+              </label>
+              <Input label="Region" value={region} onChange={(event) => setRegion(event.target.value)} disabled={!manualOverride} />
+              <Select
+                label="Cloud Type"
+                value={cloudType}
+                onChange={(event) => setCloudType(event.target.value as "secure" | "community")}
+                disabled={!manualOverride}
+                options={[
+                  { value: "secure", label: "secure" },
+                  { value: "community", label: "community" }
+                ]}
+              />
+              <Select
+                label="Availability tier"
+                value={availabilityTier}
+                onChange={(event) => setAvailabilityTier(event.target.value as "low" | "medium" | "high")}
+                disabled={!manualOverride}
+                options={[
+                  { value: "low", label: "low" },
+                  { value: "medium", label: "medium" },
+                  { value: "high", label: "high" }
+                ]}
+              />
+              <Input
+                type="number"
+                min={1}
+                step={1}
+                label="System RAM (GB)"
+                value={`${systemRamGB}`}
+                onChange={(event) => setSystemRamGB(Number(event.target.value) || 0)}
+                disabled={!manualOverride}
+              />
+              <Input
+                type="number"
+                min={0}
+                step={1}
+                label="VRAM (GB)"
+                value={`${vramGB}`}
+                onChange={(event) => setVramGB(Number(event.target.value) || 0)}
+                disabled={!manualOverride}
+              />
+              <Input
+                type="number"
+                min={1}
+                step={1}
+                label="Max instances"
+                value={`${maxInstances}`}
+                onChange={(event) => setMaxInstances(Number(event.target.value) || 1)}
+                disabled={!manualOverride}
+              />
+              <label className="flex items-center gap-2 text-xs text-textSecondary">
+                <input
+                  type="checkbox"
+                  checked={networkVolumeSupported}
+                  onChange={(event) => setNetworkVolumeSupported(event.target.checked)}
+                  className="h-4 w-4 rounded border-border bg-canvas"
+                  disabled={!manualOverride}
+                />
+                Network volume supported
+              </label>
+              <label className="flex items-center gap-2 text-xs text-textSecondary">
+                <input
+                  type="checkbox"
+                  checked={globalNetworkingSupported}
+                  onChange={(event) => setGlobalNetworkingSupported(event.target.checked)}
+                  className="h-4 w-4 rounded border-border bg-canvas"
+                  disabled={!manualOverride}
+                />
+                Global networking supported
+              </label>
+            </div>
+          </details>
+          <details className="xl:col-span-4 rounded-md border border-border bg-canvas p-3 text-sm text-textSecondary" open>
+            <summary className="cursor-pointer text-textPrimary">Deploy summary</summary>
             <div className="mt-2 space-y-1 text-xs">
+              <div>Source: {configSource}</div>
               <div>Template: {selectedTemplate?.name || template} ({template})</div>
               <div>Shape: {cpuCores} CPU / {ramMb} MB / {gpuUnits} GPU</div>
               <div>Network: {networkMbps} Mbps</div>

@@ -11,14 +11,16 @@ type Props = {
   onSuccess: () => void;
 };
 
+const HACKATHON_ADMIN_USERNAME = "admin";
+const HACKATHON_ADMIN_ACCESS_KEY = "admin";
+
 export function AdminAccessPanel({ onSuccess }: Props) {
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
+  const [username, setUsername] = useState(HACKATHON_ADMIN_USERNAME);
+  const [password, setPassword] = useState(HACKATHON_ADMIN_ACCESS_KEY);
   const [loading, setLoading] = useState(false);
   const { push } = useToast();
 
-  async function submit(event: FormEvent) {
-    event.preventDefault();
+  async function submitCredentials() {
     if (!username.trim() || !password.trim()) {
       push("error", "Username and access key are required");
       return;
@@ -36,17 +38,27 @@ export function AdminAccessPanel({ onSuccess }: Props) {
     }
   }
 
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    await submitCredentials();
+  }
+
   return (
     <section className="section-stack">
       <PageSectionHeader
         title="Direct /admin Access"
-        description="Sign in with admin credentials for privileged admin workflows."
+        description="Use prefilled hackathon credentials or edit manually if needed."
       />
       <Card title="Administrator Login" description="This login flow is dedicated to admin module access.">
         <form className="space-y-3" onSubmit={submit}>
           <Input label="Username" value={username} onChange={(event) => setUsername(event.target.value)} />
           <Input label="Access key" type="password" value={password} onChange={(event) => setPassword(event.target.value)} />
-          <Button type="submit" loading={loading}>Enter /admin</Button>
+          <div className="flex flex-wrap gap-2">
+            <Button type="submit" loading={loading}>Enter /admin</Button>
+            <Button type="button" variant="secondary" loading={loading} onClick={() => submitCredentials()}>
+              Quick access
+            </Button>
+          </div>
         </form>
       </Card>
     </section>

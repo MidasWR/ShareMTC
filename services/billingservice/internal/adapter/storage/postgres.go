@@ -62,6 +62,7 @@ func (r *Repo) Migrate(ctx context.Context) error {
 			id UUID PRIMARY KEY,
 			user_id TEXT NOT NULL,
 			plan_id UUID NOT NULL REFERENCES rental_plans(id),
+			vm_id TEXT NOT NULL DEFAULT '',
 			os_name TEXT NOT NULL,
 			network_mbps INTEGER NOT NULL,
 			cpu_cores INTEGER NOT NULL,
@@ -72,6 +73,7 @@ func (r *Repo) Migrate(ctx context.Context) error {
 			status TEXT NOT NULL DEFAULT 'created',
 			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 		);
+		ALTER TABLE server_orders ADD COLUMN IF NOT EXISTS vm_id TEXT NOT NULL DEFAULT '';
 	`)
 	if err != nil {
 		return err
@@ -230,16 +232,16 @@ func (r *Repo) GetRentalPlan(ctx context.Context, planID string) (models.RentalP
 func (r *Repo) CreateServerOrder(ctx context.Context, order models.ServerOrder) (models.ServerOrder, error) {
 	order.ID = uuid.NewString()
 	err := r.db.QueryRow(ctx, `
-		INSERT INTO server_orders (id, user_id, plan_id, os_name, network_mbps, cpu_cores, ram_gb, gpu_units, period, estimated_price_usd, status)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+		INSERT INTO server_orders (id, user_id, plan_id, vm_id, os_name, network_mbps, cpu_cores, ram_gb, gpu_units, period, estimated_price_usd, status)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
 		RETURNING created_at
-	`, order.ID, order.UserID, order.PlanID, order.OSName, order.NetworkMbps, order.CPUCores, order.RAMGB, order.GPUUnits, order.Period, order.EstimatedPrice, order.Status).Scan(&order.CreatedAt)
+	`, order.ID, order.UserID, order.PlanID, order.VMID, order.OSName, order.NetworkMbps, order.CPUCores, order.RAMGB, order.GPUUnits, order.Period, order.EstimatedPrice, order.Status).Scan(&order.CreatedAt)
 	return order, err
 }
 
 func (r *Repo) ListServerOrders(ctx context.Context, userID string) ([]models.ServerOrder, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT id, user_id, plan_id, os_name, network_mbps, cpu_cores, ram_gb, gpu_units, period, estimated_price_usd, status, created_at
+		SELECT id, user_id, plan_id, vm_id, os_name, network_mbps, cpu_cores, ram_gb, gpu_units, period, estimated_price_usd, status, created_at
 		FROM server_orders
 		WHERE user_id = $1
 		ORDER BY created_at DESC
@@ -255,6 +257,7 @@ func (r *Repo) ListServerOrders(ctx context.Context, userID string) ([]models.Se
 			&item.ID,
 			&item.UserID,
 			&item.PlanID,
+			&item.VMID,
 			&item.OSName,
 			&item.NetworkMbps,
 			&item.CPUCores,

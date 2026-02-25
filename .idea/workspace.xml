@@ -6,6 +6,7 @@
   <component name="ChangeListManager">
     <list default="true" id="093339f5-8e40-4fff-8dda-262df5227056" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.github/workflows/hostagent-release.yml" beforeDir="false" afterPath="$PROJECT_DIR$/.github/workflows/hostagent-release.yml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Makefile" beforeDir="false" afterPath="$PROJECT_DIR$/Makefile" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/installer/hostagent-node-installer.sh" beforeDir="false" afterPath="$PROJECT_DIR$/installer/hostagent-node-installer.sh" afterDir="false" />

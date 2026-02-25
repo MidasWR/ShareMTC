@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { listAllAccruals } from "../../billing/api/billingApi";
 import { listAllAllocations } from "../../resources/api/resourcesApi";
 import { useToast } from "../../../design/components/Toast";
@@ -15,9 +15,19 @@ import { getAgentInstallCommand } from "../api/adminApi";
 import { AdminPodsPanel } from "../catalog/AdminPodsPanel";
 
 type AdminTab = "overview" | "providers" | "pods" | "allocations" | "billing" | "risk";
+const adminTabs: AdminTab[] = ["overview", "providers", "pods", "allocations", "billing", "risk"];
+
+function isAdminTab(value: string | null): value is AdminTab {
+  return value !== null && adminTabs.includes(value as AdminTab);
+}
+
+function readTabFromURL(): AdminTab {
+  const candidate = new URLSearchParams(window.location.search).get("tab");
+  return isAdminTab(candidate) ? candidate : "overview";
+}
 
 export function AdminConsolePanel() {
-  const [tab, setTab] = useState<AdminTab>("overview");
+  const [tab, setTab] = useState<AdminTab>(() => readTabFromURL());
   const [loading, setLoading] = useState(false);
   const [commandLoading, setCommandLoading] = useState(false);
   const [allocations, setAllocations] = useState<Array<{ id: string; provider_id: string; cpu_cores: number; ram_mb: number; gpu_units: number; released_at?: string | null }>>([]);
@@ -85,6 +95,34 @@ export function AdminConsolePanel() {
   }, [allocations]);
   const highRiskCount = useMemo(() => riskRows.filter((row) => row.score > 10).length, [riskRows]);
 
+  function updateTab(next: AdminTab, pushHistory = true) {
+    setTab(next);
+    const url = new URL(window.location.href);
+    url.searchParams.set("tab", next);
+    if (pushHistory) {
+      window.history.pushState({}, "", url);
+      return;
+    }
+    window.history.replaceState({}, "", url);
+  }
+
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const current = url.searchParams.get("tab");
+    if (!isAdminTab(current)) {
+      url.searchParams.set("tab", tab);
+      window.history.replaceState({}, "", url);
+    }
+  }, [tab]);
+
+  useEffect(() => {
+    const onPopState = () => {
+      setTab(readTabFromURL());
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
+
   return (
     <section className="section-stack">
       <PageSectionHeader
@@ -147,8 +185,8 @@ export function AdminConsolePanel() {
           { id: "risk", label: "Risk & Sharing" }
         ]}
         value={tab}
-        onChange={(next) => setTab(next)}
-        collapseAfter={4}
+        onChange={(next) => updateTab(next)}
+        mode="many"
         moreLabel="More"
       />
 

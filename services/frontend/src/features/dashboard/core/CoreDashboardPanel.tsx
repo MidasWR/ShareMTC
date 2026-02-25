@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { listAllAccruals, getBillingStats } from "../../billing/api/billingApi";
 import { getAdminStats } from "../../admin/api/adminApi";
@@ -89,6 +89,10 @@ export function CoreDashboardPanel() {
     }
   }
 
+  useEffect(() => {
+    void refresh();
+  }, []);
+
   return (
     <section className="section-stack">
       <PageSectionHeader
@@ -117,7 +121,7 @@ export function CoreDashboardPanel() {
                 <XAxis dataKey="day" />
                 <YAxis />
                 <Tooltip />
-                <Area type="monotone" dataKey="revenue" stroke="#4f8cff" fill="#4f8cff55" />
+                <Area type="monotone" dataKey="revenue" stroke="rgb(var(--brand-rgb))" fill="rgba(var(--brand-rgb), 0.25)" />
               </AreaChart>
             </ResponsiveContainer>
           </div>

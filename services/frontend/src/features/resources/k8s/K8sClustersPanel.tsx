@@ -10,12 +10,14 @@ import { createK8sCluster, deleteK8sCluster, listK8sClusters, refreshK8sCluster 
 import { KubernetesCluster } from "../../../types/api";
 import { StatusBadge } from "../../../design/patterns/StatusBadge";
 import { ActionDropdown } from "../../../design/components/ActionDropdown";
+import { Modal } from "../../../design/components/Modal";
 
 export function K8sClustersPanel() {
   const [rows, setRows] = useState<KubernetesCluster[]>([]);
   const [name, setName] = useState("core-k8s");
   const [providerID, setProviderID] = useState("provider-default");
   const [loading, setLoading] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<KubernetesCluster | null>(null);
   const { push } = useToast();
 
   async function refresh() {
@@ -131,7 +133,7 @@ export function K8sClustersPanel() {
                     onSelect={(action) => {
                       if (!row.id) return;
                       if (action === "refresh") sync(row.id);
-                      if (action === "delete") remove(row.id);
+                      if (action === "delete") setDeleteTarget(row);
                     }}
                   />
                 )
@@ -140,6 +142,22 @@ export function K8sClustersPanel() {
           />
         </div>
       </Card>
+      <Modal
+        open={Boolean(deleteTarget)}
+        title="Delete Kubernetes cluster"
+        description={deleteTarget ? `Cluster ${deleteTarget.name} will be permanently deleted.` : undefined}
+        confirmLabel="Delete"
+        confirmVariant="destructive"
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={() => {
+          if (!deleteTarget?.id) {
+            setDeleteTarget(null);
+            return;
+          }
+          void remove(deleteTarget.id);
+          setDeleteTarget(null);
+        }}
+      />
     </section>
   );
 }

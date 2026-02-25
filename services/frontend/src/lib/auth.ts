@@ -12,6 +12,7 @@ export type AuthUser = {
 
 const TOKEN_KEY = "host_token";
 const USER_KEY = "host_user";
+const AUTH_CHANGED_EVENT = "sharemtc:auth-changed";
 
 function parsePayload(token: string): JwtPayload | null {
   try {
@@ -60,9 +61,16 @@ export function isTokenValid(): boolean {
 export function setSession(token: string, user: AuthUser) {
   localStorage.setItem(TOKEN_KEY, token);
   localStorage.setItem(USER_KEY, JSON.stringify(user));
+  window.dispatchEvent(new Event(AUTH_CHANGED_EVENT));
 }
 
 export function clearSession() {
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(USER_KEY);
+  window.dispatchEvent(new Event(AUTH_CHANGED_EVENT));
+}
+
+export function onAuthChange(listener: () => void): () => void {
+  window.addEventListener(AUTH_CHANGED_EVENT, listener);
+  return () => window.removeEventListener(AUTH_CHANGED_EVENT, listener);
 }

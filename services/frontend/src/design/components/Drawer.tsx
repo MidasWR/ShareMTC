@@ -10,9 +10,14 @@ type DrawerProps = {
 
 export function Drawer({ open, title, onClose, children }: DrawerProps) {
   const containerRef = useRef<HTMLElement>(null);
+  const triggerRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      triggerRef.current?.focus();
+      return;
+    }
+    triggerRef.current = document.activeElement as HTMLElement | null;
     const container = containerRef.current;
     if (!container) return;
     const overlay = container;

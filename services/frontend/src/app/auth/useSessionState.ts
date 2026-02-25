@@ -1,17 +1,21 @@
 import { useEffect, useState } from "react";
-import { clearSession, getRole, isTokenValid } from "../../lib/auth";
+import { clearSession, getRole, isTokenValid, onAuthChange } from "../../lib/auth";
 
 export function useSessionState() {
   const [isAuthenticated, setIsAuthenticated] = useState(() => isTokenValid());
   const [role, setRole] = useState(() => getRole());
 
   useEffect(() => {
-    function onStorageUpdate() {
+    function syncSession() {
       setIsAuthenticated(isTokenValid());
       setRole(getRole());
     }
-    window.addEventListener("storage", onStorageUpdate);
-    return () => window.removeEventListener("storage", onStorageUpdate);
+    window.addEventListener("storage", syncSession);
+    const unsubscribe = onAuthChange(syncSession);
+    return () => {
+      window.removeEventListener("storage", syncSession);
+      unsubscribe();
+    };
   }, []);
 
   function refreshSession() {

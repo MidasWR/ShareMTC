@@ -1,6 +1,7 @@
 import { ServerOrder, VM } from "../../types/api";
 
 export function getLinkedVMID(order: ServerOrder, manualLinks: Record<string, string>): string | undefined {
+  if (order.vm_id?.trim()) return order.vm_id.trim();
   if (!order.id) return undefined;
   return manualLinks[order.id];
 }

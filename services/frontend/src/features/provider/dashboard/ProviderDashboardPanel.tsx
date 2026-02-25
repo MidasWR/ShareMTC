@@ -13,6 +13,7 @@ import { Input } from "../../../design/primitives/Input";
 import { AgentLog, Allocation, UsageAccrual } from "../../../types/api";
 import { loadProviderDashboard } from "../api/providerApi";
 import { listAgentLogs, listHealthChecks, listMetrics, listSharedOffers, upsertSharedOffer } from "../../resources/api/resourcesApi";
+import { PROVIDER_SHARED_CAPACITY_DEFAULTS } from "../../resources/defaults";
 
 
 export function ProviderDashboardPanel() {
@@ -88,13 +89,13 @@ export function ProviderDashboardPanel() {
         resource_type: "gpu",
         title: "Provider Shared GPU Pool",
         description: "Shared GPU capacity for marketplace users",
-        cpu_cores: 16,
-        ram_mb: 65536,
-        gpu_units: 4,
-        network_mbps: 5000,
-        quantity: 4,
-        available_qty: 4,
-        price_hourly_usd: 1.49,
+        cpu_cores: PROVIDER_SHARED_CAPACITY_DEFAULTS.cpuCores,
+        ram_mb: PROVIDER_SHARED_CAPACITY_DEFAULTS.ramMB,
+        gpu_units: PROVIDER_SHARED_CAPACITY_DEFAULTS.gpuUnits,
+        network_mbps: PROVIDER_SHARED_CAPACITY_DEFAULTS.networkMbps,
+        quantity: PROVIDER_SHARED_CAPACITY_DEFAULTS.quantity,
+        available_qty: PROVIDER_SHARED_CAPACITY_DEFAULTS.quantity,
+        price_hourly_usd: PROVIDER_SHARED_CAPACITY_DEFAULTS.priceHourlyUSD,
         status: "active"
       });
       push("success", "Shared capacity published");
@@ -130,6 +131,9 @@ export function ProviderDashboardPanel() {
           <MetricTile label="Shared offer qty" value={`${sharedOfferQty}`} />
         </div>
         <div className="mt-3">
+          <p className="mb-2 text-xs text-textMuted">
+            Publish source: <span className="font-medium text-textPrimary">Provider preset offer</span>
+          </p>
           <Button variant="secondary" onClick={publishSharedCapacity}>Publish shared capacity</Button>
         </div>
       </Card>

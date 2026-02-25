@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { listProviders } from "../../admin/api/adminApi";
 import { listAllAccruals, getBillingStats } from "../../billing/api/billingApi";
@@ -105,6 +105,10 @@ export function AdminDashboardPanel() {
     }
   }
 
+  useEffect(() => {
+    void refresh();
+  }, []);
+
   return (
     <section className="section-stack">
       <PageSectionHeader
@@ -131,7 +135,7 @@ export function AdminDashboardPanel() {
               <XAxis dataKey="provider" hide />
               <YAxis />
               <Tooltip />
-              <Bar dataKey="revenue" fill="#4f8cff" />
+              <Bar dataKey="revenue" fill="rgba(var(--brand-rgb), 0.25)" stroke="rgb(var(--brand-rgb))" />
             </BarChart>
           </ResponsiveContainer>
         </div>

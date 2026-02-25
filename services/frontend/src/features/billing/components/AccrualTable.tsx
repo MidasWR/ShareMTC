@@ -1,5 +1,4 @@
 import { useMemo } from "react";
-import { FaCcVisa, FaCcMastercard } from "react-icons/fa6";
 import { ColumnPicker } from "../../../design/components/ColumnPicker";
 import { FilterBar } from "../../../design/components/FilterBar";
 import { Table, TableColumn } from "../../../design/components/Table";
@@ -31,16 +30,7 @@ export function AccrualTable({ rows, visibleColumns, sortBy, search, onSortBy, o
       { key: "amount", header: "Amount", render: (row) => <span className="tabular-nums">${row.amount_usd.toFixed(2)}</span> },
       { key: "bonus", header: "VIP bonus", render: (row) => <span className="tabular-nums">${row.vip_bonus_usd.toFixed(2)}</span> },
       { key: "total", header: "Total", render: (row) => <span className="tabular-nums">${row.total_usd.toFixed(2)}</span> },
-      { 
-        key: "payment", 
-        header: "Method", 
-        render: (row) => (
-          <span className="flex items-center gap-2 text-xl">
-            {row.amount_usd % 2 === 0 ? <FaCcVisa className="text-brand" /> : <FaCcMastercard className="text-brand" />}
-            <span className="text-xs text-textSecondary font-mono">**** {row.id.slice(-4)}</span>
-          </span>
-        ) 
-      },
+      { key: "payment", header: "Method", render: () => <span className="text-xs text-textMuted">N/A</span> },
       { key: "created", header: "Created", render: (row) => <span className="tabular-nums">{new Date(row.created_at).toLocaleString()}</span> }
     ],
     []

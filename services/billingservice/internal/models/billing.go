@@ -57,6 +57,7 @@ type ServerOrder struct {
 	ID             string    `json:"id"`
 	UserID         string    `json:"user_id"`
 	PlanID         string    `json:"plan_id"`
+	VMID           string    `json:"vm_id"`
 	OSName         string    `json:"os_name"`
 	NetworkMbps    int       `json:"network_mbps"`
 	CPUCores       int       `json:"cpu_cores"`

@@ -12,12 +12,12 @@ type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
 };
 
 const variantClasses: Record<Variant, string> = {
-  primary: "bg-brand text-canvas shadow-[0_0_15px_rgba(0,255,65,0.4)] hover:shadow-[0_0_25px_rgba(0,255,65,0.6)] hover:bg-brandHover",
-  secondary: "bg-transparent text-textPrimary border border-border hover:border-brand hover:shadow-[0_0_10px_rgba(0,255,65,0.2)] hover:text-brand",
+  primary: "bg-brand text-canvas hover:bg-brandHover shadow-brand hover:shadow-brandStrong",
+  secondary: "border border-border bg-transparent text-textPrimary hover:border-brand hover:text-brand hover:shadow-brand",
   ghost: "bg-transparent text-textSecondary hover:text-brand hover:bg-brand/10",
-  destructive: "bg-danger text-white hover:bg-red-500 shadow-[0_0_15px_rgba(239,68,68,0.4)] hover:shadow-[0_0_25px_rgba(239,68,68,0.6)]",
-  info: "bg-info text-white hover:bg-sky-400 shadow-[0_0_15px_rgba(56,189,248,0.4)] hover:shadow-[0_0_25px_rgba(56,189,248,0.6)]",
-  warning: "bg-warning text-white hover:bg-yellow-400 shadow-[0_0_15px_rgba(245,158,11,0.4)] hover:shadow-[0_0_25px_rgba(245,158,11,0.6)]"
+  destructive: "bg-danger text-white hover:bg-red-500 shadow-md",
+  info: "bg-info text-white hover:bg-sky-400 shadow-md",
+  warning: "bg-warning text-white hover:bg-yellow-400 shadow-md"
 };
 
 const sizeClasses: Record<Size, string> = {
@@ -40,7 +40,7 @@ export function Button({
   return (
     <button
       className={cx(
-        "focus-ring inline-flex items-center justify-center gap-2 rounded-none font-medium transition-colors disabled:pointer-events-none disabled:opacity-60",
+        "focus-ring inline-flex items-center justify-center gap-2 rounded-md font-medium transition-colors disabled:pointer-events-none disabled:opacity-60",
         variantClasses[variant],
         sizeClasses[size],
         className

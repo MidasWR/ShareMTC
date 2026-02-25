@@ -19,6 +19,7 @@ import { listSharedOffers, reserveSharedOffer } from "../resources/api/resources
 import { SharedInventoryOffer } from "../../types/api";
 import { buildVmSelectOptions, getLinkedVMID } from "./orderVmMapping";
 import { validateServerOrder } from "./rentalValidation";
+import { SERVER_ORDER_DEFAULTS } from "./defaults";
 
 type Props = {
   onNavigate?: (tab: AppTab) => void;
@@ -27,15 +28,7 @@ type Props = {
 export function ServerRentalPanel({ onNavigate }: Props) {
   const [plans, setPlans] = useState<RentalPlan[]>([]);
   const [orders, setOrders] = useState<ServerOrder[]>([]);
-  const [form, setForm] = useState<ServerOrder>({
-    plan_id: "",
-    os_name: "Ubuntu 22.04",
-    network_mbps: 1000,
-    cpu_cores: 8,
-    ram_gb: 32,
-    gpu_units: 1,
-    period: "hourly"
-  });
+  const [form, setForm] = useState<ServerOrder>({ ...SERVER_ORDER_DEFAULTS });
   const [estimate, setEstimate] = useState<number>(0);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
@@ -188,7 +181,136 @@ export function ServerRentalPanel({ onNavigate }: Props) {
         description="Manage your running instances, view logs, and configure new servers."
       />
 
-      <Card title="Controls" description="Search, filter, refresh, and route to create screens.">
+      <div className="grid gap-4 xl:grid-cols-[1.55fr_1fr]">
+        <Card title="Marketplace Catalog" description="Pick a published offer and reserve capacity in one click.">
+          <Table
+            dense
+            ariaLabel="Shared offers table"
+            rowKey={(row) => row.id ?? `${row.provider_id}-${row.title}`}
+            items={sharedOffers}
+            emptyState={<EmptyState title="No shared offers" description="Providers have not published capacity yet." />}
+            columns={[
+              { key: "title", header: "Offer", render: (row) => row.title },
+              { key: "provider", header: "Provider", render: (row) => row.provider_id },
+              { key: "shape", header: "Shape", render: (row) => `${row.cpu_cores} CPU / ${row.ram_mb} MB / ${row.gpu_units} GPU` },
+              { key: "available", header: "Available", render: (row) => `${row.available_qty}/${row.quantity}` },
+              { key: "price", header: "$/hr", render: (row) => row.price_hourly_usd.toFixed(2) },
+              {
+                key: "actions",
+                header: "Actions",
+                render: (row) => (
+                  <Button variant="secondary" disabled={!row.id || row.available_qty <= 0 || loading} onClick={() => rentSharedOffer(row)}>
+                    Rent 1
+                  </Button>
+                )
+              }
+            ]}
+          />
+        </Card>
+
+        <Card title="Deploy" description="Compact server order form with explicit summary.">
+          <form className="grid gap-3 md:grid-cols-2" onSubmit={handleEstimate}>
+            <Select
+              label="Plan"
+              value={form.plan_id}
+              onChange={(event) => {
+                const nextPlan = plans.find((item) => item.id === event.target.value);
+                setForm((prev) => ({
+                  ...prev,
+                  plan_id: event.target.value,
+                  period: (nextPlan?.period as "hourly" | "monthly") ?? prev.period
+                }));
+              }}
+              options={plans.map((item) => ({ value: item.id, label: `${item.name} (${item.period})` }))}
+            />
+            <Select
+              label="OS Template"
+              value={form.os_name}
+              onChange={(event) => setForm((prev) => ({ ...prev, os_name: event.target.value }))}
+              options={[
+                { value: "Ubuntu 22.04", label: "Ubuntu 22.04" },
+                { value: "Ubuntu 24.04", label: "Ubuntu 24.04" },
+                { value: "Debian 12", label: "Debian 12" }
+              ]}
+            />
+            <Input
+              type="number"
+              min={1}
+              step={1}
+              label="CPU Cores"
+              value={`${form.cpu_cores}`}
+              onChange={(event) => setForm((prev) => ({ ...prev, cpu_cores: Number(event.target.value) || 0 }))}
+            />
+            <Input
+              type="number"
+              min={1}
+              step={1}
+              label="RAM (GB)"
+              value={`${form.ram_gb}`}
+              onChange={(event) => setForm((prev) => ({ ...prev, ram_gb: Number(event.target.value) || 0 }))}
+            />
+            <details className="md:col-span-2 rounded-md border border-border bg-canvas p-3">
+              <summary className="cursor-pointer text-sm text-textPrimary">Advanced</summary>
+              <div className="mt-3 grid gap-3 md:grid-cols-2">
+                <Input
+                  type="number"
+                  min={0}
+                  step={1}
+                  label="GPU units"
+                  value={`${form.gpu_units}`}
+                  onChange={(event) => setForm((prev) => ({ ...prev, gpu_units: Number(event.target.value) || 0 }))}
+                />
+                <Input
+                  type="number"
+                  min={1}
+                  step={100}
+                  label="Network (Mbps)"
+                  value={`${form.network_mbps}`}
+                  onChange={(event) => setForm((prev) => ({ ...prev, network_mbps: Number(event.target.value) || 0 }))}
+                />
+                {onNavigate ? (
+                  <>
+                    <Select
+                      label="Create destination"
+                      value={createTarget}
+                      onChange={(event) => setCreateTarget(event.target.value as AppTab)}
+                      options={[
+                        { value: "myCompute", label: "My Compute workspace" },
+                        { value: "provideCompute", label: "Provide Compute workspace" },
+                        { value: "marketplace", label: "Marketplace" }
+                      ]}
+                    />
+                    <div className="md:mt-7">
+                      <Button onClick={() => onNavigate(createTarget)} variant="ghost">
+                        Open destination
+                      </Button>
+                    </div>
+                  </>
+                ) : null}
+              </div>
+            </details>
+            <div className="md:col-span-2 rounded-md border border-border bg-canvas p-3 text-xs text-textSecondary">
+              <div className="mb-1 text-sm text-textPrimary">Summary</div>
+              <div>Plan: {selectedPlan?.name || form.plan_id || "not selected"}</div>
+              <div>Shape: {form.cpu_cores} CPU / {form.ram_gb} GB / {form.gpu_units} GPU</div>
+              <div>Network: {form.network_mbps} Mbps · Billing: {form.period}</div>
+              <div>Config source: <span className="font-medium text-textPrimary">Manual order form</span></div>
+            </div>
+            <div className="md:col-span-2 flex flex-wrap items-center gap-2">
+              <Button type="submit" loading={loading} variant="secondary">Estimate</Button>
+              <Button type="button" onClick={handleCreateOrder} loading={loading}>
+                Deploy
+              </Button>
+              <Button type="button" variant="ghost" onClick={() => setForm({ ...SERVER_ORDER_DEFAULTS, plan_id: form.plan_id, period: form.period })}>
+                Reset
+              </Button>
+              <Badge variant="info">Estimated ${estimate.toFixed(2)}/{selectedPlan?.period === "hourly" ? "hr" : "mo"}</Badge>
+            </div>
+          </form>
+        </Card>
+      </div>
+
+      <Card title="My Instances" description="Active and past server rentals with lifecycle actions.">
         <FilterBar
           search={<Input label="Search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="ID, plan, OS" />}
           filters={
@@ -224,25 +346,9 @@ export function ServerRentalPanel({ onNavigate }: Props) {
               <Button variant="secondary" onClick={refresh} loading={loading}>
                 Refresh
               </Button>
-              <Select
-                label="Create"
-                value={createTarget}
-                onChange={(event) => setCreateTarget(event.target.value as AppTab)}
-                options={[
-                  { value: "myCompute", label: "My Compute workspace" },
-                  { value: "provideCompute", label: "Provide Compute workspace" },
-                  { value: "marketplace", label: "Marketplace" }
-                ]}
-              />
-              <Button onClick={() => onNavigate?.(createTarget)} disabled={!onNavigate}>
-                Open
-              </Button>
             </>
           }
         />
-      </Card>
-      
-      <Card title="Your Instances" description="Active and past server rentals.">
         <Table
           dense
           ariaLabel="Server history"
@@ -264,13 +370,18 @@ export function ServerRentalPanel({ onNavigate }: Props) {
               header: "Actions",
               render: (row) => (
                 <div className="flex min-w-[280px] items-end gap-2">
+                  <div className="min-w-[120px] pb-1 text-xs text-textMuted">
+                    {row.vm_id ? "From server vm_id" : "Manual link"}
+                  </div>
                   <Select
                     label="Linked VM"
-                    value={(row.id && vmByOrder[row.id]) || ""}
+                    value={row.vm_id || (row.id && vmByOrder[row.id]) || ""}
                     onChange={(event) => {
+                      if (row.vm_id) return;
                       if (!row.id) return;
                       setVmByOrder((prev) => ({ ...prev, [row.id as string]: event.target.value }));
                     }}
+                    disabled={Boolean(row.vm_id)}
                     options={[{ value: "", label: "Select VM" }, ...vmOptions]}
                   />
                   <ActionDropdown
@@ -289,99 +400,6 @@ export function ServerRentalPanel({ onNavigate }: Props) {
             }
           ]}
         />
-      </Card>
-
-      <Card title="Shared Resource Marketplace" description="Rent published shared capacities from providers.">
-        <Table
-          dense
-          ariaLabel="Shared offers table"
-          rowKey={(row) => row.id ?? `${row.provider_id}-${row.title}`}
-          items={sharedOffers}
-          emptyState={<EmptyState title="No shared offers" description="Providers have not published capacity yet." />}
-          columns={[
-            { key: "title", header: "Offer", render: (row) => row.title },
-            { key: "provider", header: "Provider", render: (row) => row.provider_id },
-            { key: "shape", header: "Shape", render: (row) => `${row.cpu_cores} CPU / ${row.ram_mb} MB / ${row.gpu_units} GPU` },
-            { key: "available", header: "Available", render: (row) => `${row.available_qty}/${row.quantity}` },
-            { key: "price", header: "$/hr", render: (row) => row.price_hourly_usd.toFixed(2) },
-            {
-              key: "actions",
-              header: "Actions",
-              render: (row) => (
-                <Button variant="secondary" disabled={!row.id || row.available_qty <= 0 || loading} onClick={() => rentSharedOffer(row)}>
-                  Rent 1
-                </Button>
-              )
-            }
-          ]}
-        />
-      </Card>
-
-      <Card title="Quick Deploy" description="Compact order form for server provisioning.">
-        <form className="grid gap-3 md:grid-cols-2 xl:grid-cols-3" onSubmit={handleEstimate}>
-          <Select
-            label="Plan"
-            value={form.plan_id}
-            onChange={(event) => {
-              const nextPlan = plans.find((item) => item.id === event.target.value);
-              setForm((prev) => ({
-                ...prev,
-                plan_id: event.target.value,
-                period: (nextPlan?.period as "hourly" | "monthly") ?? prev.period
-              }));
-            }}
-            options={plans.map((item) => ({ value: item.id, label: `${item.name} (${item.period})` }))}
-          />
-          <Select
-            label="OS Template"
-            value={form.os_name}
-            onChange={(event) => setForm((prev) => ({ ...prev, os_name: event.target.value }))}
-            options={[
-              { value: "Ubuntu 22.04", label: "Ubuntu 22.04" },
-              { value: "Ubuntu 24.04", label: "Ubuntu 24.04" },
-              { value: "Debian 12", label: "Debian 12" }
-            ]}
-          />
-          <Input
-            type="number"
-            min={1}
-            step={1}
-            label="CPU Cores"
-            value={`${form.cpu_cores}`}
-            onChange={(event) => setForm((prev) => ({ ...prev, cpu_cores: Number(event.target.value) || 0 }))}
-          />
-          <Input
-            type="number"
-            min={1}
-            step={1}
-            label="RAM (GB)"
-            value={`${form.ram_gb}`}
-            onChange={(event) => setForm((prev) => ({ ...prev, ram_gb: Number(event.target.value) || 0 }))}
-          />
-          <Input
-            type="number"
-            min={0}
-            step={1}
-            label="GPU units"
-            value={`${form.gpu_units}`}
-            onChange={(event) => setForm((prev) => ({ ...prev, gpu_units: Number(event.target.value) || 0 }))}
-          />
-          <Input
-            type="number"
-            min={1}
-            step={100}
-            label="Network (Mbps)"
-            value={`${form.network_mbps}`}
-            onChange={(event) => setForm((prev) => ({ ...prev, network_mbps: Number(event.target.value) || 0 }))}
-          />
-          <div className="md:col-span-2 xl:col-span-3 flex flex-wrap items-center gap-2">
-            <Button type="submit" loading={loading} variant="secondary">Estimate</Button>
-            <Button type="button" onClick={handleCreateOrder} loading={loading}>
-              Deploy
-            </Button>
-            <Badge variant="info">Estimated ${estimate.toFixed(2)}/{selectedPlan?.period === "hourly" ? "hr" : "mo"}</Badge>
-          </div>
-        </form>
       </Card>
     </section>
   );

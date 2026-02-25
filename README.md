@@ -104,7 +104,7 @@ Priority is assigned using `S/F/B` together, with `S0` always in Wave 1.
 ### Current UX roadmap focus (4 core flows)
 
 - **Resources -> VM/POD lifecycle:** reduce hidden defaults, tighten form validation, and make lifecycle feedback deterministic.
-- **Server rental -> estimate/order/manage:** remove weak order-to-VM mapping and enforce transparent post-order status progression.
+- **Server rental -> estimate/order/manage:** prioritize server-side `vm_id` linkage over manual map and enforce transparent post-order status progression.
 - **Admin operations (access/servers/sharing):** remove insecure defaults and clarify high-risk actions through explicit state and copy.
 - **Billing and usage control:** remove hardcoded usage assumptions and make financial state transitions user-verifiable.
 
@@ -112,6 +112,7 @@ Detailed audit findings and Wave 1/2/3 implementation plan are tracked in:
 
 - `reports/10_frontend_core_ux_audit_roadmap.md`
 - `reports/12_frontend_tabs_navigation_marketplace_demo.md`
+- `reports/13_frontend_demo_plus_contract_ux.md`
 
 ### Security model
 
@@ -281,3 +282,4 @@ Latest upgrade reports:
 - `reports/8_runpod_style_core_ux_iteration.md`
 - `reports/9_phase1_templates_sharing_pipeline.md`
 - `reports/11_marketplace_alignment_linux_first_security.md`
+- `reports/13_frontend_demo_plus_contract_ux.md`
