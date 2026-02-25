@@ -1,260 +1,251 @@
-import { useEffect, useMemo, useState } from "react";
-import { createServerOrder, listRentalPlans, listServerOrders } from "../billing/api/billingApi";
-import { listVMTemplates } from "../resources/api/resourcesApi";
-import { useToast } from "../../design/components/Toast";
-import { Table } from "../../design/components/Table";
+import { useMemo, useState } from "react";
+import { LuArrowRight, LuCircleCheckBig, LuFilter, LuGlobe, LuHardDrive, LuKeyRound, LuMapPin, LuNetwork, LuServer, LuTriangleAlert } from "react-icons/lu";
 import { EmptyState } from "../../design/patterns/EmptyState";
 import { PageSectionHeader } from "../../design/patterns/PageSectionHeader";
+import { StatusBadge } from "../../design/patterns/StatusBadge";
 import { Button } from "../../design/primitives/Button";
 import { Card } from "../../design/primitives/Card";
+import { Icon } from "../../design/primitives/Icon";
 import { Input } from "../../design/primitives/Input";
+import { MultiSelect } from "../../design/primitives/MultiSelect";
 import { Select } from "../../design/primitives/Select";
-import { RentalPlan, ServerOrder, VMTemplate } from "../../types/api";
-import { resolveTemplateLogoURL } from "../../lib/logoResolver";
-import { firstServerOrderError, ServerOrderValidationErrors, validateServerOrder } from "../rental/rentalValidation";
+import { useSettings } from "../../app/providers/SettingsProvider";
+import { countryOptions, deployCatalog } from "../hifi/mockData";
+import { flagFromCountry, formatUSD } from "../hifi/formatters";
 
-function toRamGB(value: number) {
-  return Math.max(1, Math.ceil(value / 1024));
-}
+const steps = [
+  "Template",
+  "Location",
+  "Resources",
+  "Storage/Networking",
+  "Access",
+  "Pricing model",
+  "Review & Deploy"
+] as const;
+
+type PricingModel = "on-demand" | "spot" | "savings";
 
 export function MarketplacePanel() {
-  const [templates, setTemplates] = useState<VMTemplate[]>([]);
-  const [plans, setPlans] = useState<RentalPlan[]>([]);
-  const [orders, setOrders] = useState<ServerOrder[]>([]);
-  const [selectedCode, setSelectedCode] = useState("");
+  const { settings } = useSettings();
+  const locale = settings.language === "ru" ? "ru" : "en";
+  const [computeType, setComputeType] = useState<"ALL" | "GPU" | "CPU">("GPU");
+  const [countries, setCountries] = useState<string[]>([]);
   const [search, setSearch] = useState("");
-  const [minVram, setMinVram] = useState(0);
-  const [form, setForm] = useState<ServerOrder>({
-    plan_id: "",
-    name: "demo-instance",
-    os_name: "Ubuntu 22.04",
-    network_mbps: 1000,
-    cpu_cores: 8,
-    ram_gb: 16,
-    gpu_units: 1,
-    period: "hourly"
-  });
-  const [formErrors, setFormErrors] = useState<ServerOrderValidationErrors>({});
-  const [loading, setLoading] = useState(false);
-  const { push } = useToast();
+  const [minVram, setMinVram] = useState(12);
+  const [maxPrice, setMaxPrice] = useState(4.5);
+  const [availability, setAvailability] = useState<"" | "high" | "medium" | "low">("");
+  const [networkFeature, setNetworkFeature] = useState("");
+  const [selectedId, setSelectedId] = useState<string>(deployCatalog[0]?.id || "");
+  const [activeStep, setActiveStep] = useState<number>(1);
+  const [instanceName, setInstanceName] = useState("mts-instance-01");
+  const [gpuCount, setGpuCount] = useState(1);
+  const [cpuCores, setCpuCores] = useState(8);
+  const [ramGb, setRamGb] = useState(24);
+  const [storageGb, setStorageGb] = useState(120);
+  const [network, setNetwork] = useState("Public IPv4");
+  const [sshKey, setSshKey] = useState("default-ed25519");
+  const [pricingModel, setPricingModel] = useState<PricingModel>("on-demand");
+  const [deploySubmitted, setDeploySubmitted] = useState(false);
 
-  const selectedTemplate = useMemo(
-    () => templates.find((item) => item.code === selectedCode) ?? null,
-    [templates, selectedCode]
-  );
+  const filteredCatalog = useMemo(() => {
+    const normalizedSearch = search.trim().toLowerCase();
+    return deployCatalog.filter((item) => {
+      const typeMatch = computeType === "ALL" || item.computeType === computeType;
+      const countryMatch = countries.length === 0 || countries.includes(item.country);
+      const vramMatch = item.vramGb >= minVram;
+      const priceMatch = item.pricePerHour <= maxPrice;
+      const availabilityMatch = !availability || item.availability === availability;
+      const networkMatch = !networkFeature || item.networkFeatures.includes(networkFeature);
+      const searchMatch =
+        !normalizedSearch ||
+        item.gpuModel.toLowerCase().includes(normalizedSearch) ||
+        item.region.toLowerCase().includes(normalizedSearch) ||
+        item.country.toLowerCase().includes(normalizedSearch);
+      return typeMatch && countryMatch && vramMatch && priceMatch && availabilityMatch && networkMatch && searchMatch;
+    });
+  }, [availability, computeType, countries, maxPrice, minVram, networkFeature, search]);
 
-  const filteredTemplates = useMemo(() => {
-    const query = search.trim().toLowerCase();
-    return templates
-      .filter((item) => {
-        const vram = item.vram_gb ?? 0;
-        const matchesVram = vram >= minVram;
-        if (!matchesVram) return false;
-        if (!query) return true;
-        return item.name.toLowerCase().includes(query) || item.code.toLowerCase().includes(query) || item.os_name.toLowerCase().includes(query);
-      })
-      .sort((a, b) => (b.vram_gb ?? 0) - (a.vram_gb ?? 0));
-  }, [templates, search, minVram]);
+  const selected = useMemo(() => filteredCatalog.find((item) => item.id === selectedId) || filteredCatalog[0] || null, [filteredCatalog, selectedId]);
 
-  async function load() {
-    setLoading(true);
-    try {
-      const [templateRows, planRows, orderRows] = await Promise.all([listVMTemplates(), listRentalPlans(), listServerOrders()]);
-      setTemplates(templateRows);
-      setPlans(planRows);
-      setOrders(orderRows);
-      if (planRows.length && !form.plan_id) {
-        setForm((prev) => ({ ...prev, plan_id: planRows[0].id, period: planRows[0].period }));
-      }
-      if (templateRows.length && !selectedCode) {
-        const first = templateRows[0];
-        setSelectedCode(first.code);
-        setForm((prev) => ({
-          ...prev,
-          os_name: first.os_name || prev.os_name,
-          cpu_cores: first.cpu_cores || prev.cpu_cores,
-          gpu_units: first.gpu_units,
-          network_mbps: first.network_mbps || prev.network_mbps,
-          ram_gb: toRamGB(first.ram_mb || prev.ram_gb * 1024)
-        }));
-      }
-    } catch (error) {
-      push("error", error instanceof Error ? error.message : "Failed to load marketplace");
-    } finally {
-      setLoading(false);
-    }
-  }
+  const estimatedCost = useMemo(() => {
+    if (!selected) return 0;
+    const multiplier = pricingModel === "spot" ? 0.72 : pricingModel === "savings" ? 0.84 : 1;
+    return Number((selected.pricePerHour * Math.max(1, gpuCount) * multiplier).toFixed(2));
+  }, [gpuCount, pricingModel, selected]);
 
-  useEffect(() => {
-    load();
-  }, []);
-
-  function selectTemplate(template: VMTemplate) {
-    setSelectedCode(template.code);
-    setForm((prev) => ({
-      ...prev,
-      os_name: template.os_name || prev.os_name,
-      cpu_cores: template.cpu_cores || prev.cpu_cores,
-      gpu_units: template.gpu_units,
-      network_mbps: template.network_mbps || prev.network_mbps,
-      ram_gb: toRamGB(template.ram_mb || prev.ram_gb * 1024)
-    }));
-  }
-
-  async function deploy() {
-    const errors = validateServerOrder(form);
-    setFormErrors(errors);
-    const validationError = firstServerOrderError(errors);
-    if (validationError) {
-      push("error", validationError);
-      return;
-    }
-    if (!selectedTemplate) {
-      push("error", "Select a template before deploy");
-      return;
-    }
-    setLoading(true);
-    try {
-      const created = await createServerOrder(form);
-      setOrders((prev) => [created, ...prev]);
-      push("success", `Deploy started for ${created.name || form.name}`);
-    } catch (error) {
-      push("error", error instanceof Error ? error.message : "Failed to deploy instance");
-    } finally {
-      setLoading(false);
-    }
-  }
+  const risks = useMemo(() => {
+    const values: string[] = [];
+    if (!selected) return values;
+    if (selected.availability === "low") values.push("Insufficient capacity in selected region");
+    if (pricingModel === "spot") values.push("Interrupted(spot) risk for long trainings");
+    if (!sshKey) values.push("SSH key missing");
+    return values;
+  }, [pricingModel, selected, sshKey]);
 
   return (
     <section className="section-stack">
       <PageSectionHeader
-        title="Marketplace"
-        description="Select compute, deploy in one click, and track your instances without leaving this screen."
+        title={locale === "ru" ? "Marketplace / Deploy" : "Marketplace / Deploy"}
+        description={locale === "ru" ? "Каталог, фильтры и пошаговый wizard деплоя на одном экране." : "Catalog, filters and step-by-step deploy wizard on a single screen."}
       />
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
-        <Card title="Catalog" description="Choose a template by price/performance profile.">
-          <div className="grid gap-3 md:grid-cols-[2fr_1fr_auto]">
-            <Input label="Search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="GPU model, code, OS..." />
-            <Input
-              type="number"
-              min={0}
-              step={8}
-              label="Min VRAM (GB)"
-              value={`${minVram}`}
-              onChange={(event) => setMinVram(Number(event.target.value) || 0)}
-            />
-            <Button className="md:mt-7" variant="secondary" onClick={load} loading={loading}>
-              Refresh
-            </Button>
+      <Card title={locale === "ru" ? "Фильтры" : "Filters"} description={locale === "ru" ? "Compute type, регион, VRAM, цена, availability и сеть." : "Compute type, region, VRAM, price, availability and network."}>
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+          <Select
+            label="Compute type"
+            value={computeType}
+            onChange={(event) => setComputeType(event.target.value as "ALL" | "GPU" | "CPU")}
+            options={[
+              { value: "ALL", label: "All" },
+              { value: "GPU", label: "GPU" },
+              { value: "CPU", label: "CPU" }
+            ]}
+          />
+          <MultiSelect label="Country / Region" value={countries} onChange={setCountries} options={countryOptions.map((item) => ({ value: item.value, label: `${flagFromCountry(item.value)} ${item.label}`, meta: item.value }))} />
+          <Input label="Search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="GPU, region, country..." leftIcon={<Icon glyph={LuFilter} size={16} />} />
+          <div className="space-y-1.5">
+            <span className="text-sm font-medium text-textSecondary">VRAM slider: {minVram} GB</span>
+            <input className="focus-ring h-10 w-full accent-brand" type="range" min={0} max={160} step={4} value={minVram} onChange={(event) => setMinVram(Number(event.target.value))} />
           </div>
-          <div className="mt-4 grid gap-2 lg:grid-cols-2">
-            {filteredTemplates.map((item) => (
-              <button
-                key={item.code}
-                type="button"
-                aria-pressed={selectedCode === item.code}
-                className={`rounded-md border p-3 text-left transition-colors ${
-                  selectedCode === item.code ? "focus-ring border-brand bg-brand/10" : "focus-ring border-border bg-surface hover:border-brand/40"
-                }`}
-                onClick={() => selectTemplate(item)}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <img src={resolveTemplateLogoURL(item.code, item.name)} alt={`${item.name} logo`} className="h-6 w-6 rounded-sm object-contain" />
-                    <div>
-                      <div className="font-medium">{item.name}</div>
-                      <div className="text-xs text-textMuted">{item.code}</div>
-                    </div>
-                  </div>
-                  <span className="text-xs text-textSecondary">
-                    {selectedCode === item.code ? "Selected" : item.availability_tier || "medium"}
-                  </span>
-                </div>
-                <div className="mt-2 text-xs text-textSecondary">
-                  {(item.vram_gb ?? 0)} GB VRAM · {item.cpu_cores} CPU · {toRamGB(item.ram_mb)} GB RAM
-                </div>
-              </button>
-            ))}
-            {filteredTemplates.length === 0 ? <EmptyState title="No templates found" description="Adjust filters to see more options." /> : null}
+          <div className="space-y-1.5">
+            <span className="text-sm font-medium text-textSecondary">Price range: {formatUSD(maxPrice, locale)}</span>
+            <input className="focus-ring h-10 w-full accent-brand" type="range" min={0.18} max={4.5} step={0.05} value={maxPrice} onChange={(event) => setMaxPrice(Number(event.target.value))} />
           </div>
-        </Card>
-
-        <div className="space-y-4">
-          <Card title="Deploy" description="Only a few required fields for a demo-ready launch.">
-            <div className="grid gap-3">
-              <Input
-                label="Instance name"
-                value={form.name}
-                onChange={(event) => {
-                  const value = event.target.value;
-                  setForm((prev) => ({ ...prev, name: value }));
-                  setFormErrors((prev) => ({ ...prev, name: undefined }));
-                }}
-                error={formErrors.name}
-              />
-              <Select
-                label="Billing plan"
-                value={form.plan_id}
-                onChange={(event) => {
-                  const nextPlan = plans.find((item) => item.id === event.target.value);
-                  setForm((prev) => ({
-                    ...prev,
-                    plan_id: event.target.value,
-                    period: (nextPlan?.period as "hourly" | "monthly") ?? prev.period
-                  }));
-                  setFormErrors((prev) => ({ ...prev, plan_id: undefined }));
-                }}
-                options={plans.map((plan) => ({ value: plan.id, label: `${plan.name} (${plan.period})` }))}
-                error={formErrors.plan_id}
-              />
-              <div className="rounded-md border border-border bg-elevated p-3 text-sm text-textSecondary">
-                <div className="text-xs uppercase tracking-wide text-textMuted">Summary</div>
-                {selectedTemplate ? (
-                  <div className="mt-2 space-y-1">
-                    <div>You are going to deploy: <span className="text-textPrimary">{selectedTemplate.name}</span></div>
-                    <div>{form.cpu_cores} CPU · {form.ram_gb} GB RAM · {form.gpu_units} GPU · {form.network_mbps} Mbps</div>
-                    <div>OS: {form.os_name} · Plan: {form.period}</div>
-                  </div>
-                ) : (
-                  <div className="mt-2">Select a template to build deployment summary.</div>
-                )}
-              </div>
-              <details className="rounded-md border border-border bg-canvas px-3 py-2 text-sm text-textSecondary">
-                <summary className="details-summary-focus cursor-pointer text-textPrimary">Advanced</summary>
-                {selectedTemplate ? (
-                  <div className="mt-2 space-y-1 text-xs">
-                    <div>Region: {selectedTemplate.region || "any"}</div>
-                    <div>Cloud: {selectedTemplate.cloud_type || "secure"}</div>
-                    <div>Availability: {selectedTemplate.availability_tier || "medium"}</div>
-                    <div>Network volume: {selectedTemplate.network_volume_supported ? "supported" : "not supported"}</div>
-                    <div>Global networking: {selectedTemplate.global_networking_supported ? "enabled" : "disabled"}</div>
-                    <div>Max instances: {selectedTemplate.max_instances || 1}</div>
-                  </div>
-                ) : null}
-              </details>
-              <Button onClick={deploy} loading={loading} disabled={!selectedTemplate || !form.plan_id}>
-                Deploy
-              </Button>
-            </div>
-          </Card>
-
-          <Card title="My Instances" description="Recent server orders and statuses.">
-            <Table
-              dense
-              ariaLabel="Marketplace instances table"
-              rowKey={(row) => row.id ?? `${row.plan_id}-${row.created_at}`}
-              items={orders}
-              emptyState={<EmptyState title="No instances yet" description="Deploy your first instance from the panel above." />}
-              columns={[
-                { key: "name", header: "Instance", render: (row) => row.name || "-" },
-                { key: "plan", header: "Plan", render: (row) => row.plan_id },
-                { key: "shape", header: "Config", render: (row) => `${row.cpu_cores} CPU / ${row.ram_gb} GB / ${row.gpu_units} GPU` },
-                { key: "os", header: "OS", render: (row) => row.os_name },
-                { key: "status", header: "Status", render: (row) => row.status || "queued" }
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+            <Select
+              label="Availability"
+              value={availability}
+              onChange={(event) => setAvailability(event.target.value as "" | "high" | "medium" | "low")}
+              options={[
+                { value: "", label: "Any" },
+                { value: "high", label: "High" },
+                { value: "medium", label: "Medium" },
+                { value: "low", label: "Low" }
               ]}
             />
-          </Card>
+            <Select
+              label="Network"
+              value={networkFeature}
+              onChange={(event) => setNetworkFeature(event.target.value)}
+              options={[
+                { value: "", label: "Any" },
+                { value: "IPv4", label: "IPv4" },
+                { value: "IPv6", label: "IPv6" },
+                { value: "SSH", label: "SSH" },
+                { value: "Private VPC", label: "Private VPC" }
+              ]}
+            />
+          </div>
         </div>
+      </Card>
+
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.45fr)_minmax(340px,1fr)]">
+        <Card title={locale === "ru" ? "Каталог" : "Catalog"} description={locale === "ru" ? "Карточки с ценой/час, страной, VRAM и availability." : "Tiles with price/hour, country, VRAM and availability."}>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {filteredCatalog.map((item) => {
+              const isSelected = selected?.id === item.id;
+              return (
+                <article key={item.id} className={`rounded-lg border p-3 ${isSelected ? "border-brand bg-brand/10" : "border-border bg-surface"}`}>
+                  <div className="mb-2 flex items-start justify-between gap-2">
+                    <div>
+                      <h3 className="font-semibold text-textPrimary">{item.gpuModel}</h3>
+                      <p className="text-xs text-textMuted">{item.vcpu} vCPU · {item.ramGb} GB RAM · {item.vramGb} GB VRAM</p>
+                    </div>
+                    <StatusBadge status={item.availability === "high" ? "running" : item.availability === "medium" ? "queued" : "interrupted"} />
+                  </div>
+                  <div className="space-y-1 text-xs text-textSecondary">
+                    <p className="flex items-center gap-1.5"><Icon glyph={LuMapPin} size={16} /> {flagFromCountry(item.country)} {item.country} · {item.region}</p>
+                    <p className="flex items-center gap-1.5"><Icon glyph={LuNetwork} size={16} /> {item.networkFeatures.join(", ")}</p>
+                  </div>
+                  <div className="mt-3 flex items-center justify-between">
+                    <span className="text-sm font-semibold text-textPrimary">{formatUSD(item.pricePerHour, locale)}/hr</span>
+                    <Button variant={isSelected ? "primary" : "secondary"} onClick={() => setSelectedId(item.id)}>Select</Button>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+          {filteredCatalog.length === 0 ? (
+            <div className="mt-3">
+              <EmptyState title={locale === "ru" ? "Ничего не найдено" : "No results"} description={locale === "ru" ? "Измените фильтры и попробуйте снова." : "Adjust filters and try again."} />
+            </div>
+          ) : null}
+        </Card>
+
+        <Card title={locale === "ru" ? "Deploy wizard" : "Deploy wizard"} description={locale === "ru" ? "Пошаговый деплой в side panel стиле." : "Step-by-step deployment in side panel style."}>
+          <ol className="mb-4 grid gap-2 rounded-md border border-border bg-canvas p-2">
+            {steps.map((step, index) => {
+              const current = index + 1 === activeStep;
+              const done = index + 1 < activeStep;
+              return (
+                <li key={step}>
+                  <button type="button" className={`focus-ring flex min-h-9 w-full items-center justify-between rounded-md px-2 py-1.5 text-left ${current ? "bg-brand/20 text-textPrimary" : "text-textSecondary hover:bg-elevated"}`} onClick={() => setActiveStep(index + 1)}>
+                    <span>{index + 1}. {step}</span>
+                    {done ? <Icon glyph={LuCircleCheckBig} size={16} className="text-success" /> : <Icon glyph={LuArrowRight} size={16} />}
+                  </button>
+                </li>
+              );
+            })}
+          </ol>
+
+          <div className="space-y-3">
+            <Input label="1) Template / Pod Name" value={instanceName} onChange={(event) => setInstanceName(event.target.value)} />
+            <Input label="2) Location (country / region / datacenter)" value={selected ? `${selected.country}/${selected.region}/${selected.datacenter}` : ""} readOnly />
+            <div className="grid gap-3 sm:grid-cols-3">
+              <Input type="number" min={1} label="3) GPU count" value={String(gpuCount)} onChange={(event) => setGpuCount(Number(event.target.value) || 1)} />
+              <Input type="number" min={2} label="3) CPU" value={String(cpuCores)} onChange={(event) => setCpuCores(Number(event.target.value) || 2)} />
+              <Input type="number" min={4} label="3) RAM (GB)" value={String(ramGb)} onChange={(event) => setRamGb(Number(event.target.value) || 4)} />
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Input type="number" min={20} label="4) Storage (GB)" value={String(storageGb)} onChange={(event) => setStorageGb(Number(event.target.value) || 20)} leftIcon={<Icon glyph={LuHardDrive} size={16} />} />
+              <Select label="4) Networking" value={network} onChange={(event) => setNetwork(event.target.value)} options={[{ value: "Public IPv4", label: "Public IPv4" }, { value: "Private VPC", label: "Private VPC" }, { value: "Dual Stack IPv4/IPv6", label: "Dual Stack IPv4/IPv6" }]} />
+            </div>
+            <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
+              <Select label="5) Access / SSH key" value={sshKey} onChange={(event) => setSshKey(event.target.value)} options={[{ value: "default-ed25519", label: "default-ed25519" }, { value: "ml-team-rsa", label: "ml-team-rsa" }, { value: "", label: "No key selected" }]} />
+              <div className="sm:mt-7">
+                <Button variant="secondary" leftIcon={<Icon glyph={LuKeyRound} size={16} />}>Add SSH key</Button>
+              </div>
+            </div>
+            <Select
+              label="6) Pricing model"
+              value={pricingModel}
+              onChange={(event) => setPricingModel(event.target.value as PricingModel)}
+              options={[
+                { value: "on-demand", label: "On-demand" },
+                { value: "spot", label: "Spot" },
+                { value: "savings", label: "Savings plan" }
+              ]}
+            />
+            <div className="rounded-md border border-border bg-elevated/40 p-3 text-sm">
+              <h4 className="mb-2 flex items-center gap-2 font-semibold text-textPrimary"><Icon glyph={LuServer} size={16} /> 7) Review</h4>
+              <div className="space-y-1 text-textSecondary">
+                <p><span className="text-textMuted">Name:</span> <span className="text-textPrimary">{instanceName}</span></p>
+                <p><span className="text-textMuted">Location:</span> {selected ? `${flagFromCountry(selected.country)} ${selected.country} / ${selected.region}` : "-"}</p>
+                <p><span className="text-textMuted">Cost/hour:</span> <span className="text-textPrimary">{formatUSD(estimatedCost, locale)}</span></p>
+                <p><span className="text-textMuted">SLA / availability:</span> {selected?.availability || "-"}</p>
+                <p><span className="text-textMuted">Pricing:</span> {pricingModel}</p>
+              </div>
+              {risks.length ? (
+                <div className="mt-3 rounded-md border border-warning/50 bg-warning/10 p-2">
+                  <p className="mb-1 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-warning"><Icon glyph={LuTriangleAlert} size={16} /> Risks</p>
+                  <ul className="space-y-1 text-xs text-textSecondary">
+                    {risks.map((risk) => <li key={risk}>- {risk}</li>)}
+                  </ul>
+                </div>
+              ) : null}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button onClick={() => setDeploySubmitted(true)} leftIcon={<Icon glyph={LuGlobe} size={16} />}>
+                {locale === "ru" ? "Review & Deploy" : "Review & Deploy"}
+              </Button>
+              <Button variant="ghost" onClick={() => setActiveStep((prev) => Math.min(7, prev + 1))}>Next step</Button>
+            </div>
+            {deploySubmitted ? (
+              <p className="rounded-md border border-success/40 bg-success/10 p-2 text-sm text-textSecondary">
+                {locale === "ru" ? "Запуск деплоя принят. Проверьте My Instances для статуса provisioning/queued." : "Deployment request accepted. Check My Instances for provisioning/queued status."}
+              </p>
+            ) : null}
+          </div>
+        </Card>
       </div>
     </section>
   );

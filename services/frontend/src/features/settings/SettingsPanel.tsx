@@ -1,10 +1,12 @@
 import { FormEvent, useEffect, useState } from "react";
 import { createSSHKey, deleteSSHKey, listSSHKeys, upsertUserSettings } from "../auth/api/authApi";
+import { LuInfo } from "react-icons/lu";
 import { SSHKey } from "../../types/api";
 import { useToast } from "../../design/components/Toast";
 import { PageSectionHeader } from "../../design/patterns/PageSectionHeader";
 import { Card } from "../../design/primitives/Card";
 import { Input } from "../../design/primitives/Input";
+import { Icon } from "../../design/primitives/Icon";
 import { Select } from "../../design/primitives/Select";
 import { Button } from "../../design/primitives/Button";
 import { Textarea } from "../../design/primitives/Textarea";
@@ -24,6 +26,7 @@ export function SettingsPanel() {
   const [keyValue, setKeyValue] = useState("");
   const [loading, setLoading] = useState(false);
   const { push } = useToast();
+  const locale = settings.language === "ru" ? "ru" : "en";
 
   useEffect(() => {
     async function load() {
@@ -43,9 +46,9 @@ export function SettingsPanel() {
     try {
       const saved = await upsertUserSettings(settings);
       updateSettingsState(saved);
-      push("success", "Settings saved");
+      push("success", locale === "ru" ? "Настройки сохранены" : "Settings saved");
     } catch (error) {
-      push("error", error instanceof Error ? error.message : "Failed to save settings");
+      push("error", error instanceof Error ? error.message : locale === "ru" ? "Не удалось сохранить настройки" : "Failed to save settings");
     } finally {
       setLoading(false);
     }
@@ -54,7 +57,7 @@ export function SettingsPanel() {
   async function addSSHKey(event: FormEvent) {
     event.preventDefault();
     if (!keyValue.startsWith("ssh-")) {
-      push("error", "SSH key must start with ssh-rsa/ssh-ed25519");
+      push("error", locale === "ru" ? "SSH key должен начинаться с ssh-rsa/ssh-ed25519" : "SSH key must start with ssh-rsa/ssh-ed25519");
       return;
     }
     setLoading(true);
@@ -63,9 +66,9 @@ export function SettingsPanel() {
       setSSHKeys((prev) => [created, ...prev]);
       setKeyName("");
       setKeyValue("");
-      push("success", "SSH key added");
+      push("success", locale === "ru" ? "SSH ключ добавлен" : "SSH key added");
     } catch (error) {
-      push("error", error instanceof Error ? error.message : "Failed to add SSH key");
+      push("error", error instanceof Error ? error.message : locale === "ru" ? "Не удалось добавить SSH ключ" : "Failed to add SSH key");
     } finally {
       setLoading(false);
     }
@@ -77,9 +80,9 @@ export function SettingsPanel() {
     try {
       await deleteSSHKey(id);
       setSSHKeys((prev) => prev.filter((item) => item.id !== id));
-      push("info", "SSH key removed");
+      push("info", locale === "ru" ? "SSH ключ удален" : "SSH key removed");
     } catch (error) {
-      push("error", error instanceof Error ? error.message : "Failed to remove SSH key");
+      push("error", error instanceof Error ? error.message : locale === "ru" ? "Не удалось удалить SSH ключ" : "Failed to remove SSH key");
     } finally {
       setLoading(false);
     }
@@ -88,90 +91,95 @@ export function SettingsPanel() {
   async function copySSHKey(value: string) {
     try {
       await navigator.clipboard.writeText(value);
-      push("success", "SSH key copied");
+      push("success", locale === "ru" ? "SSH ключ скопирован" : "SSH key copied");
     } catch {
-      push("error", "Clipboard access is not available");
+      push("error", locale === "ru" ? "Clipboard недоступен" : "Clipboard access is not available");
     }
   }
 
   return (
     <section className="section-stack">
-      <PageSectionHeader title="Personalization & SSH Access" description="User interface preferences and SSH public key management." />
-      <Card title="Personalization" description="Theme, language, and timezone settings.">
+      <PageSectionHeader title={locale === "ru" ? "Settings" : "Settings"} description={locale === "ru" ? "RU/EN, тема, бренд, timezone и SSH ключи." : "RU/EN, theme, brand, timezone and SSH keys."} />
+      <Card title={locale === "ru" ? "Personalization" : "Personalization"} description={locale === "ru" ? "Пользовательские настройки интерфейса." : "User interface preferences."}>
         <form className="grid gap-3 md:grid-cols-4" onSubmit={saveSettings}>
           <Select
-            label="Theme"
+            label={locale === "ru" ? "Theme / Тема" : "Theme / Тема"}
             value={settings.theme}
             onChange={(event) => updateSettingsState({ theme: event.target.value })}
             options={[
-              { value: "system", label: "System" },
-              { value: "dark", label: "Dark" },
-              { value: "light", label: "Light" }
+              { value: "system", label: "System / Системная" },
+              { value: "dark", label: "Dark / Темная" },
+              { value: "light", label: "Light / Светлая" }
             ]}
           />
           <Select
-            label="Language"
+            label={locale === "ru" ? "Language / Язык" : "Language / Язык"}
             value={settings.language}
-            onChange={(event) => updateSettingsState({ language: event.target.value })}
+            onChange={(event) => updateSettingsState({ language: event.target.value as "en" | "ru" })}
             options={[
               { value: "en", label: "English" },
               { value: "ru", label: "Русский" }
             ]}
           />
           <Input
-            label="Timezone"
+            label={locale === "ru" ? "Timezone / Часовой пояс" : "Timezone / Часовой пояс"}
             value={settings.timezone}
+            placeholder="Europe/Minsk"
             onChange={(event) => updateSettingsState({ timezone: event.target.value })}
           />
           <Select
-            label="Brand theme"
+            label={locale === "ru" ? "Brand theme / Бренд" : "Brand theme / Бренд"}
             value={brandTheme}
-            onChange={(event) => updateBrandTheme(event.target.value as "mts" | "neon")}
+            onChange={(event) => updateBrandTheme(event.target.value as "mts" | "mono")}
             options={[
-              { value: "mts", label: "MTS (demo default)" },
-              { value: "neon", label: "Neon" }
+              { value: "mts", label: "MTS Red (default)" },
+              { value: "mono", label: "Mono Red" }
             ]}
           />
           <div className="md:col-span-4">
-            <Button type="submit" loading={loading}>Save settings</Button>
+            <Button type="submit" loading={loading}>{locale === "ru" ? "Сохранить настройки" : "Save settings"}</Button>
           </div>
         </form>
       </Card>
 
-      <Card title="SSH Access Keys" description="Public keys used to access rented servers and PODs.">
+      <Card title={locale === "ru" ? "SSH keys CRUD" : "SSH keys CRUD"} description={locale === "ru" ? "Управление публичными SSH ключами." : "Public keys used to access rented servers and PODs."}>
+        <div className="mb-3 rounded-md border border-border bg-canvas p-3 text-xs text-textSecondary">
+          <p className="flex items-center gap-2 text-textPrimary"><Icon glyph={LuInfo} size={16} /> {locale === "ru" ? "Подсказка" : "Hint"}</p>
+          <p className="mt-1">{locale === "ru" ? "Храните ключи по устройствам/командам и не вставляйте приватные ключи." : "Store keys per device/team and never paste private keys."}</p>
+        </div>
         <form className="space-y-3" onSubmit={addSSHKey}>
-          <Input label="Key name" value={keyName} onChange={(event) => setKeyName(event.target.value)} placeholder="Work laptop" />
+          <Input label={locale === "ru" ? "Key name / Имя" : "Key name / Имя"} value={keyName} onChange={(event) => setKeyName(event.target.value)} placeholder={locale === "ru" ? "Рабочий ноутбук" : "Work laptop"} />
           <Textarea
-            label="Public SSH key"
+            label={locale === "ru" ? "Public SSH key / Публичный ключ" : "Public SSH key / Публичный ключ"}
             value={keyValue}
             onChange={(event) => setKeyValue(event.target.value)}
             placeholder="ssh-ed25519 AAAA..."
             className="font-mono"
           />
-          <Button type="submit" loading={loading}>Add key</Button>
+          <Button type="submit" loading={loading}>{locale === "ru" ? "Добавить ключ" : "Add key"}</Button>
         </form>
         <div className="mt-4">
           <Table
             ariaLabel="User SSH keys"
             rowKey={(row) => row.id ?? row.name}
             items={sshKeys}
-            emptyState={<EmptyState title="No SSH keys yet" description="Add at least one key to access machines." />}
+            emptyState={<EmptyState title={locale === "ru" ? "SSH ключи не добавлены" : "No SSH keys yet"} description={locale === "ru" ? "Добавьте минимум один ключ для доступа к машинам." : "Add at least one key to access machines."} />}
             columns={[
-              { key: "name", header: "Name", render: (row) => row.name },
+              { key: "name", header: locale === "ru" ? "Имя" : "Name", render: (row) => row.name },
               {
                 key: "key",
-                header: "Key",
+                header: locale === "ru" ? "Ключ" : "Key",
                 render: (row) => (
                   <div className="flex items-center gap-2">
                     <span className="font-mono text-xs">{truncateSSHKey(row.public_key)}</span>
                     <Button variant="ghost" size="sm" onClick={() => copySSHKey(row.public_key)}>
-                      Copy
+                      {locale === "ru" ? "Копировать" : "Copy"}
                     </Button>
                   </div>
                 )
               },
-              { key: "created", header: "Created", render: (row) => (row.created_at ? new Date(row.created_at).toLocaleString() : "-") },
-              { key: "actions", header: "Actions", render: (row) => <Button variant="ghost" size="sm" onClick={() => removeSSHKey(row.id)}>Delete</Button> }
+              { key: "created", header: locale === "ru" ? "Создан" : "Created", render: (row) => (row.created_at ? new Date(row.created_at).toLocaleString() : "-") },
+              { key: "actions", header: locale === "ru" ? "Действия" : "Actions", render: (row) => <Button variant="ghost" size="sm" onClick={() => removeSSHKey(row.id)}>{locale === "ru" ? "Удалить" : "Delete"}</Button> }
             ]}
           />
         </div>

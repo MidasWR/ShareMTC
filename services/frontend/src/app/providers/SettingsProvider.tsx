@@ -3,7 +3,7 @@ import { getUserSettings } from "../../features/auth/api/authApi";
 import { featureFlags } from "../../config/featureFlags";
 import { UserSettings } from "../../types/api";
 
-export type BrandTheme = "mts" | "neon";
+export type BrandTheme = "mts" | "mono";
 
 type SettingsContextType = {
   settings: UserSettings;
@@ -24,7 +24,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<UserSettings>(defaultSettings);
   const [brandTheme, setBrandTheme] = useState<BrandTheme>(() => {
     const saved = window.localStorage.getItem("brandTheme");
-    if (saved === "neon" || saved === "mts") return saved;
+    if (saved === "mono" || saved === "mts") return saved;
     return featureFlags.defaultBrandTheme;
   });
 

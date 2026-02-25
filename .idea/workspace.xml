@@ -7,40 +7,6 @@
     <list default="true" id="093339f5-8e40-4fff-8dda-262df5227056" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/billingservice/internal/adapter/storage/postgres.go" beforeDir="false" afterPath="$PROJECT_DIR$/services/billingservice/internal/adapter/storage/postgres.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/billingservice/internal/models/billing.go" beforeDir="false" afterPath="$PROJECT_DIR$/services/billingservice/internal/models/billing.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/frontend/index.html" beforeDir="false" afterPath="$PROJECT_DIR$/services/frontend/index.html" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/frontend/src/app/auth/useSessionState.ts" beforeDir="false" afterPath="$PROJECT_DIR$/services/frontend/src/app/auth/useSessionState.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/frontend/src/app/i18n/index.ts" beforeDir="false" afterPath="$PROJECT_DIR$/services/frontend/src/app/i18n/index.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/frontend/src/app/navigation/SidebarNav.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/services/frontend/src/app/navigation/SidebarNav.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/frontend/src/app/shell/AppShell.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/services/frontend/src/app/shell/AppShell.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/frontend/src/design/components/Drawer.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/services/frontend/src/design/components/Drawer.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/frontend/src/design/components/Modal.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/services/frontend/src/design/components/Modal.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/frontend/src/design/primitives/Button.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/services/frontend/src/design/primitives/Button.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/frontend/src/design/primitives/Input.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/services/frontend/src/design/primitives/Input.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/frontend/src/design/primitives/Select.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/services/frontend/src/design/primitives/Select.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/frontend/src/design/primitives/Tabs.test.ts" beforeDir="false" afterPath="$PROJECT_DIR$/services/frontend/src/design/primitives/Tabs.test.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/frontend/src/design/primitives/Tabs.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/services/frontend/src/design/primitives/Tabs.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/frontend/src/design/primitives/Textarea.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/services/frontend/src/design/primitives/Textarea.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/frontend/src/features/admin/access/AdminAccessPanel.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/services/frontend/src/features/admin/access/AdminAccessPanel.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/frontend/src/features/admin/console/AdminConsolePanel.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/services/frontend/src/features/admin/console/AdminConsolePanel.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/frontend/src/features/billing/components/AccrualTable.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/services/frontend/src/features/billing/components/AccrualTable.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/frontend/src/features/dashboard/admin/AdminDashboardPanel.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/services/frontend/src/features/dashboard/admin/AdminDashboardPanel.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/frontend/src/features/dashboard/core/CoreDashboardPanel.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/services/frontend/src/features/dashboard/core/CoreDashboardPanel.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/frontend/src/features/marketplace/MarketplacePanel.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/services/frontend/src/features/marketplace/MarketplacePanel.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/frontend/src/features/provider/ProvideComputePanel.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/services/frontend/src/features/provider/ProvideComputePanel.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/frontend/src/features/provider/dashboard/ProviderDashboardPanel.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/services/frontend/src/features/provider/dashboard/ProviderDashboardPanel.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/frontend/src/features/rental/ServerRentalPanel.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/services/frontend/src/features/rental/ServerRentalPanel.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/frontend/src/features/rental/orderVmMapping.test.ts" beforeDir="false" afterPath="$PROJECT_DIR$/services/frontend/src/features/rental/orderVmMapping.test.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/frontend/src/features/rental/orderVmMapping.ts" beforeDir="false" afterPath="$PROJECT_DIR$/services/frontend/src/features/rental/orderVmMapping.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/frontend/src/features/resources/k8s/K8sClustersPanel.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/services/frontend/src/features/resources/k8s/K8sClustersPanel.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/frontend/src/features/resources/shared/SharedVMPanel.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/services/frontend/src/features/resources/shared/SharedVMPanel.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/frontend/src/features/resources/vm/VMPanel.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/services/frontend/src/features/resources/vm/VMPanel.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/frontend/src/features/settings/SettingsPanel.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/services/frontend/src/features/settings/SettingsPanel.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/frontend/src/lib/auth.ts" beforeDir="false" afterPath="$PROJECT_DIR$/services/frontend/src/lib/auth.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/frontend/src/styles.css" beforeDir="false" afterPath="$PROJECT_DIR$/services/frontend/src/styles.css" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/frontend/src/types/api.ts" beforeDir="false" afterPath="$PROJECT_DIR$/services/frontend/src/types/api.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/frontend/tsconfig.tsbuildinfo" beforeDir="false" afterPath="$PROJECT_DIR$/services/frontend/tsconfig.tsbuildinfo" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />

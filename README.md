@@ -1,3 +1,5 @@
+Project for Hackathon Space x MTS 2026 Minsk
+
 # ShareMTC Platform
 
 ShareMTC is a compute marketplace and control plane where providers expose CPU/RAM/GPU/network capacity and users consume that capacity through allocation and billing contracts.
@@ -78,9 +80,33 @@ ShareMTC is a compute marketplace and control plane where providers expose CPU/R
 
 - Frontend design tokens now support two brand themes:
   - `mts` (default demo theme),
-  - `neon` (optional geek theme).
+  - `mono` (neutral monochrome variant that still keeps MTS red accents).
 - Theme is applied through `data-brand-theme` and CSS variables, then consumed by Tailwind color tokens.
 - User can switch brand theme in `Settings -> Personalization`.
+
+### Hi-fi design preset (desktop/tablet/mobile)
+
+- Unified dark-first token groups are active: `Canvas`, `Surface`, `Elevated`, `Border`, `Text`, `Brand`.
+- Brand accent is MTS red `#E41120`; no green/blue logo accents remain in core identity assets.
+- Core hi-fi screens are implemented in frontend:
+  - `Auth` (Sign in/Register with password policy, show/hide and inline errors),
+  - `Marketplace / Deploy` (filter toolbar + catalog tiles + side-panel style wizard),
+  - `My Instances` (expandable operational rows with actions, connect and logs),
+  - `Instance Details` tabs (`Overview`, `Logs`, `Metrics`, `Billing`),
+  - `Settings` (RU/EN, theme, timezone, SSH keys CRUD).
+- Accessibility baseline in core components:
+  - visible focus ring,
+  - interactive controls sized for at least ~24x24 hit area,
+  - explicit disabled/error/empty states.
+
+### Design system and demo data
+
+- UI primitives/components include buttons, inputs, select, multi-select, tabs, table rows, status chips, cards, modals and dropdown interactions.
+- Unified stroke icon sizing is used via icon primitive (`16/20/24`) for action consistency.
+- Demo data module includes 12+ realistic instances across required countries/sizes/statuses with:
+  - `id`, `name`, `created_at`, `uptime`, `last_action`, `cost_to_date`,
+  - error conditions (`Insufficient capacity`, `CUDA mismatch`, `Auth required`, `SSH key missing`),
+  - pricing spread `0.18–4.50 USD/hr`.
 
 ### RunPod-style UX direction
 

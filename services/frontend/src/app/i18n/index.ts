@@ -36,6 +36,29 @@ const translations = {
       adminServers: "Admin Console",
       adminSharing: "Sharing Control",
       vip: "VIP Policy"
+    },
+    common: {
+      auth: {
+        title: "Platform Access",
+        signIn: "Sign in",
+        register: "Register",
+        createFirstInstance: "Create first instance"
+      },
+      marketplace: {
+        title: "Marketplace / Deploy",
+        filters: "Filters",
+        deployWizard: "Deploy wizard",
+        reviewDeploy: "Review & Deploy"
+      },
+      instances: {
+        title: "My Instances",
+        details: "Instance Details",
+        actions: "Actions"
+      },
+      settings: {
+        title: "Settings",
+        ssh: "SSH keys CRUD"
+      }
     }
   },
   ru: {
@@ -72,6 +95,29 @@ const translations = {
       adminServers: "Админ консоль",
       adminSharing: "Управление шарингом",
       vip: "VIP политика"
+    },
+    common: {
+      auth: {
+        title: "Доступ к платформе",
+        signIn: "Вход",
+        register: "Регистрация",
+        createFirstInstance: "Создать первый инстанс"
+      },
+      marketplace: {
+        title: "Marketplace / Deploy",
+        filters: "Фильтры",
+        deployWizard: "Deploy wizard",
+        reviewDeploy: "Review & Deploy"
+      },
+      instances: {
+        title: "My Instances",
+        details: "Instance Details",
+        actions: "Действия"
+      },
+      settings: {
+        title: "Настройки",
+        ssh: "SSH keys CRUD"
+      }
     }
   }
 } as const;

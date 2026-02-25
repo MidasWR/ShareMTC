@@ -1,485 +1,223 @@
-import { FormEvent, useEffect, useMemo, useState } from "react";
-import { createServerOrder, estimateServerOrder, listRentalPlans, listServerOrders } from "../billing/api/billingApi";
-import { RentalPlan, ServerOrder } from "../../types/api";
-import { PageSectionHeader } from "../../design/patterns/PageSectionHeader";
-import { Card } from "../../design/primitives/Card";
-import { Select } from "../../design/primitives/Select";
-import { Input } from "../../design/primitives/Input";
-import { Button } from "../../design/primitives/Button";
-import { useToast } from "../../design/components/Toast";
-import { Table } from "../../design/components/Table";
+import { useMemo, useState } from "react";
+import { LuChevronDown, LuChevronUp, LuExternalLink, LuFileText, LuPlay, LuPower, LuRefreshCw, LuTrash2 } from "react-icons/lu";
+import { useSettings } from "../../app/providers/SettingsProvider";
 import { EmptyState } from "../../design/patterns/EmptyState";
-import { listVMs, startVM, stopVM, rebootVM, terminateVM } from "../resources/api/resourcesApi";
-import { AppTab } from "../../app/navigation/menu";
+import { PageSectionHeader } from "../../design/patterns/PageSectionHeader";
 import { StatusBadge } from "../../design/patterns/StatusBadge";
-import { Badge } from "../../design/primitives/Badge";
-import { FilterBar } from "../../design/components/FilterBar";
-import { ActionDropdown } from "../../design/components/ActionDropdown";
-import { listSharedOffers, reserveSharedOffer } from "../resources/api/resourcesApi";
-import { SharedInventoryOffer } from "../../types/api";
-import { buildVmSelectOptions, getLinkedVMID } from "./orderVmMapping";
-import { firstServerOrderError, ServerOrderValidationErrors, validateServerOrder } from "./rentalValidation";
-import { SERVER_ORDER_DEFAULTS } from "./defaults";
-import { Modal } from "../../design/components/Modal";
-import { DataFreshnessBadge } from "../../design/patterns/DataFreshnessBadge";
+import { Button } from "../../design/primitives/Button";
+import { Card } from "../../design/primitives/Card";
+import { Icon } from "../../design/primitives/Icon";
+import { Input } from "../../design/primitives/Input";
+import { Select } from "../../design/primitives/Select";
+import { getTabElementID, getTabPanelElementID, Tabs } from "../../design/primitives/Tabs";
+import { demoInstances } from "../hifi/mockData";
+import { DemoInstance } from "../hifi/types";
+import { flagFromCountry, formatDateTime, formatUSD } from "../hifi/formatters";
 
-type Props = {
-  onNavigate?: (tab: AppTab) => void;
-};
+const detailTabs = [
+  { id: "overview", label: "Overview" },
+  { id: "logs", label: "Logs" },
+  { id: "metrics", label: "Metrics" },
+  { id: "billing", label: "Billing" }
+] as const;
 
-export function ServerRentalPanel({ onNavigate }: Props) {
-  const [plans, setPlans] = useState<RentalPlan[]>([]);
-  const [orders, setOrders] = useState<ServerOrder[]>([]);
-  const [form, setForm] = useState<ServerOrder>({ ...SERVER_ORDER_DEFAULTS });
-  const [formErrors, setFormErrors] = useState<ServerOrderValidationErrors>({});
-  const [estimate, setEstimate] = useState<number>(0);
-  const [loading, setLoading] = useState(false);
+type DetailTab = (typeof detailTabs)[number]["id"];
+
+export function ServerRentalPanel() {
+  const { settings } = useSettings();
+  const locale = settings.language === "ru" ? "ru" : "en";
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"" | "active" | "queued" | "failed">("");
-  const [typeFilter, setTypeFilter] = useState<"" | "hourly" | "monthly">("");
-  const [createTarget, setCreateTarget] = useState<AppTab>("myCompute");
-  const [vmByOrder, setVmByOrder] = useState<Record<string, string>>({});
-  const [vmOptions, setVmOptions] = useState<Array<{ value: string; label: string }>>([]);
-  const [sharedOffers, setSharedOffers] = useState<SharedInventoryOffer[]>([]);
-  const [lastRefreshedAt, setLastRefreshedAt] = useState<Date | null>(null);
-  const [linkOrderID, setLinkOrderID] = useState<string>("");
-  const [linkVmID, setLinkVmID] = useState<string>("");
-  const { push } = useToast();
+  const [statusFilter, setStatusFilter] = useState("");
+  const [expandedId, setExpandedId] = useState<string>("");
+  const [selectedId, setSelectedId] = useState<string>(demoInstances[0]?.id || "");
+  const [detailTab, setDetailTab] = useState<DetailTab>("overview");
 
-  const selectedPlan = useMemo(() => plans.find((item) => item.id === form.plan_id), [plans, form.plan_id]);
-
-  useEffect(() => {
-    async function loadInitial() {
-      try {
-        const [planRows, orderRows, offers, vmRows] = await Promise.all([
-          listRentalPlans(),
-          listServerOrders(),
-          listSharedOffers({ status: "active" }),
-          listVMs()
-        ]);
-        setPlans(planRows);
-        setOrders(orderRows);
-        setSharedOffers(offers);
-        setVmOptions(buildVmSelectOptions(vmRows));
-        setLastRefreshedAt(new Date());
-        if (planRows.length && !form.plan_id) {
-          setForm((prev) => ({ ...prev, plan_id: planRows[0].id, period: planRows[0].period }));
-        }
-      } catch (error) {
-        push("error", error instanceof Error ? error.message : "Failed to load rental data");
-      }
-    }
-    loadInitial();
-  }, []);
-
-  async function refresh() {
-    setLoading(true);
-    try {
-      const [orderRows, offers, vmRows] = await Promise.all([listServerOrders(), listSharedOffers({ status: "active" }), listVMs()]);
-      setOrders(orderRows);
-      setSharedOffers(offers);
-      setVmOptions(buildVmSelectOptions(vmRows));
-      setLastRefreshedAt(new Date());
-      push("info", "Server list refreshed");
-    } catch (error) {
-      push("error", error instanceof Error ? error.message : "Failed to refresh servers");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function handleLifecycle(row: ServerOrder, action: "start" | "stop" | "reboot" | "terminate") {
-    const vmID = getLinkedVMID(row, vmByOrder);
-    if (!vmID) {
-      push("error", "Link a VM ID to this order before lifecycle actions");
-      return;
-    }
-    setLoading(true);
-    try {
-      if (action === "start") await startVM(vmID);
-      if (action === "stop") await stopVM(vmID);
-      if (action === "reboot") await rebootVM(vmID);
-      if (action === "terminate") await terminateVM(vmID);
-      push("success", `Lifecycle action '${action}' completed`);
-    } catch (error) {
-      push("error", error instanceof Error ? error.message : `Failed to ${action} VM`);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function handleEstimate(event: FormEvent) {
-    event.preventDefault();
-    const errors = validateServerOrder(form);
-    setFormErrors(errors);
-    const validationError = firstServerOrderError(errors);
-    if (validationError) {
-      push("error", validationError);
-      return;
-    }
-    setLoading(true);
-    try {
-      const response = await estimateServerOrder(form);
-      setEstimate(response.estimated_price_usd ?? 0);
-    } catch (error) {
-      push("error", error instanceof Error ? error.message : "Estimation error");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function handleCreateOrder() {
-    const errors = validateServerOrder(form);
-    setFormErrors(errors);
-    const validationError = firstServerOrderError(errors);
-    if (validationError) {
-      push("error", validationError);
-      return;
-    }
-    setLoading(true);
-    try {
-      const created = await createServerOrder(form);
-      setOrders((prev) => [created, ...prev]);
-      setEstimate(created.estimated_price_usd ?? estimate);
-      push("success", "Server order created");
-    } catch (error) {
-      push("error", error instanceof Error ? error.message : "Failed to create order");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function rentSharedOffer(offer: SharedInventoryOffer) {
-    if (!offer.id) {
-      push("error", "Offer id is missing");
-      return;
-    }
-    setLoading(true);
-    try {
-      await reserveSharedOffer({ offer_id: offer.id, quantity: 1 });
-      push("success", `Reserved 1 unit from ${offer.title}`);
-      await refresh();
-    } catch (error) {
-      push("error", error instanceof Error ? error.message : "Failed to reserve shared offer");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  function openLinkVMDialog(order: ServerOrder) {
-    if (!order.id) {
-      push("error", "Order ID is missing");
-      return;
-    }
-    setLinkOrderID(order.id);
-    setLinkVmID(vmByOrder[order.id] || "");
-  }
-
-  function applyLinkedVM() {
-    if (!linkOrderID || !linkVmID) {
-      push("error", "Select VM to link");
-      return;
-    }
-    setVmByOrder((prev) => ({ ...prev, [linkOrderID]: linkVmID }));
-    push("success", "VM linked to order");
-    setLinkOrderID("");
-    setLinkVmID("");
-  }
-
-  const filteredOrders = useMemo(() => {
+  const rows = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return orders.filter((row) => {
-      const id = String(row.id || "").toLowerCase();
-      const planID = String(row.plan_id || "").toLowerCase();
-      const osName = String(row.os_name || "").toLowerCase();
-      const queryOk =
-        q.length === 0 ||
-        id.includes(q) ||
-        planID.includes(q) ||
-        osName.includes(q);
-      const statusOk = !statusFilter || (row.status || "").toLowerCase() === statusFilter;
-      const typeOk = !typeFilter || row.period === typeFilter;
-      return queryOk && statusOk && typeOk;
+    return demoInstances.filter((row) => {
+      const matchesSearch = !q || row.name.toLowerCase().includes(q) || row.id.toLowerCase().includes(q) || row.country.toLowerCase().includes(q);
+      const matchesStatus = !statusFilter || row.status === statusFilter;
+      return matchesSearch && matchesStatus;
     });
-  }, [orders, search, statusFilter, typeFilter]);
+  }, [search, statusFilter]);
+
+  const selected = useMemo(() => demoInstances.find((item) => item.id === selectedId) || null, [selectedId]);
+
+  function renderDetail(instance: DemoInstance) {
+    return (
+      <div className="rounded-md border border-border bg-canvas p-3 text-sm text-textSecondary">
+        <div className="grid gap-3 md:grid-cols-2">
+          <div>
+            <p className="text-xs uppercase tracking-wide text-textMuted">Endpoints</p>
+            <ul className="mt-1 space-y-1">
+              {instance.endpoints.map((endpoint) => <li key={endpoint} className="font-mono text-xs">{endpoint}</li>)}
+            </ul>
+          </div>
+          <div>
+            <p className="text-xs uppercase tracking-wide text-textMuted">SSH command</p>
+            <p className="mt-1 font-mono text-xs">{instance.sshCommand}</p>
+          </div>
+          <div>
+            <p className="text-xs uppercase tracking-wide text-textMuted">Last events</p>
+            <ul className="mt-1 space-y-1 text-xs">
+              {instance.lastEvents.map((event) => <li key={event}>- {event}</li>)}
+            </ul>
+          </div>
+          <div>
+            <p className="text-xs uppercase tracking-wide text-textMuted">Billing summary</p>
+            <ul className="mt-1 space-y-1 text-xs">
+              <li>On-demand: {instance.billingSummary.onDemandHours}h</li>
+              <li>Spot: {instance.billingSummary.spotHours}h</li>
+              <li>Total: {formatUSD(instance.billingSummary.total, locale)}</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <section className="section-stack">
-      <PageSectionHeader
-        title="My Servers"
-        description="Manage your running instances, view logs, and configure new servers."
-      />
+      <PageSectionHeader title={locale === "ru" ? "My Instances" : "My Instances"} description={locale === "ru" ? "Операционный список с быстрыми действиями и раскрытием деталей." : "Operational list with quick actions and expandable details."} />
 
-      <div className="grid gap-4 xl:grid-cols-[1.55fr_1fr]">
-        <Card title="Marketplace Catalog" description="Pick a published offer and reserve capacity in one click.">
-          <Table
-            dense
-            ariaLabel="Shared offers table"
-            rowKey={(row) => row.id ?? `${row.provider_id}-${row.title}`}
-            items={sharedOffers}
-            emptyState={<EmptyState title="No shared offers" description="Providers have not published capacity yet." />}
-            columns={[
-              { key: "title", header: "Offer", render: (row) => row.title },
-              { key: "provider", header: "Provider", render: (row) => row.provider_id },
-              { key: "shape", header: "Shape", render: (row) => `${row.cpu_cores} CPU / ${row.ram_mb} MB / ${row.gpu_units} GPU` },
-              { key: "available", header: "Available", render: (row) => `${row.available_qty}/${row.quantity}` },
-              { key: "price", header: "$/hr", render: (row) => row.price_hourly_usd.toFixed(2) },
-              {
-                key: "actions",
-                header: "Actions",
-                render: (row) => (
-                  <Button variant="secondary" disabled={!row.id || row.available_qty <= 0 || loading} onClick={() => rentSharedOffer(row)}>
-                    Rent 1
-                  </Button>
-                )
-              }
+      <Card title={locale === "ru" ? "Instances list" : "Instances list"} description={locale === "ru" ? "Start/Stop/Reboot/Terminate, Connect и Logs из одной строки." : "Start/Stop/Reboot/Terminate, Connect and Logs from a single row."}>
+        <div className="mb-3 grid gap-3 md:grid-cols-[2fr_1fr]">
+          <Input label="Search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="name, id, country..." />
+          <Select
+            label="Status"
+            value={statusFilter}
+            onChange={(event) => setStatusFilter(event.target.value)}
+            options={[
+              { value: "", label: "Any" },
+              { value: "running", label: "running" },
+              { value: "provisioning", label: "provisioning" },
+              { value: "stopped", label: "stopped" },
+              { value: "error", label: "error" },
+              { value: "interrupted", label: "interrupted(spot)" },
+              { value: "queued", label: "queued" }
             ]}
           />
-        </Card>
+        </div>
 
-        <Card title="Deploy" description="Compact server order form with explicit summary.">
-          <form className="grid gap-3 md:grid-cols-2" onSubmit={handleEstimate}>
-            <Select
-              label="Plan"
-              value={form.plan_id}
-              error={formErrors.plan_id}
-              onChange={(event) => {
-                const nextPlan = plans.find((item) => item.id === event.target.value);
-                setForm((prev) => ({
-                  ...prev,
-                  plan_id: event.target.value,
-                  period: (nextPlan?.period as "hourly" | "monthly") ?? prev.period
-                }));
-                setFormErrors((prev) => ({ ...prev, plan_id: undefined }));
-              }}
-              options={plans.map((item) => ({ value: item.id, label: `${item.name} (${item.period})` }))}
-            />
-            <Input
-              label="Instance name"
-              value={form.name}
-              error={formErrors.name}
-              onChange={(event) => {
-                setForm((prev) => ({ ...prev, name: event.target.value }));
-                setFormErrors((prev) => ({ ...prev, name: undefined }));
-              }}
-            />
-            <Select
-              label="OS Template"
-              value={form.os_name}
-              error={formErrors.os_name}
-              onChange={(event) => {
-                setForm((prev) => ({ ...prev, os_name: event.target.value }));
-                setFormErrors((prev) => ({ ...prev, os_name: undefined }));
-              }}
-              options={[
-                { value: "Ubuntu 22.04", label: "Ubuntu 22.04" },
-                { value: "Ubuntu 24.04", label: "Ubuntu 24.04" },
-                { value: "Debian 12", label: "Debian 12" }
-              ]}
-            />
-            <Input
-              type="number"
-              min={1}
-              step={1}
-              label="CPU Cores"
-              error={formErrors.cpu_cores}
-              value={`${form.cpu_cores}`}
-              onChange={(event) => {
-                setForm((prev) => ({ ...prev, cpu_cores: Number(event.target.value) || 0 }));
-                setFormErrors((prev) => ({ ...prev, cpu_cores: undefined }));
-              }}
-            />
-            <Input
-              type="number"
-              min={1}
-              step={1}
-              label="RAM (GB)"
-              error={formErrors.ram_gb}
-              value={`${form.ram_gb}`}
-              onChange={(event) => {
-                setForm((prev) => ({ ...prev, ram_gb: Number(event.target.value) || 0 }));
-                setFormErrors((prev) => ({ ...prev, ram_gb: undefined }));
-              }}
-            />
-            <details className="md:col-span-2 rounded-md border border-border bg-canvas p-3">
-              <summary className="details-summary-focus cursor-pointer text-sm text-textPrimary">Advanced</summary>
-              <div className="mt-3 grid gap-3 md:grid-cols-2">
-                <Input
-                  type="number"
-                  min={0}
-                  step={1}
-                  label="GPU units"
-                  error={formErrors.gpu_units}
-                  value={`${form.gpu_units}`}
-                  onChange={(event) => {
-                    setForm((prev) => ({ ...prev, gpu_units: Number(event.target.value) || 0 }));
-                    setFormErrors((prev) => ({ ...prev, gpu_units: undefined }));
-                  }}
-                />
-                <Input
-                  type="number"
-                  min={1}
-                  step={100}
-                  label="Network (Mbps)"
-                  error={formErrors.network_mbps}
-                  value={`${form.network_mbps}`}
-                  onChange={(event) => {
-                    setForm((prev) => ({ ...prev, network_mbps: Number(event.target.value) || 0 }));
-                    setFormErrors((prev) => ({ ...prev, network_mbps: undefined }));
-                  }}
-                />
-                {onNavigate ? (
+        {rows.length === 0 ? <EmptyState title={locale === "ru" ? "Нет инстансов" : "No instances"} description={locale === "ru" ? "Проверьте фильтры." : "Check filters."} /> : null}
+
+        <div className="overflow-x-auto rounded-md border border-border">
+          <table className="min-w-full text-left text-sm">
+            <thead className="bg-elevated text-textSecondary">
+              <tr>
+                <th className="px-3 py-2">Name</th>
+                <th className="px-3 py-2">Status</th>
+                <th className="px-3 py-2">Country</th>
+                <th className="px-3 py-2">GPU/VRAM</th>
+                <th className="px-3 py-2">Price/hr</th>
+                <th className="px-3 py-2">Uptime</th>
+                <th className="px-3 py-2">Actions</th>
+                <th className="px-3 py-2">Details</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => {
+                const expanded = expandedId === row.id;
+                return (
                   <>
-                    <Select
-                      label="Create destination"
-                      value={createTarget}
-                      onChange={(event) => setCreateTarget(event.target.value as AppTab)}
-                      options={[
-                        { value: "myCompute", label: "My Compute workspace" },
-                        { value: "provideCompute", label: "Provide Compute workspace" },
-                        { value: "marketplace", label: "Marketplace" }
-                      ]}
-                    />
-                    <div className="md:mt-7">
-                      <Button onClick={() => onNavigate(createTarget)} variant="ghost">
-                        Open destination
-                      </Button>
-                    </div>
+                    <tr key={row.id} className="border-t border-border bg-surface hover:bg-elevated/40">
+                      <td className="px-3 py-2">
+                        <button type="button" className="focus-ring rounded text-left text-brand hover:text-brandSoft" onClick={() => setSelectedId(row.id)}>
+                          {row.name}
+                        </button>
+                      </td>
+                      <td className="px-3 py-2"><StatusBadge status={row.status} /></td>
+                      <td className="px-3 py-2">{flagFromCountry(row.country)} {row.country}</td>
+                      <td className="px-3 py-2">{row.gpuModel} / {row.vramGb} GB</td>
+                      <td className="px-3 py-2">{formatUSD(row.pricePerHour, locale)}</td>
+                      <td className="px-3 py-2">{row.uptime}</td>
+                      <td className="px-3 py-2">
+                        <div className="flex flex-wrap gap-1">
+                          <Button size="sm" variant="secondary" leftIcon={<Icon glyph={LuPlay} size={16} />}>Start</Button>
+                          <Button size="sm" variant="secondary" leftIcon={<Icon glyph={LuPower} size={16} />}>Stop</Button>
+                          <Button size="sm" variant="secondary" leftIcon={<Icon glyph={LuRefreshCw} size={16} />}>Reboot</Button>
+                          <Button size="sm" variant="destructive" leftIcon={<Icon glyph={LuTrash2} size={16} />}>Terminate</Button>
+                        </div>
+                      </td>
+                      <td className="px-3 py-2">
+                        <div className="flex gap-1">
+                          <Button size="sm" variant="ghost" leftIcon={<Icon glyph={LuExternalLink} size={16} />}>Connect</Button>
+                          <Button size="sm" variant="ghost" leftIcon={<Icon glyph={LuFileText} size={16} />}>Logs</Button>
+                          <Button size="sm" variant="ghost" onClick={() => setExpandedId(expanded ? "" : row.id)} leftIcon={<Icon glyph={expanded ? LuChevronUp : LuChevronDown} size={16} />}>
+                            Expand
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                    {expanded ? (
+                      <tr className="border-t border-border bg-canvas">
+                        <td className="px-3 py-2" colSpan={8}>{renderDetail(row)}</td>
+                      </tr>
+                    ) : null}
                   </>
-                ) : null}
-              </div>
-            </details>
-            <div className="md:col-span-2 rounded-md border border-border bg-canvas p-3 text-xs text-textSecondary">
-              <div className="mb-1 text-sm text-textPrimary">Summary</div>
-              <div>Plan: {selectedPlan?.name || form.plan_id || "not selected"}</div>
-              <div>Instance: {form.name}</div>
-              <div>Shape: {form.cpu_cores} CPU / {form.ram_gb} GB / {form.gpu_units} GPU</div>
-              <div>Network: {form.network_mbps} Mbps · Billing: {form.period}</div>
-              <div>Config source: <span className="font-medium text-textPrimary">Manual order form</span></div>
-            </div>
-            <div className="md:col-span-2 flex flex-wrap items-center gap-2">
-              <Button type="submit" loading={loading} variant="secondary">Estimate</Button>
-              <Button type="button" onClick={handleCreateOrder} loading={loading}>
-                Deploy
-              </Button>
-              <Button type="button" variant="ghost" onClick={() => setForm({ ...SERVER_ORDER_DEFAULTS, plan_id: form.plan_id, period: form.period })}>
-                Reset
-              </Button>
-              <Badge variant="info">Estimated ${estimate.toFixed(2)}/{selectedPlan?.period === "hourly" ? "hr" : "mo"}</Badge>
-            </div>
-          </form>
-        </Card>
-      </div>
-
-      <Card title="My Instances" description="Active and past server rentals with lifecycle actions.">
-        <FilterBar
-          search={<Input label="Search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="ID, plan, OS" />}
-          filters={
-            <>
-              <Select
-                label="Status"
-                value={statusFilter}
-                onChange={(event) => setStatusFilter(event.target.value as "" | "active" | "queued" | "failed")}
-                options={[
-                  { value: "", label: "Any status" },
-                  { value: "active", label: "Active" },
-                  { value: "queued", label: "Queued" },
-                  { value: "failed", label: "Failed" }
-                ]}
-              />
-              <Select
-                label="Type"
-                value={typeFilter}
-                onChange={(event) => setTypeFilter(event.target.value as "" | "hourly" | "monthly")}
-                options={[
-                  { value: "", label: "Any type" },
-                  { value: "hourly", label: "Hourly" },
-                  { value: "monthly", label: "Monthly" }
-                ]}
-              />
-            </>
-          }
-          actions={
-            <>
-              <DataFreshnessBadge ts={lastRefreshedAt} />
-              <Button variant="secondary" onClick={refresh} loading={loading}>
-                Refresh
-              </Button>
-            </>
-          }
-        />
-        <Table
-          dense
-          ariaLabel="Server history"
-          rowKey={(row) => row.id ?? `${row.plan_id}-${row.created_at}`}
-          items={filteredOrders}
-          emptyState={<EmptyState title="No active servers" description="Configure and deploy your first server below." />}
-          columns={[
-            { key: "name", header: "Instance", render: (row) => row.name || "-" },
-            { key: "plan", header: "Plan", render: (row) => <span className="font-medium">{row.plan_id}</span> },
-            { key: "shape", header: "Config", render: (row) => <span className="text-xs text-textSecondary">{row.cpu_cores} CPU / {row.ram_gb}GB / {row.gpu_units} GPU</span> },
-            { key: "os", header: "OS", render: (row) => row.os_name },
-            { key: "status", header: "Status", render: (row) => (
-              <span className="flex items-center gap-2">
-                <StatusBadge status={row.status === "active" ? "running" : row.status === "queued" ? "starting" : row.status === "failed" ? "error" : "running"} />
-              </span>
-            ) },
-            { key: "period", header: "Billing", render: (row) => <Badge variant="neutral">{row.period}</Badge> },
-            {
-              key: "vm_link",
-              header: "Linked VM",
-              render: (row) => {
-                const vmID = getLinkedVMID(row, vmByOrder);
-                return vmID ? <span className="text-xs text-textSecondary">{vmID}</span> : <span className="text-xs text-textMuted">Not linked</span>;
-              }
-            },
-            {
-              key: "actions",
-              header: "Actions",
-              render: (row) => (
-                <div className="flex items-center gap-2">
-                  <ActionDropdown
-                    label="Actions"
-                    disabled={loading}
-                    options={[
-                      { value: "link", label: "Link VM..." },
-                      { value: "start", label: "Start" },
-                      { value: "stop", label: "Stop" },
-                      { value: "reboot", label: "Reboot" },
-                      { value: "terminate", label: "Terminate" }
-                    ]}
-                    onSelect={(action) => {
-                      if (action === "link") {
-                        openLinkVMDialog(row);
-                        return;
-                      }
-                      handleLifecycle(row, action as "start" | "stop" | "reboot" | "terminate");
-                    }}
-                  />
-                </div>
-              )
-            }
-          ]}
-        />
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </Card>
-      <Modal
-        open={Boolean(linkOrderID)}
-        title="Link VM to order"
-        description="Select an existing VM to attach lifecycle actions to this order."
-        confirmLabel="Save link"
-        onConfirm={applyLinkedVM}
-        onClose={() => {
-          setLinkOrderID("");
-          setLinkVmID("");
-        }}
-      >
-        <Select
-          label="VM"
-          value={linkVmID}
-          onChange={(event) => setLinkVmID(event.target.value)}
-          options={[{ value: "", label: "Select VM" }, ...vmOptions]}
-        />
-      </Modal>
+
+      <Card title={locale === "ru" ? "Instance Details" : "Instance Details"} description={locale === "ru" ? "Overview, Logs, Metrics, Billing." : "Overview, Logs, Metrics, Billing."}>
+        {!selected ? <EmptyState title="No instance selected" description="Select any instance from the table above." /> : null}
+        {selected ? (
+          <div className="space-y-4">
+            <div className="grid gap-3 md:grid-cols-4">
+              <div className="rounded-md border border-border bg-canvas p-3">
+                <p className="text-xs uppercase tracking-wide text-textMuted">ID</p>
+                <p className="mt-1 font-mono text-xs">{selected.id}</p>
+              </div>
+              <div className="rounded-md border border-border bg-canvas p-3">
+                <p className="text-xs uppercase tracking-wide text-textMuted">Created</p>
+                <p className="mt-1 text-sm">{formatDateTime(selected.created_at, locale)}</p>
+              </div>
+              <div className="rounded-md border border-border bg-canvas p-3">
+                <p className="text-xs uppercase tracking-wide text-textMuted">Cost to date</p>
+                <p className="mt-1 text-sm">{formatUSD(selected.cost_to_date, locale)}</p>
+              </div>
+              <div className="rounded-md border border-border bg-canvas p-3">
+                <p className="text-xs uppercase tracking-wide text-textMuted">SLA</p>
+                <p className="mt-1 text-sm">{selected.slaAvailability}</p>
+              </div>
+            </div>
+
+            <Tabs items={[...detailTabs]} value={detailTab} onChange={setDetailTab} instanceId="instance-details-tabs" ariaLabel="Instance detail tabs" />
+            {detailTab === "overview" ? (
+              <div role="tabpanel" id={getTabPanelElementID("instance-details-tabs", "overview")} aria-labelledby={getTabElementID("instance-details-tabs", "overview")} className="rounded-md border border-border bg-canvas p-3 text-sm text-textSecondary">
+                <p>Name: <span className="text-textPrimary">{selected.name}</span></p>
+                <p>Country: {flagFromCountry(selected.country)} {selected.country}</p>
+                <p>GPU: {selected.gpuModel} / {selected.vramGb} GB</p>
+                {selected.warnings.length ? <p className="mt-2 text-warning">Warnings: {selected.warnings.join(", ")}</p> : <p className="mt-2 text-success">No warnings</p>}
+              </div>
+            ) : null}
+            {detailTab === "logs" ? (
+              <div role="tabpanel" id={getTabPanelElementID("instance-details-tabs", "logs")} aria-labelledby={getTabElementID("instance-details-tabs", "logs")} className="rounded-md border border-border bg-canvas p-3">
+                {selected.lastEvents.length ? (
+                  <pre className="overflow-auto rounded-md bg-surface p-3 text-xs text-textSecondary">{selected.lastEvents.join("\n")}</pre>
+                ) : (
+                  <EmptyState title="No logs yet" description="Logs appear once workload starts." />
+                )}
+              </div>
+            ) : null}
+            {detailTab === "metrics" ? (
+              <div role="tabpanel" id={getTabPanelElementID("instance-details-tabs", "metrics")} aria-labelledby={getTabElementID("instance-details-tabs", "metrics")} className="rounded-md border border-border bg-canvas p-3">
+                {selected.status === "error" ? <EmptyState kind="error" title="Metrics unavailable" description="Auth required or instance failed to report metrics." /> : <p className="text-sm text-textSecondary">GPU util: 74% · CPU util: 43% · RAM util: 68%</p>}
+              </div>
+            ) : null}
+            {detailTab === "billing" ? (
+              <div role="tabpanel" id={getTabPanelElementID("instance-details-tabs", "billing")} aria-labelledby={getTabElementID("instance-details-tabs", "billing")} className="rounded-md border border-border bg-canvas p-3 text-sm text-textSecondary">
+                <p>On-demand hours: {selected.billingSummary.onDemandHours}</p>
+                <p>Spot hours: {selected.billingSummary.spotHours}</p>
+                <p>Total: {formatUSD(selected.billingSummary.total, locale)}</p>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+      </Card>
     </section>
   );
 }

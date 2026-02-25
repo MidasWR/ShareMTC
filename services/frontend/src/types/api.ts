@@ -124,7 +124,7 @@ export type ServerOrder = {
 export type UserSettings = {
   user_id?: string;
   theme: string;
-  language: string;
+  language: "en" | "ru";
   timezone: string;
   updated_at?: string;
 };

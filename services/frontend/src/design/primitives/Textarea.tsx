@@ -19,8 +19,8 @@ export function Textarea({ className, error, label, helpText, id, ...props }: Te
       <textarea
         id={textareaId}
         className={cx(
-          "focus-ring min-h-24 w-full rounded-md border bg-canvas px-3 py-2 text-sm text-textPrimary placeholder:text-textMuted",
-          error ? "border-danger" : "border-border",
+          "focus-ring min-h-24 w-full rounded-md border bg-canvas px-3 py-2 text-sm text-textPrimary placeholder:text-textMuted disabled:cursor-not-allowed disabled:opacity-60",
+          error ? "border-danger bg-danger/5" : "border-border",
           className
         )}
         aria-invalid={Boolean(error)}

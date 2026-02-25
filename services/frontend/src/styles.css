@@ -3,49 +3,64 @@
 @tailwind utilities;
 
 :root {
-  --color-canvas: 10 10 12;
-  --color-surface: 21 21 26;
-  --color-elevated: 31 31 38;
-  --color-border: 58 58 69;
-  --color-border-strong: 77 77 90;
-  --color-text-primary: 250 250 250;
-  --color-text-secondary: 193 194 205;
-  --color-text-muted: 139 142 160;
+  --color-canvas: 8 9 13;
+  --color-surface: 18 20 28;
+  --color-elevated: 30 34 46;
+  --color-border: 70 76 94;
+  --color-border-strong: 102 110 133;
+  --color-text-primary: 247 248 251;
+  --color-text-secondary: 197 202 216;
+  --color-text-muted: 142 150 170;
+  --color-text-inverse: 12 13 18;
+  --color-overlay: 8 9 13;
   --color-brand: 228 17 32;
   --color-brand-hover: 199 15 28;
+  --color-brand-muted: 78 18 24;
+  --color-brand-soft: 244 89 100;
   --brand-rgb: 228, 17, 32;
-  --color-success: 16 185 129;
-  --color-warning: 245 158 11;
-  --color-danger: 239 68 68;
-  --color-info: 56 189 248;
+  --color-success: 31 171 120;
+  --color-warning: 232 151 44;
+  --color-danger: 232 69 83;
+  --color-info: 132 116 232;
+  --focus-ring-rgb: 244, 89, 100;
 }
 
 :root[data-brand-theme="mts"] {
-  --color-canvas: 18 19 24;
-  --color-surface: 31 33 42;
-  --color-elevated: 43 46 58;
-  --color-border: 76 80 97;
-  --color-border-strong: 101 106 126;
-  --color-text-primary: 250 250 250;
-  --color-text-secondary: 193 194 205;
-  --color-text-muted: 139 142 160;
+  --color-canvas: 8 9 13;
+  --color-surface: 18 20 28;
+  --color-elevated: 30 34 46;
+  --color-border: 70 76 94;
+  --color-border-strong: 102 110 133;
+  --color-text-primary: 247 248 251;
+  --color-text-secondary: 197 202 216;
+  --color-text-muted: 142 150 170;
+  --color-text-inverse: 12 13 18;
+  --color-overlay: 8 9 13;
   --color-brand: 228 17 32;
   --color-brand-hover: 199 15 28;
+  --color-brand-muted: 78 18 24;
+  --color-brand-soft: 244 89 100;
   --brand-rgb: 228, 17, 32;
+  --focus-ring-rgb: 244, 89, 100;
 }
 
-:root[data-brand-theme="neon"] {
-  --color-canvas: 0 0 0;
-  --color-surface: 9 9 11;
-  --color-elevated: 18 18 20;
-  --color-border: 31 31 34;
-  --color-border-strong: 39 39 42;
-  --color-text-primary: 250 250 250;
-  --color-text-secondary: 161 161 170;
-  --color-text-muted: 113 113 122;
-  --color-brand: 0 255 65;
-  --color-brand-hover: 0 214 50;
-  --brand-rgb: 0, 255, 65;
+:root[data-brand-theme="mono"] {
+  --color-canvas: 10 11 15;
+  --color-surface: 20 22 30;
+  --color-elevated: 32 36 47;
+  --color-border: 75 82 100;
+  --color-border-strong: 111 121 145;
+  --color-text-primary: 246 247 250;
+  --color-text-secondary: 197 201 212;
+  --color-text-muted: 150 156 173;
+  --color-text-inverse: 14 15 19;
+  --color-overlay: 10 11 15;
+  --color-brand: 228 17 32;
+  --color-brand-hover: 205 16 30;
+  --color-brand-muted: 84 28 34;
+  --color-brand-soft: 248 115 125;
+  --brand-rgb: 228, 17, 32;
+  --focus-ring-rgb: 248, 115, 125;
 }
 
 body {
@@ -79,11 +94,15 @@ body {
 }
 
 .focus-ring {
-  @apply focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-canvas;
+  @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas;
+}
+
+.focus-ring:focus-visible {
+  --tw-ring-color: rgb(var(--focus-ring-rgb));
 }
 
 .checkbox-control {
-  @apply focus-ring h-4 w-4 rounded border border-border bg-canvas;
+  @apply focus-ring h-6 w-6 rounded border border-border bg-canvas;
 }
 
 .details-summary-focus {
@@ -112,14 +131,6 @@ body {
 
 .surface-card {
   @apply rounded-lg border border-border bg-surface shadow-sm;
-}
-
-.neon-glow {
-  @apply shadow-brand border border-brand;
-}
-
-.neon-text {
-  @apply text-brand drop-shadow-brand;
 }
 
 @media (prefers-reduced-motion: reduce) {

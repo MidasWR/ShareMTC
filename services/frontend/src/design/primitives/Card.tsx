@@ -15,7 +15,7 @@ export function Card({ title, description, className, actions, children }: CardP
       {title || description || actions ? (
         <header className="mb-4 flex items-start justify-between gap-3">
           <div className="space-y-1">
-            {title ? <h3 className="text-base font-semibold">{title}</h3> : null}
+            {title ? <h3 className="text-base font-semibold text-textPrimary">{title}</h3> : null}
             {description ? <p className="text-sm text-textSecondary">{description}</p> : null}
           </div>
           {actions}

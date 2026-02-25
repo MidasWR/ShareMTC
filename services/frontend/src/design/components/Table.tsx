@@ -36,7 +36,7 @@ export function Table<T>({ items, columns, emptyState, dense = false, ariaLabel 
         </thead>
         <tbody>
           {items.map((item, index) => (
-            <tr key={rowKey ? rowKey(item, index) : index} className="border-t border-border bg-surface hover:bg-elevated/50 transition-colors">
+            <tr key={rowKey ? rowKey(item, index) : index} className="border-t border-border bg-surface transition-colors hover:bg-elevated/50">
               {columns.map((column) => (
                 <td key={column.key} className={cx("px-3 py-2 align-top", column.className)}>
                   {column.render(item)}
