@@ -14,7 +14,7 @@ HOSTAGENT_LINUX_ASSET := $(DIST_DIR)/hostagent-linux-amd64
 HOSTAGENT_DARWIN_ASSET := $(DIST_DIR)/hostagent-darwin-amd64
 HOSTAGENT_WINDOWS_ASSET := $(DIST_DIR)/hostagent-windows-amd64.exe
 
-SERVICES := authservice adminservice resourceservice billingservice hostagent frontend
+SERVICES := authservice adminservice resourceservice billingservice hostagent frontend provisioningservice
 
 ifeq ($(strip $(SKIP)),)
 ifneq ($(origin skip), undefined)
