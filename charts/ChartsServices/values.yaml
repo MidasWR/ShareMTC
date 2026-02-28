@@ -30,6 +30,22 @@ resource:
   dns: resourceservice
   image: midaswr/host-resourceservice
   port: 8083
+  provisioningBaseURL: http://provisioningservice:8085
+  createRateLimitRPM: 5
+  vmTTLMinutes: 5
+
+provisioning:
+  dns: provisioningservice
+  image: midaswr/host-provisioningservice
+  port: 8085
+  ttlWorkerIntervalSeconds: 15
+  providerSecretName: host-provider-secrets
+  digitalOceanTokenKey: dop_v1_6a76fd43122df82316c35fe732908ffdebb28167638d4f2f79f669db042897f1
+  runpodApiKeyKey: RUNPOD_API_KEY
+
+security:
+  serviceSecretName: host-service-secrets
+  provisioningServiceTokenKey: PROVISIONING_SERVICE_TOKEN
 
 billing:
   dns: billingservice

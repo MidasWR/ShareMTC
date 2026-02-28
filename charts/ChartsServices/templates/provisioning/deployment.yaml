@@ -1,25 +1,23 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ .Values.resource.dns }}
+  name: {{ .Values.provisioning.dns }}
   namespace: {{ .Values.global.namespace }}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: {{ .Values.resource.dns }}
+      app: {{ .Values.provisioning.dns }}
   template:
     metadata:
       labels:
-        app: {{ .Values.resource.dns }}
+        app: {{ .Values.provisioning.dns }}
     spec:
       containers:
-        - name: {{ .Values.resource.dns }}
-          image: {{ .Values.resource.image }}:{{ default .Chart.AppVersion .Values.global.tag }}
-          securityContext:
-            privileged: true
+        - name: {{ .Values.provisioning.dns }}
+          image: {{ .Values.provisioning.image }}:{{ default .Chart.AppVersion .Values.global.tag }}
           ports:
-            - containerPort: {{ .Values.resource.port }}
+            - containerPort: {{ .Values.provisioning.port }}
           env:
             - name: PGHOST
               value: "{{ .Values.postgres.host }}.{{ .Values.global.namespace }}.svc.cluster.local"
@@ -39,21 +37,23 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.postgres.userSecretName }}
                   key: {{ .Values.postgres.passwordKey }}
-            - name: PROVISIONING_BASE_URL
-              value: {{ .Values.resource.provisioningBaseURL | quote }}
-            - name: CREATE_RATE_LIMIT_RPM
-              value: {{ .Values.resource.createRateLimitRPM | quote }}
-            - name: VM_TTL_MINUTES
-              value: {{ .Values.resource.vmTTLMinutes | quote }}
-            - name: VMDAEMON_KAFKA_TOPIC
-              value: "vmdaemon.events"
-            - name: VMDAEMON_KAFKA_GROUP
-              value: "resourceservice-vmdaemon"
             - name: PROVISIONING_SERVICE_TOKEN
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.security.serviceSecretName }}
                   key: {{ .Values.security.provisioningServiceTokenKey }}
+            - name: DIGITALOCEAN_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.provisioning.providerSecretName }}
+                  key: {{ .Values.provisioning.digitalOceanTokenKey }}
+            - name: RUNPOD_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.provisioning.providerSecretName }}
+                  key: {{ .Values.provisioning.runpodApiKeyKey }}
+            - name: TTL_WORKER_INTERVAL_SECONDS
+              value: {{ .Values.provisioning.ttlWorkerIntervalSeconds | quote }}
           envFrom:
             - configMapRef:
                 name: host-services-config

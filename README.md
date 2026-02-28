@@ -24,6 +24,8 @@ ShareMTC is a compute marketplace and control plane where providers expose CPU/R
 - `services/resourceservice` - heartbeat ingest, allocation/release, VM lifecycle, shared resources, health checks, metrics, and internal K8s orchestration.
 - `services/billingservice` - plan management, usage processing, accrual analytics.
 - `services/hostagent` - host-side telemetry collector for donor/internal machines.
+- `services/provisioningservice` - internal provider bridge for DigitalOcean VM and RunPod Pod provisioning with idempotent jobs and TTL cleanup.
+- `services/vmdaemon` - VM-side daemon (systemd) for health/metrics and root input audit shipping.
 - `services/frontend` - React + TypeScript control plane UI.
 - `services/sdk` - shared auth, DB, logging, and HTTP primitives.
 
@@ -168,6 +170,7 @@ Detailed audit findings and Wave 1/2/3 implementation plan are tracked in:
 - Resource limits are applied via cgroups accounting and lifecycle orchestration APIs.
 - This MVP does **not** claim hardened sandbox execution for untrusted workloads yet.
 - Next stage for untrusted execution is explicit isolation (sandbox VM/TEE runtime).
+- Provisioning operations are now rate-limited (`5 RPM` per user for VM/Pod create) and ephemeral by default (`5 min TTL` auto-cleanup).
 
 ### Provider node platform support
 
@@ -219,6 +222,10 @@ Detailed audit findings and Wave 1/2/3 implementation plan are tracked in:
 - `POST /v1/resources/vms/{vmID}/stop`
 - `POST /v1/resources/vms/{vmID}/reboot`
 - `POST /v1/resources/vms/{vmID}/terminate`
+- `POST /v1/resources/pods`
+- `GET /v1/resources/pods`
+- `GET /v1/resources/pods/{podID}`
+- `POST /v1/resources/pods/{podID}/terminate`
 - `POST /v1/resources/shared/vms`
 - `GET /v1/resources/shared/vms`
 - `POST /v1/resources/shared/pods`
@@ -228,6 +235,8 @@ Detailed audit findings and Wave 1/2/3 implementation plan are tracked in:
 - `POST /v1/resources/shared/offers/reserve`
 - `POST /v1/resources/agent-logs`
 - `GET /v1/resources/agent-logs?provider_id=&resource_id=&level=&limit=`
+- `POST /v1/resources/root-input-logs`
+- `GET /v1/resources/root-input-logs?provider_id=&resource_id=&limit=`
 - `POST /v1/resources/k8s/clusters`
 - `GET /v1/resources/k8s/clusters`
 - `POST /v1/resources/k8s/clusters/{clusterID}/refresh`
@@ -246,9 +255,23 @@ Detailed audit findings and Wave 1/2/3 implementation plan are tracked in:
 ```bash
 cd services/authservice && go run ./cmd
 cd services/adminservice && go run ./cmd
+cd services/provisioningservice && go run ./cmd
 cd services/resourceservice && go run ./cmd
 cd services/billingservice && go run ./cmd
 ```
+
+### Provisioning and daemon environment
+
+- `PROVISIONING_BASE_URL` - internal URL for `resourceservice -> provisioningservice` calls.
+- `PROVISIONING_SERVICE_TOKEN` - shared internal token (`X-Service-Token`) for service-to-service auth.
+- `DIGITALOCEAN_TOKEN` - API token used by provisioning adapter.
+- `RUNPOD_API_KEY` - API key used by provisioning adapter.
+- `CREATE_RATE_LIMIT_RPM` - create rate limit per user (default `5`).
+- `VM_TTL_MINUTES` - auto-termination TTL for VM/Pod (default `5`).
+- `VMDAEMON_DOWNLOAD_URL` - binary URL injected to cloud-init for VM daemon bootstrap.
+- `VMDAEMON_KAFKA_TOPIC` - Kafka topic for daemon events consumed by resourceservice.
+- `VMDAEMON_KAFKA_GROUP` - Kafka consumer group for resourceservice daemon ingest.
+- VM daemon receives `RESOURCE_PROVIDER_ID`/`RESOURCE_ID` at install time and publishes events to Kafka; resourceservice persists them by ID linkage.
 
 ### Run frontend
 

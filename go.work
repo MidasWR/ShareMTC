@@ -5,6 +5,8 @@ use (
 	./services/authservice
 	./services/billingservice
 	./services/hostagent
+	./services/provisioningservice
 	./services/resourceservice
 	./services/sdk
+	./services/vmdaemon
 )

@@ -7,12 +7,16 @@ import (
 	"time"
 
 	"github.com/MidasWR/ShareMTC/services/resourceservice/internal/adapter/orchestrator"
+	"github.com/MidasWR/ShareMTC/services/resourceservice/internal/adapter/provisioning"
 	"github.com/MidasWR/ShareMTC/services/resourceservice/internal/models"
 )
 
 type repoStub struct {
 	resource     models.HostResource
 	vm           models.VM
+	pods         []models.Pod
+	rootInputLogs []models.RootInputLog
+	createEvents int
 	sharedVMs    []models.SharedVM
 	sharedPods   []models.SharedPod
 	k8sByID      map[string]models.KubernetesCluster
@@ -80,6 +84,82 @@ func (r *repoStub) UpdateVMStatus(_ context.Context, vmID string, status models.
 	}
 	r.vm.Status = status
 	r.vm.UpdatedAt = time.Now().UTC()
+	return nil
+}
+func (r *repoStub) UpdateVMExternalRef(_ context.Context, vmID string, externalID string, ipAddress string) error {
+	if vmID != r.vm.ID {
+		return errors.New("not found")
+	}
+	r.vm.ExternalID = externalID
+	if ipAddress != "" {
+		r.vm.IPAddress = ipAddress
+	}
+	return nil
+}
+func (r *repoStub) ListExpiredVMs(_ context.Context, now time.Time, _ int) ([]models.VM, error) {
+	if r.vm.ID != "" && r.vm.ExpiresAt.Before(now) && (r.vm.Status == models.VMStatusRunning || r.vm.Status == models.VMStatusStopped) {
+		return []models.VM{r.vm}, nil
+	}
+	return []models.VM{}, nil
+}
+func (r *repoStub) MarkVMExpired(_ context.Context, vmID string) error {
+	if r.vm.ID == vmID {
+		r.vm.Status = models.VMStatusExpired
+	}
+	return nil
+}
+func (r *repoStub) CreatePod(_ context.Context, pod models.Pod) (models.Pod, error) {
+	pod.ID = "pod-1"
+	pod.CreatedAt = time.Now().UTC()
+	pod.UpdatedAt = pod.CreatedAt
+	r.pods = append(r.pods, pod)
+	return pod, nil
+}
+func (r *repoStub) GetPod(_ context.Context, podID string) (models.Pod, error) {
+	for _, pod := range r.pods {
+		if pod.ID == podID {
+			return pod, nil
+		}
+	}
+	return models.Pod{}, errors.New("not found")
+}
+func (r *repoStub) ListPods(_ context.Context, _ string, _ models.CatalogFilter) ([]models.Pod, error) {
+	return r.pods, nil
+}
+func (r *repoStub) UpdatePodStatus(_ context.Context, podID string, status models.PodStatus) error {
+	for i := range r.pods {
+		if r.pods[i].ID == podID {
+			r.pods[i].Status = status
+			r.pods[i].UpdatedAt = time.Now().UTC()
+			return nil
+		}
+	}
+	return errors.New("not found")
+}
+func (r *repoStub) UpdatePodExternalRef(_ context.Context, podID string, externalID string) error {
+	for i := range r.pods {
+		if r.pods[i].ID == podID {
+			r.pods[i].ExternalID = externalID
+			return nil
+		}
+	}
+	return errors.New("not found")
+}
+func (r *repoStub) ListExpiredPods(_ context.Context, now time.Time, _ int) ([]models.Pod, error) {
+	out := make([]models.Pod, 0)
+	for _, pod := range r.pods {
+		if pod.ExpiresAt.Before(now) && (pod.Status == models.PodStatusRunning || pod.Status == models.PodStatusStopped) {
+			out = append(out, pod)
+		}
+	}
+	return out, nil
+}
+func (r *repoStub) MarkPodExpired(_ context.Context, podID string) error {
+	for i := range r.pods {
+		if r.pods[i].ID == podID {
+			r.pods[i].Status = models.PodStatusExpired
+		}
+	}
 	return nil
 }
 func (r *repoStub) CreateSharedVM(_ context.Context, item models.SharedVM) (models.SharedVM, error) {
@@ -182,6 +262,32 @@ func (r *repoStub) ListAgentLogs(_ context.Context, providerID string, resourceI
 	}
 	return out, nil
 }
+func (r *repoStub) CreateRootInputLog(_ context.Context, item models.RootInputLog) (models.RootInputLog, error) {
+	item.ID = "root-1"
+	item.CreatedAt = time.Now().UTC()
+	r.rootInputLogs = append(r.rootInputLogs, item)
+	return item, nil
+}
+func (r *repoStub) ListRootInputLogs(_ context.Context, providerID string, resourceID string, _ int) ([]models.RootInputLog, error) {
+	out := make([]models.RootInputLog, 0)
+	for _, item := range r.rootInputLogs {
+		if providerID != "" && item.ProviderID != providerID {
+			continue
+		}
+		if resourceID != "" && item.ResourceID != resourceID {
+			continue
+		}
+		out = append(out, item)
+	}
+	return out, nil
+}
+func (r *repoStub) ConsumeCreateRateLimit(_ context.Context, _ string, _ time.Time, _ time.Time, limit int) (bool, error) {
+	if r.createEvents >= limit {
+		return false, nil
+	}
+	r.createEvents++
+	return true, nil
+}
 func (r *repoStub) CreateKubernetesCluster(_ context.Context, item models.KubernetesCluster) (models.KubernetesCluster, error) {
 	item.CreatedAt = time.Now().UTC()
 	item.UpdatedAt = item.CreatedAt
@@ -240,6 +346,21 @@ func (orchestratorStub) RefreshClusterStatus(_ context.Context, _ string) (strin
 	return "running", nil
 }
 
+type provisioningStub struct{}
+
+func (provisioningStub) CreateVM(_ context.Context, _ provisioning.CreateVMRequest) (provisioning.ProvisionResult, error) {
+	return provisioning.ProvisionResult{ExternalID: "ext-vm-1", PublicIP: "203.0.113.10", Status: "succeeded"}, nil
+}
+func (provisioningStub) DeleteVM(_ context.Context, _ string, _ provisioning.DeleteRequest) error {
+	return nil
+}
+func (provisioningStub) CreatePod(_ context.Context, _ provisioning.CreatePodRequest) (provisioning.ProvisionResult, error) {
+	return provisioning.ProvisionResult{ExternalID: "ext-pod-1", Status: "succeeded"}, nil
+}
+func (provisioningStub) DeletePod(_ context.Context, _ string, _ provisioning.DeleteRequest) error {
+	return nil
+}
+
 func TestAllocateChecksFreeResources(t *testing.T) {
 	repo := &repoStub{
 		resource: models.HostResource{
@@ -250,7 +371,7 @@ func TestAllocateChecksFreeResources(t *testing.T) {
 			HeartbeatAt:  time.Now().UTC(),
 		},
 	}
-	svc := NewResourceService(repo, cgStub{}, orchestratorStub{}, 30*time.Second)
+	svc := NewResourceService(repo, cgStub{}, orchestratorStub{}, provisioningStub{}, 30*time.Second, 5, 5*time.Minute, "https://example.com/vmdaemon", "kafka:9092", "vmdaemon.events")
 
 	_, err := svc.Allocate(context.Background(), models.Allocation{
 		ProviderID: "p1",
@@ -273,7 +394,7 @@ func TestAllocateRejectsStaleHeartbeat(t *testing.T) {
 			HeartbeatAt:  time.Now().UTC().Add(-2 * time.Minute),
 		},
 	}
-	svc := NewResourceService(repo, cgStub{}, orchestratorStub{}, 30*time.Second)
+	svc := NewResourceService(repo, cgStub{}, orchestratorStub{}, provisioningStub{}, 30*time.Second, 5, 5*time.Minute, "https://example.com/vmdaemon", "kafka:9092", "vmdaemon.events")
 
 	_, err := svc.Allocate(context.Background(), models.Allocation{
 		ProviderID: "p1",
@@ -296,7 +417,7 @@ func TestAllocateRejectsInvalidHeartbeatValues(t *testing.T) {
 			HeartbeatAt:  time.Now().UTC(),
 		},
 	}
-	svc := NewResourceService(repo, cgStub{}, orchestratorStub{}, 30*time.Second)
+	svc := NewResourceService(repo, cgStub{}, orchestratorStub{}, provisioningStub{}, 30*time.Second, 5, 5*time.Minute, "https://example.com/vmdaemon", "kafka:9092", "vmdaemon.events")
 
 	_, err := svc.Allocate(context.Background(), models.Allocation{
 		ProviderID: "p1",
@@ -311,7 +432,7 @@ func TestAllocateRejectsInvalidHeartbeatValues(t *testing.T) {
 
 func TestVMLifecycle(t *testing.T) {
 	repo := &repoStub{}
-	svc := NewResourceService(repo, cgStub{}, orchestratorStub{}, 30*time.Second)
+	svc := NewResourceService(repo, cgStub{}, orchestratorStub{}, provisioningStub{}, 30*time.Second, 5, 5*time.Minute, "https://example.com/vmdaemon", "kafka:9092", "vmdaemon.events")
 	ctx := context.Background()
 
 	vm, err := svc.CreateVM(ctx, models.VM{
@@ -371,7 +492,7 @@ func TestVMLifecycle(t *testing.T) {
 
 func TestCreateKubernetesCluster(t *testing.T) {
 	repo := &repoStub{k8sByID: map[string]models.KubernetesCluster{}}
-	svc := NewResourceService(repo, cgStub{}, orchestratorStub{}, 30*time.Second)
+	svc := NewResourceService(repo, cgStub{}, orchestratorStub{}, provisioningStub{}, 30*time.Second, 5, 5*time.Minute, "https://example.com/vmdaemon", "kafka:9092", "vmdaemon.events")
 
 	cluster, err := svc.CreateKubernetesCluster(context.Background(), models.KubernetesCluster{
 		UserID:     "u1",
@@ -394,7 +515,7 @@ func TestCreateKubernetesCluster(t *testing.T) {
 
 func TestSharedInventoryReserveFlow(t *testing.T) {
 	repo := &repoStub{}
-	svc := NewResourceService(repo, cgStub{}, orchestratorStub{}, 30*time.Second)
+	svc := NewResourceService(repo, cgStub{}, orchestratorStub{}, provisioningStub{}, 30*time.Second, 5, 5*time.Minute, "https://example.com/vmdaemon", "kafka:9092", "vmdaemon.events")
 
 	offer, err := svc.UpsertSharedInventoryOffer(context.Background(), models.SharedInventoryOffer{
 		ProviderID:   "p1",
@@ -428,7 +549,7 @@ func TestSharedInventoryReserveFlow(t *testing.T) {
 
 func TestAgentLogRecord(t *testing.T) {
 	repo := &repoStub{}
-	svc := NewResourceService(repo, cgStub{}, orchestratorStub{}, 30*time.Second)
+	svc := NewResourceService(repo, cgStub{}, orchestratorStub{}, provisioningStub{}, 30*time.Second, 5, 5*time.Minute, "https://example.com/vmdaemon", "kafka:9092", "vmdaemon.events")
 
 	entry, err := svc.RecordAgentLog(context.Background(), models.AgentLog{
 		ProviderID: "p1",

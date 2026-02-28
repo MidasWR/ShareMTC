@@ -3,6 +3,7 @@ module github.com/MidasWR/ShareMTC/services/resourceservice
 go 1.25.0
 
 require (
+	github.com/IBM/sarama v1.45.0
 	github.com/MidasWR/ShareMTC/services/sdk v0.0.0
 	github.com/go-chi/chi/v5 v5.2.1
 	github.com/google/uuid v1.6.0

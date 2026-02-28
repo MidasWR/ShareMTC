@@ -223,6 +223,65 @@ func (h *Handler) TerminateVM(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusOK, item)
 }
 
+func (h *Handler) CreatePod(w http.ResponseWriter, r *http.Request) {
+	claims := sdkauth.ClaimsFromContext(r.Context())
+	if claims == nil {
+		httpx.Error(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	var req models.Pod
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid json")
+		return
+	}
+	req.UserID = claims.UserID
+	item, err := h.svc.CreatePod(r.Context(), req)
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	httpx.JSON(w, http.StatusCreated, item)
+}
+
+func (h *Handler) ListPods(w http.ResponseWriter, r *http.Request) {
+	claims := sdkauth.ClaimsFromContext(r.Context())
+	if claims == nil {
+		httpx.Error(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	filter := readCatalogFilter(r)
+	items, err := h.svc.ListPods(r.Context(), claims.UserID, filter)
+	if err != nil {
+		httpx.Error(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	httpx.JSON(w, http.StatusOK, items)
+}
+
+func (h *Handler) GetPod(w http.ResponseWriter, r *http.Request) {
+	podID := chi.URLParam(r, "podID")
+	if podID == "" {
+		httpx.Error(w, http.StatusBadRequest, "podID is required")
+		return
+	}
+	item, err := h.svc.GetPod(r.Context(), podID)
+	if err != nil {
+		httpx.Error(w, http.StatusNotFound, err.Error())
+		return
+	}
+	httpx.JSON(w, http.StatusOK, item)
+}
+
+func (h *Handler) TerminatePod(w http.ResponseWriter, r *http.Request) {
+	podID := chi.URLParam(r, "podID")
+	item, err := h.svc.TerminatePod(r.Context(), podID)
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	httpx.JSON(w, http.StatusOK, item)
+}
+
 type shareRequest struct {
 	VMID        string                   `json:"vm_id"`
 	PodCode     string                   `json:"pod_code"`
@@ -257,6 +316,16 @@ type agentLogRequest struct {
 	Level      string `json:"level"`
 	Message    string `json:"message"`
 	Source     string `json:"source"`
+}
+
+type rootInputLogRequest struct {
+	ProviderID string `json:"provider_id"`
+	ResourceID string `json:"resource_id"`
+	Username   string `json:"username"`
+	TTY        string `json:"tty"`
+	Command    string `json:"command"`
+	Source     string `json:"source"`
+	ExecutedAt string `json:"executed_at"`
 }
 
 func (h *Handler) ShareVM(w http.ResponseWriter, r *http.Request) {
@@ -395,6 +464,11 @@ func (h *Handler) ReserveSharedInventoryOffer(w http.ResponseWriter, r *http.Req
 }
 
 func (h *Handler) RecordHealthCheck(w http.ResponseWriter, r *http.Request) {
+	claims := sdkauth.ClaimsFromContext(r.Context())
+	if claims == nil {
+		httpx.Error(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
 	var req models.HealthCheck
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		httpx.Error(w, http.StatusBadRequest, "invalid json")
@@ -421,6 +495,11 @@ func (h *Handler) ListHealthChecks(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) RecordMetric(w http.ResponseWriter, r *http.Request) {
+	claims := sdkauth.ClaimsFromContext(r.Context())
+	if claims == nil {
+		httpx.Error(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
 	var req models.MetricPoint
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		httpx.Error(w, http.StatusBadRequest, "invalid json")
@@ -494,6 +573,50 @@ func (h *Handler) ListAgentLogs(w http.ResponseWriter, r *http.Request) {
 	level := strings.TrimSpace(r.URL.Query().Get("level"))
 	limit := intQuery(r, "limit", 200)
 	items, err := h.svc.ListAgentLogs(r.Context(), providerID, resourceID, level, limit)
+	if err != nil {
+		httpx.Error(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	httpx.JSON(w, http.StatusOK, items)
+}
+
+func (h *Handler) RecordRootInputLog(w http.ResponseWriter, r *http.Request) {
+	claims := sdkauth.ClaimsFromContext(r.Context())
+	if claims == nil {
+		httpx.Error(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	var req rootInputLogRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid json")
+		return
+	}
+	if err := validateAgentIdentity(claims, req.ProviderID); err != nil {
+		httpx.Error(w, http.StatusForbidden, err.Error())
+		return
+	}
+	executedAt := parseTimeQuery(req.ExecutedAt)
+	item, err := h.svc.RecordRootInputLog(r.Context(), models.RootInputLog{
+		ProviderID: req.ProviderID,
+		ResourceID: req.ResourceID,
+		Username:   req.Username,
+		TTY:        req.TTY,
+		Command:    req.Command,
+		Source:     req.Source,
+		ExecutedAt: executedAt,
+	})
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	httpx.JSON(w, http.StatusCreated, item)
+}
+
+func (h *Handler) ListRootInputLogs(w http.ResponseWriter, r *http.Request) {
+	providerID := strings.TrimSpace(r.URL.Query().Get("provider_id"))
+	resourceID := strings.TrimSpace(r.URL.Query().Get("resource_id"))
+	limit := intQuery(r, "limit", 200)
+	items, err := h.svc.ListRootInputLogs(r.Context(), providerID, resourceID, limit)
 	if err != nil {
 		httpx.Error(w, http.StatusInternalServerError, err.Error())
 		return
@@ -607,3 +730,4 @@ func validateAgentIdentity(claims *sdkauth.Claims, providerID string) error {
 		return errors.New("insufficient role for agent telemetry")
 	}
 }
+

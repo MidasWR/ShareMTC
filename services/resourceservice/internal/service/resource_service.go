@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/MidasWR/ShareMTC/services/resourceservice/internal/adapter/orchestrator"
+	"github.com/MidasWR/ShareMTC/services/resourceservice/internal/adapter/provisioning"
 	"github.com/MidasWR/ShareMTC/services/resourceservice/internal/models"
 	"github.com/google/uuid"
 )
@@ -27,6 +28,17 @@ type Repository interface {
 	GetVM(ctx context.Context, vmID string) (models.VM, error)
 	ListVMs(ctx context.Context, userID string, filter models.CatalogFilter) ([]models.VM, error)
 	UpdateVMStatus(ctx context.Context, vmID string, status models.VMStatus) error
+	UpdateVMExternalRef(ctx context.Context, vmID string, externalID string, ipAddress string) error
+	ListExpiredVMs(ctx context.Context, now time.Time, limit int) ([]models.VM, error)
+	MarkVMExpired(ctx context.Context, vmID string) error
+
+	CreatePod(ctx context.Context, pod models.Pod) (models.Pod, error)
+	GetPod(ctx context.Context, podID string) (models.Pod, error)
+	ListPods(ctx context.Context, userID string, filter models.CatalogFilter) ([]models.Pod, error)
+	UpdatePodStatus(ctx context.Context, podID string, status models.PodStatus) error
+	UpdatePodExternalRef(ctx context.Context, podID string, externalID string) error
+	ListExpiredPods(ctx context.Context, now time.Time, limit int) ([]models.Pod, error)
+	MarkPodExpired(ctx context.Context, podID string) error
 
 	CreateSharedVM(ctx context.Context, item models.SharedVM) (models.SharedVM, error)
 	ListSharedVMs(ctx context.Context, userID string) ([]models.SharedVM, error)
@@ -44,6 +56,10 @@ type Repository interface {
 	MetricSummaries(ctx context.Context, limit int) ([]models.MetricSummary, error)
 	CreateAgentLog(ctx context.Context, item models.AgentLog) (models.AgentLog, error)
 	ListAgentLogs(ctx context.Context, providerID string, resourceID string, level string, limit int) ([]models.AgentLog, error)
+	CreateRootInputLog(ctx context.Context, item models.RootInputLog) (models.RootInputLog, error)
+	ListRootInputLogs(ctx context.Context, providerID string, resourceID string, limit int) ([]models.RootInputLog, error)
+
+	ConsumeCreateRateLimit(ctx context.Context, userID string, windowStart time.Time, windowEnd time.Time, limit int) (bool, error)
 
 	CreateKubernetesCluster(ctx context.Context, item models.KubernetesCluster) (models.KubernetesCluster, error)
 	GetKubernetesCluster(ctx context.Context, clusterID string) (models.KubernetesCluster, error)
@@ -61,17 +77,36 @@ type ResourceService struct {
 	repo            Repository
 	cgroups         CGroupApplier
 	orchestrator    orchestrator.Runtime
+	provisioning    ProvisioningClient
 	heartbeatMaxAge time.Duration
+	createRateLimitRPM int
+	vmTTL time.Duration
+	vmDaemonDownloadURL string
+	vmDaemonKafkaBrokers string
+	vmDaemonKafkaTopic string
+}
+
+type ProvisioningClient interface {
+	CreateVM(ctx context.Context, req provisioning.CreateVMRequest) (provisioning.ProvisionResult, error)
+	DeleteVM(ctx context.Context, externalID string, req provisioning.DeleteRequest) error
+	CreatePod(ctx context.Context, req provisioning.CreatePodRequest) (provisioning.ProvisionResult, error)
+	DeletePod(ctx context.Context, externalID string, req provisioning.DeleteRequest) error
 }
 
 // NewResourceService wires control-plane components for telemetry, allocation accounting,
 // and lifecycle APIs. It is not a hardened sandbox runtime for untrusted code execution.
-func NewResourceService(repo Repository, cgroups CGroupApplier, runtime orchestrator.Runtime, heartbeatMaxAge time.Duration) *ResourceService {
+func NewResourceService(repo Repository, cgroups CGroupApplier, runtime orchestrator.Runtime, provisioningClient ProvisioningClient, heartbeatMaxAge time.Duration, createRateLimitRPM int, vmTTL time.Duration, vmDaemonDownloadURL string, vmDaemonKafkaBrokers string, vmDaemonKafkaTopic string) *ResourceService {
 	if heartbeatMaxAge <= 0 {
 		heartbeatMaxAge = 30 * time.Second
 	}
+	if createRateLimitRPM <= 0 {
+		createRateLimitRPM = 5
+	}
+	if vmTTL <= 0 {
+		vmTTL = 5 * time.Minute
+	}
 	return &ResourceService{
-		repo: repo, cgroups: cgroups, orchestrator: runtime, heartbeatMaxAge: heartbeatMaxAge,
+		repo: repo, cgroups: cgroups, orchestrator: runtime, provisioning: provisioningClient, heartbeatMaxAge: heartbeatMaxAge, createRateLimitRPM: createRateLimitRPM, vmTTL: vmTTL, vmDaemonDownloadURL: vmDaemonDownloadURL, vmDaemonKafkaBrokers: vmDaemonKafkaBrokers, vmDaemonKafkaTopic: vmDaemonKafkaTopic,
 	}
 }
 
@@ -178,8 +213,18 @@ func (s *ResourceService) CreateVM(ctx context.Context, vm models.VM) (models.VM
 	if vm.CPUCores <= 0 || vm.RAMMB <= 0 || vm.NetworkMbps <= 0 {
 		return models.VM{}, errors.New("cpu_cores, ram_mb and network_mbps must be positive")
 	}
+	windowEnd := time.Now().UTC()
+	windowStart := windowEnd.Add(-1 * time.Minute)
+	allowed, err := s.repo.ConsumeCreateRateLimit(ctx, vm.UserID, windowStart, windowEnd, s.createRateLimitRPM)
+	if err != nil {
+		return models.VM{}, err
+	}
+	if !allowed {
+		return models.VM{}, errors.New("rate limit exceeded: max 5 create requests per minute")
+	}
 	vm.Status = models.VMStatusProvisioning
-	vm.IPAddress = fmt.Sprintf("10.%d.%d.%d", time.Now().UTC().Second()%255, time.Now().UTC().Minute()%255, time.Now().UTC().Hour()%255)
+	vm.ExpiresAt = time.Now().UTC().Add(s.vmTTL)
+	vm.IPAddress = ""
 	if vm.Region == "" {
 		vm.Region = "any"
 	}
@@ -200,6 +245,36 @@ func (s *ResourceService) CreateVM(ctx context.Context, vm models.VM) (models.VM
 	}
 	created, err := s.repo.CreateVM(ctx, vm)
 	if err != nil {
+		return models.VM{}, err
+	}
+	cloudInit := provisioning.BuildVMCloudInit(created, s.vmDaemonDownloadURL, s.vmDaemonKafkaBrokers, s.vmDaemonKafkaTopic)
+	provisioned, err := s.provisioning.CreateVM(ctx, provisioning.CreateVMRequest{
+		RequestID:          uuid.NewString(),
+		TraceID:            uuid.NewString(),
+		UserID:             created.UserID,
+		ProviderID:         created.ProviderID,
+		Name:               created.Name,
+		Region:             created.Region,
+		Size:               mapDropletSize(created),
+		Image:              mapDropletImage(created),
+		ExpiresAt:          created.ExpiresAt,
+		SSHKeyFingerprints: nil,
+		UserData:           cloudInit,
+		Metadata: map[string]any{
+			"vm_id": created.ID,
+		},
+	})
+	if err != nil {
+		_ = s.repo.UpdateVMStatus(ctx, created.ID, models.VMStatusTerminated)
+		return models.VM{}, err
+	}
+	created.ExternalID = provisioned.ExternalID
+	if provisioned.PublicIP != "" {
+		created.IPAddress = provisioned.PublicIP
+	} else {
+		created.IPAddress = fmt.Sprintf("10.%d.%d.%d", time.Now().UTC().Second()%255, time.Now().UTC().Minute()%255, time.Now().UTC().Hour()%255)
+	}
+	if err := s.repo.UpdateVMExternalRef(ctx, created.ID, created.ExternalID, created.IPAddress); err != nil {
 		return models.VM{}, err
 	}
 	if err := s.repo.UpdateVMStatus(ctx, created.ID, models.VMStatusRunning); err != nil {
@@ -252,10 +327,101 @@ func (s *ResourceService) RebootVM(ctx context.Context, vmID string) (models.VM,
 }
 
 func (s *ResourceService) TerminateVM(ctx context.Context, vmID string) (models.VM, error) {
+	vm, err := s.repo.GetVM(ctx, vmID)
+	if err != nil {
+		return models.VM{}, err
+	}
+	if strings.TrimSpace(vm.ExternalID) != "" {
+		if err := s.provisioning.DeleteVM(ctx, vm.ExternalID, provisioning.DeleteRequest{
+			RequestID: uuid.NewString(),
+			TraceID:   uuid.NewString(),
+		}); err != nil {
+			return models.VM{}, err
+		}
+	}
 	if err := s.repo.UpdateVMStatus(ctx, vmID, models.VMStatusTerminated); err != nil {
 		return models.VM{}, err
 	}
 	return s.repo.GetVM(ctx, vmID)
+}
+
+func (s *ResourceService) CreatePod(ctx context.Context, pod models.Pod) (models.Pod, error) {
+	if pod.UserID == "" || pod.ProviderID == "" || pod.Name == "" || pod.ImageName == "" || pod.GPUTypeID == "" {
+		return models.Pod{}, errors.New("user_id, provider_id, name, image_name and gpu_type_id are required")
+	}
+	if pod.GPUCount <= 0 || pod.CPUCount <= 0 || pod.MemoryGB <= 0 {
+		return models.Pod{}, errors.New("gpu_count, cpu_count and memory_gb must be positive")
+	}
+	windowEnd := time.Now().UTC()
+	windowStart := windowEnd.Add(-1 * time.Minute)
+	allowed, err := s.repo.ConsumeCreateRateLimit(ctx, pod.UserID, windowStart, windowEnd, s.createRateLimitRPM)
+	if err != nil {
+		return models.Pod{}, err
+	}
+	if !allowed {
+		return models.Pod{}, errors.New("rate limit exceeded: max 5 create requests per minute")
+	}
+	pod.Status = models.PodStatusProvisioning
+	pod.ExpiresAt = time.Now().UTC().Add(s.vmTTL)
+	created, err := s.repo.CreatePod(ctx, pod)
+	if err != nil {
+		return models.Pod{}, err
+	}
+	provisioned, err := s.provisioning.CreatePod(ctx, provisioning.CreatePodRequest{
+		RequestID:  uuid.NewString(),
+		TraceID:    uuid.NewString(),
+		UserID:     created.UserID,
+		ProviderID: created.ProviderID,
+		Name:       created.Name,
+		ImageName:  created.ImageName,
+		GPUTypeID:  created.GPUTypeID,
+		GPUCount:   created.GPUCount,
+		CPUCount:   created.CPUCount,
+		MemoryGB:   created.MemoryGB,
+		ExpiresAt:  created.ExpiresAt,
+		Metadata: map[string]any{
+			"pod_id": created.ID,
+		},
+	})
+	if err != nil {
+		_ = s.repo.UpdatePodStatus(ctx, created.ID, models.PodStatusTerminated)
+		return models.Pod{}, err
+	}
+	created.ExternalID = provisioned.ExternalID
+	if err := s.repo.UpdatePodExternalRef(ctx, created.ID, created.ExternalID); err != nil {
+		return models.Pod{}, err
+	}
+	if err := s.repo.UpdatePodStatus(ctx, created.ID, models.PodStatusRunning); err != nil {
+		return models.Pod{}, err
+	}
+	return s.repo.GetPod(ctx, created.ID)
+}
+
+func (s *ResourceService) ListPods(ctx context.Context, userID string, filter models.CatalogFilter) ([]models.Pod, error) {
+	return s.repo.ListPods(ctx, userID, filter)
+}
+
+func (s *ResourceService) GetPod(ctx context.Context, podID string) (models.Pod, error) {
+	return s.repo.GetPod(ctx, podID)
+}
+
+func (s *ResourceService) TerminatePod(ctx context.Context, podID string) (models.Pod, error) {
+	pod, err := s.repo.GetPod(ctx, podID)
+	if err != nil {
+		return models.Pod{}, err
+	}
+	if strings.TrimSpace(pod.ExternalID) != "" {
+		if err := s.provisioning.DeletePod(ctx, pod.ExternalID, provisioning.DeleteRequest{
+			RequestID: uuid.NewString(),
+			TraceID:   uuid.NewString(),
+		}); err != nil {
+			return models.Pod{}, err
+		}
+	}
+	if err := s.repo.UpdatePodStatus(ctx, podID, models.PodStatusTerminated); err != nil {
+		return models.Pod{}, err
+	}
+	return s.repo.GetPod(ctx, podID)
 }
 
 func (s *ResourceService) ShareVM(ctx context.Context, item models.SharedVM) (models.SharedVM, error) {
@@ -375,6 +541,92 @@ func (s *ResourceService) ListAgentLogs(ctx context.Context, providerID string, 
 		limit = 200
 	}
 	return s.repo.ListAgentLogs(ctx, providerID, resourceID, level, limit)
+}
+
+func (s *ResourceService) RecordRootInputLog(ctx context.Context, item models.RootInputLog) (models.RootInputLog, error) {
+	if item.ProviderID == "" || item.ResourceID == "" || item.Command == "" {
+		return models.RootInputLog{}, errors.New("provider_id, resource_id and command are required")
+	}
+	if item.Username == "" {
+		item.Username = "root"
+	}
+	if item.Source == "" {
+		item.Source = "vmdaemon"
+	}
+	if item.ExecutedAt.IsZero() {
+		item.ExecutedAt = time.Now().UTC()
+	}
+	return s.repo.CreateRootInputLog(ctx, item)
+}
+
+func (s *ResourceService) ListRootInputLogs(ctx context.Context, providerID string, resourceID string, limit int) ([]models.RootInputLog, error) {
+	if limit <= 0 {
+		limit = 200
+	}
+	return s.repo.ListRootInputLogs(ctx, providerID, resourceID, limit)
+}
+
+func mapDropletSize(vm models.VM) string {
+	if vm.GPUUnits > 0 {
+		return "g-2vcpu-8gb"
+	}
+	switch {
+	case vm.CPUCores >= 8:
+		return "s-8vcpu-16gb"
+	case vm.CPUCores >= 4:
+		return "s-4vcpu-8gb"
+	default:
+		return "s-2vcpu-4gb"
+	}
+}
+
+func mapDropletImage(vm models.VM) string {
+	if strings.TrimSpace(vm.OSName) == "" {
+		return "ubuntu-22-04-x64"
+	}
+	name := strings.ToLower(vm.OSName)
+	if strings.Contains(name, "ubuntu") {
+		return "ubuntu-22-04-x64"
+	}
+	if strings.Contains(name, "debian") {
+		return "debian-12-x64"
+	}
+	return "ubuntu-22-04-x64"
+}
+
+func (s *ResourceService) ExpireResources(ctx context.Context, now time.Time) error {
+	expiredVMs, err := s.repo.ListExpiredVMs(ctx, now, 100)
+	if err != nil {
+		return err
+	}
+	for _, vm := range expiredVMs {
+		if strings.TrimSpace(vm.ExternalID) != "" {
+			if err := s.provisioning.DeleteVM(ctx, vm.ExternalID, provisioning.DeleteRequest{
+				RequestID: uuid.NewString(),
+				TraceID:   uuid.NewString(),
+			}); err != nil {
+				continue
+			}
+		}
+		_ = s.repo.MarkVMExpired(ctx, vm.ID)
+	}
+
+	expiredPods, err := s.repo.ListExpiredPods(ctx, now, 100)
+	if err != nil {
+		return err
+	}
+	for _, pod := range expiredPods {
+		if strings.TrimSpace(pod.ExternalID) != "" {
+			if err := s.provisioning.DeletePod(ctx, pod.ExternalID, provisioning.DeleteRequest{
+				RequestID: uuid.NewString(),
+				TraceID:   uuid.NewString(),
+			}); err != nil {
+				continue
+			}
+		}
+		_ = s.repo.MarkPodExpired(ctx, pod.ID)
+	}
+	return nil
 }
 
 func (s *ResourceService) CreateKubernetesCluster(ctx context.Context, cluster models.KubernetesCluster) (models.KubernetesCluster, error) {

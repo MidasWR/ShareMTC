@@ -129,7 +129,8 @@ export type UserSettings = {
   updated_at?: string;
 };
 
-export type VMStatus = "provisioning" | "running" | "stopped" | "terminated";
+export type VMStatus = "provisioning" | "running" | "stopped" | "terminated" | "expired";
+export type PodStatus = "provisioning" | "running" | "stopped" | "terminated" | "expired";
 
 export type VM = {
   id?: string;
@@ -152,7 +153,26 @@ export type VM = {
   global_networking_supported?: boolean;
   availability_tier?: "low" | "medium" | "high";
   max_instances?: number;
+  external_id?: string;
+  expires_at?: string;
   status?: VMStatus;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type Pod = {
+  id?: string;
+  user_id?: string;
+  provider_id: string;
+  name: string;
+  image_name: string;
+  gpu_type_id: string;
+  gpu_count: number;
+  cpu_count: number;
+  memory_gb: number;
+  external_id?: string;
+  expires_at?: string;
+  status?: PodStatus;
   created_at?: string;
   updated_at?: string;
 };
@@ -272,6 +292,18 @@ export type AgentLog = {
   level: "info" | "warning" | "error";
   message: string;
   source?: string;
+  created_at?: string;
+};
+
+export type RootInputLog = {
+  id?: string;
+  provider_id: string;
+  resource_id: string;
+  username?: string;
+  tty?: string;
+  command: string;
+  source?: string;
+  executed_at?: string;
   created_at?: string;
 };
 

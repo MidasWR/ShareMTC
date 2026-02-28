@@ -41,6 +41,17 @@ const (
 	VMStatusRunning      VMStatus = "running"
 	VMStatusStopped      VMStatus = "stopped"
 	VMStatusTerminated   VMStatus = "terminated"
+	VMStatusExpired      VMStatus = "expired"
+)
+
+type PodStatus string
+
+const (
+	PodStatusProvisioning PodStatus = "provisioning"
+	PodStatusRunning      PodStatus = "running"
+	PodStatusStopped      PodStatus = "stopped"
+	PodStatusTerminated   PodStatus = "terminated"
+	PodStatusExpired      PodStatus = "expired"
 )
 
 type SharedAccessLevel string
@@ -91,9 +102,28 @@ type VM struct {
 	GlobalNetworkingSupport bool      `json:"global_networking_supported"`
 	AvailabilityTier        string    `json:"availability_tier"`
 	MaxInstances            int       `json:"max_instances"`
+	ExternalID              string    `json:"external_id"`
+	ExpiresAt               time.Time `json:"expires_at"`
 	Status                  VMStatus  `json:"status"`
 	CreatedAt               time.Time `json:"created_at"`
 	UpdatedAt               time.Time `json:"updated_at"`
+}
+
+type Pod struct {
+	ID         string    `json:"id"`
+	UserID     string    `json:"user_id"`
+	ProviderID string    `json:"provider_id"`
+	Name       string    `json:"name"`
+	ImageName  string    `json:"image_name"`
+	GPUTypeID  string    `json:"gpu_type_id"`
+	GPUCount   int       `json:"gpu_count"`
+	CPUCount   int       `json:"cpu_count"`
+	MemoryGB   int       `json:"memory_gb"`
+	ExternalID string    `json:"external_id"`
+	ExpiresAt  time.Time `json:"expires_at"`
+	Status     PodStatus `json:"status"`
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
 }
 
 type VMTemplate struct {
@@ -168,6 +198,18 @@ type AgentLog struct {
 	Message    string        `json:"message"`
 	Source     string        `json:"source"`
 	CreatedAt  time.Time     `json:"created_at"`
+}
+
+type RootInputLog struct {
+	ID         string    `json:"id"`
+	ProviderID string    `json:"provider_id"`
+	ResourceID string    `json:"resource_id"`
+	Username   string    `json:"username"`
+	TTY        string    `json:"tty"`
+	Command    string    `json:"command"`
+	Source     string    `json:"source"`
+	ExecutedAt time.Time `json:"executed_at"`
+	CreatedAt  time.Time `json:"created_at"`
 }
 
 type CatalogFilter struct {

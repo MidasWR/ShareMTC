@@ -13,7 +13,9 @@ import {
   VM,
   VMTemplate,
   CatalogFilter,
-  AgentLog
+  AgentLog,
+  Pod,
+  RootInputLog
 } from "../../../types/api";
 
 export function listAllocations(providerID: string) {
@@ -109,6 +111,22 @@ export function terminateVM(vmID: string) {
   return apiClient.post<VM>(`${API_BASE.resource}/v1/resources/vms/${encodeURIComponent(vmID)}/terminate`);
 }
 
+export function createPod(payload: Pod) {
+  return apiClient.post<Pod>(`${API_BASE.resource}/v1/resources/pods`, payload);
+}
+
+export function listPods() {
+  return apiClient.get<Pod[]>(`${API_BASE.resource}/v1/resources/pods`);
+}
+
+export function getPod(podID: string) {
+  return apiClient.get<Pod>(`${API_BASE.resource}/v1/resources/pods/${encodeURIComponent(podID)}`);
+}
+
+export function terminatePod(podID: string) {
+  return apiClient.post<Pod>(`${API_BASE.resource}/v1/resources/pods/${encodeURIComponent(podID)}/terminate`);
+}
+
 export function shareVM(payload: { vm_id: string; shared_with: string[]; access_level?: "read" | "write" | "admin" }) {
   return apiClient.post<SharedVM>(`${API_BASE.resource}/v1/resources/shared/vms`, payload);
 }
@@ -198,6 +216,23 @@ export function listAgentLogs(params?: {
   if (params?.limit) search.set("limit", String(params.limit));
   const query = search.toString();
   return apiClient.get<AgentLog[]>(`${API_BASE.resource}/v1/resources/agent-logs${query ? `?${query}` : ""}`);
+}
+
+export function recordRootInputLog(payload: RootInputLog) {
+  return apiClient.post<RootInputLog>(`${API_BASE.resource}/v1/resources/root-input-logs`, payload);
+}
+
+export function listRootInputLogs(params?: {
+  provider_id?: string;
+  resource_id?: string;
+  limit?: number;
+}) {
+  const search = new URLSearchParams();
+  if (params?.provider_id) search.set("provider_id", params.provider_id);
+  if (params?.resource_id) search.set("resource_id", params.resource_id);
+  if (params?.limit) search.set("limit", String(params.limit));
+  const query = search.toString();
+  return apiClient.get<RootInputLog[]>(`${API_BASE.resource}/v1/resources/root-input-logs${query ? `?${query}` : ""}`);
 }
 
 export function createK8sCluster(payload: KubernetesCluster) {

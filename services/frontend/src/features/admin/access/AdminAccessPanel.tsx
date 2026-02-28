@@ -11,11 +11,12 @@ type Props = {
   onSuccess: () => void;
 };
 
-const ENABLE_ADMIN_QUICK_ACCESS = import.meta.env.VITE_ENABLE_ADMIN_QUICK_ACCESS === "true";
+const PREFILL_ADMIN_USERNAME = import.meta.env.VITE_ADMIN_PREFILL_USERNAME ?? "admin";
+const PREFILL_ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PREFILL_PASSWORD ?? "admin";
 
 export function AdminAccessPanel({ onSuccess }: Props) {
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
+  const [username, setUsername] = useState(PREFILL_ADMIN_USERNAME);
+  const [password, setPassword] = useState(PREFILL_ADMIN_PASSWORD);
   const [loading, setLoading] = useState(false);
   const { push } = useToast();
 
@@ -46,7 +47,7 @@ export function AdminAccessPanel({ onSuccess }: Props) {
     <section className="section-stack">
       <PageSectionHeader
         title="Direct /admin Access"
-        description="Use dedicated administrator credentials. This form never auto-fills secrets by default."
+        description="Use dedicated administrator credentials and press Enter /admin to continue."
       />
       <Card title="Administrator Login" description="This login flow is dedicated to admin module access.">
         <form className="space-y-3" onSubmit={submit}>
@@ -54,19 +55,6 @@ export function AdminAccessPanel({ onSuccess }: Props) {
           <Input label="Access key" type="password" value={password} onChange={(event) => setPassword(event.target.value)} />
           <div className="flex flex-wrap gap-2">
             <Button type="submit" loading={loading}>Enter /admin</Button>
-            {ENABLE_ADMIN_QUICK_ACCESS ? (
-              <Button
-                type="button"
-                variant="secondary"
-                loading={loading}
-                onClick={() => {
-                  setUsername("admin");
-                  setPassword("admin");
-                }}
-              >
-                Fill demo credentials
-              </Button>
-            ) : null}
           </div>
         </form>
       </Card>

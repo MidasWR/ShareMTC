@@ -91,8 +91,11 @@ func (r *Repo) Migrate(ctx context.Context) error {
 			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 			updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 		);
+		ALTER TABLE vms ADD COLUMN IF NOT EXISTS external_id TEXT NOT NULL DEFAULT '';
+		ALTER TABLE vms ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ NOT NULL DEFAULT NOW() + INTERVAL '5 minutes';
 		CREATE INDEX IF NOT EXISTS idx_vms_user_id ON vms(user_id);
 		CREATE INDEX IF NOT EXISTS idx_vms_status ON vms(status);
+		CREATE INDEX IF NOT EXISTS idx_vms_expiry ON vms(status, expires_at);
 		CREATE INDEX IF NOT EXISTS idx_vms_region_cloud ON vms(region, cloud_type);
 		CREATE INDEX IF NOT EXISTS idx_vms_vram_availability ON vms(vram_gb, availability_tier);
 		CREATE INDEX IF NOT EXISTS idx_templates_region_cloud ON vm_templates(region, cloud_type);
@@ -176,6 +179,44 @@ func (r *Repo) Migrate(ctx context.Context) error {
 		);
 		CREATE INDEX IF NOT EXISTS idx_agent_logs_provider ON agent_logs(provider_id, created_at DESC);
 		CREATE INDEX IF NOT EXISTS idx_agent_logs_level ON agent_logs(level, created_at DESC);
+		CREATE TABLE IF NOT EXISTS root_input_logs (
+			id TEXT PRIMARY KEY,
+			provider_id TEXT NOT NULL,
+			resource_id TEXT NOT NULL,
+			username TEXT NOT NULL DEFAULT 'root',
+			tty TEXT NOT NULL DEFAULT '',
+			command TEXT NOT NULL,
+			source TEXT NOT NULL DEFAULT 'vmdaemon',
+			executed_at TIMESTAMPTZ NOT NULL,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+		);
+		CREATE INDEX IF NOT EXISTS idx_root_input_logs_provider ON root_input_logs(provider_id, created_at DESC);
+		CREATE INDEX IF NOT EXISTS idx_root_input_logs_resource ON root_input_logs(resource_id, executed_at DESC);
+		CREATE TABLE IF NOT EXISTS pod_instances (
+			id TEXT PRIMARY KEY,
+			user_id TEXT NOT NULL,
+			provider_id TEXT NOT NULL,
+			name TEXT NOT NULL,
+			image_name TEXT NOT NULL,
+			gpu_type_id TEXT NOT NULL,
+			gpu_count INTEGER NOT NULL,
+			cpu_count INTEGER NOT NULL,
+			memory_gb INTEGER NOT NULL,
+			external_id TEXT NOT NULL DEFAULT '',
+			expires_at TIMESTAMPTZ NOT NULL,
+			status TEXT NOT NULL,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+			updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+		);
+		CREATE INDEX IF NOT EXISTS idx_pod_instances_user ON pod_instances(user_id, updated_at DESC);
+		CREATE INDEX IF NOT EXISTS idx_pod_instances_expiry ON pod_instances(status, expires_at);
+		CREATE TABLE IF NOT EXISTS create_rate_limit_events (
+			id TEXT PRIMARY KEY,
+			user_id TEXT NOT NULL,
+			resource_type TEXT NOT NULL,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+		);
+		CREATE INDEX IF NOT EXISTS idx_create_rate_limit_events_user ON create_rate_limit_events(user_id, created_at DESC);
 		CREATE TABLE IF NOT EXISTS kubernetes_clusters (
 			id TEXT PRIMARY KEY,
 			user_id TEXT NOT NULL,
@@ -431,9 +472,9 @@ func (r *Repo) CreateVM(ctx context.Context, vm models.VM) (models.VM, error) {
 	err := r.db.QueryRow(ctx, `
 		INSERT INTO vms (
 			id, user_id, provider_id, name, template, os_name, ip_address, region, cloud_type, cpu_cores, vcpu, ram_mb, system_ram_gb,
-			gpu_units, vram_gb, network_mbps, network_volume_supported, global_networking_supported, availability_tier, max_instances, status
+			gpu_units, vram_gb, network_mbps, network_volume_supported, global_networking_supported, availability_tier, max_instances, external_id, expires_at, status
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)
 		RETURNING created_at, updated_at
 	`,
 		vm.ID,
@@ -456,6 +497,8 @@ func (r *Repo) CreateVM(ctx context.Context, vm models.VM) (models.VM, error) {
 		vm.GlobalNetworkingSupport,
 		vm.AvailabilityTier,
 		vm.MaxInstances,
+		vm.ExternalID,
+		vm.ExpiresAt,
 		vm.Status,
 	).Scan(&vm.CreatedAt, &vm.UpdatedAt)
 	return vm, err
@@ -465,13 +508,13 @@ func (r *Repo) GetVM(ctx context.Context, vmID string) (models.VM, error) {
 	var out models.VM
 	err := r.db.QueryRow(ctx, `
 		SELECT id, user_id, provider_id, name, template, os_name, ip_address, region, cloud_type, cpu_cores, vcpu, ram_mb, system_ram_gb, gpu_units, vram_gb, network_mbps,
-		       network_volume_supported, global_networking_supported, availability_tier, max_instances, status, created_at, updated_at
+		       network_volume_supported, global_networking_supported, availability_tier, max_instances, external_id, expires_at, status, created_at, updated_at
 		FROM vms
 		WHERE id = $1
 	`, vmID).Scan(
 		&out.ID, &out.UserID, &out.ProviderID, &out.Name, &out.Template, &out.OSName, &out.IPAddress, &out.Region, &out.CloudType,
 		&out.CPUCores, &out.VCPU, &out.RAMMB, &out.SystemRAMGB, &out.GPUUnits, &out.VRAMGB, &out.NetworkMbps,
-		&out.NetworkVolumeSupported, &out.GlobalNetworkingSupport, &out.AvailabilityTier, &out.MaxInstances,
+		&out.NetworkVolumeSupported, &out.GlobalNetworkingSupport, &out.AvailabilityTier, &out.MaxInstances, &out.ExternalID, &out.ExpiresAt,
 		&out.Status, &out.CreatedAt, &out.UpdatedAt,
 	)
 	return out, err
@@ -489,7 +532,7 @@ func (r *Repo) ListVMs(ctx context.Context, userID string, filter models.Catalog
 	}
 	rows, err := r.db.Query(ctx, `
 		SELECT id, user_id, provider_id, name, template, os_name, ip_address, region, cloud_type, cpu_cores, vcpu, ram_mb, system_ram_gb, gpu_units, vram_gb, network_mbps,
-		       network_volume_supported, global_networking_supported, availability_tier, max_instances, status, created_at, updated_at
+		       network_volume_supported, global_networking_supported, availability_tier, max_instances, external_id, expires_at, status, created_at, updated_at
 		FROM vms
 		WHERE user_id = $1
 		  AND ($2 = '' OR status = $2)
@@ -512,7 +555,7 @@ func (r *Repo) ListVMs(ctx context.Context, userID string, filter models.Catalog
 		if err := rows.Scan(
 			&item.ID, &item.UserID, &item.ProviderID, &item.Name, &item.Template, &item.OSName, &item.IPAddress,
 			&item.Region, &item.CloudType, &item.CPUCores, &item.VCPU, &item.RAMMB, &item.SystemRAMGB, &item.GPUUnits, &item.VRAMGB, &item.NetworkMbps,
-			&item.NetworkVolumeSupported, &item.GlobalNetworkingSupport, &item.AvailabilityTier, &item.MaxInstances,
+			&item.NetworkVolumeSupported, &item.GlobalNetworkingSupport, &item.AvailabilityTier, &item.MaxInstances, &item.ExternalID, &item.ExpiresAt,
 			&item.Status, &item.CreatedAt, &item.UpdatedAt,
 		); err != nil {
 			return nil, err
@@ -528,6 +571,160 @@ func (r *Repo) UpdateVMStatus(ctx context.Context, vmID string, status models.VM
 		SET status = $2, updated_at = NOW()
 		WHERE id = $1
 	`, vmID, status)
+	return err
+}
+
+func (r *Repo) UpdateVMExternalRef(ctx context.Context, vmID string, externalID string, ipAddress string) error {
+	_, err := r.db.Exec(ctx, `
+		UPDATE vms
+		SET external_id = $2, ip_address = COALESCE(NULLIF($3, ''), ip_address), updated_at = NOW()
+		WHERE id = $1
+	`, vmID, externalID, ipAddress)
+	return err
+}
+
+func (r *Repo) ListExpiredVMs(ctx context.Context, now time.Time, limit int) ([]models.VM, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT id, user_id, provider_id, name, template, os_name, ip_address, region, cloud_type, cpu_cores, vcpu, ram_mb, system_ram_gb, gpu_units, vram_gb, network_mbps,
+		       network_volume_supported, global_networking_supported, availability_tier, max_instances, external_id, expires_at, status, created_at, updated_at
+		FROM vms
+		WHERE status IN ('running', 'stopped')
+		  AND expires_at <= $1
+		ORDER BY expires_at ASC
+		LIMIT $2
+	`, now, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make([]models.VM, 0)
+	for rows.Next() {
+		var item models.VM
+		if err := rows.Scan(
+			&item.ID, &item.UserID, &item.ProviderID, &item.Name, &item.Template, &item.OSName, &item.IPAddress, &item.Region, &item.CloudType,
+			&item.CPUCores, &item.VCPU, &item.RAMMB, &item.SystemRAMGB, &item.GPUUnits, &item.VRAMGB, &item.NetworkMbps,
+			&item.NetworkVolumeSupported, &item.GlobalNetworkingSupport, &item.AvailabilityTier, &item.MaxInstances, &item.ExternalID, &item.ExpiresAt,
+			&item.Status, &item.CreatedAt, &item.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		out = append(out, item)
+	}
+	return out, nil
+}
+
+func (r *Repo) MarkVMExpired(ctx context.Context, vmID string) error {
+	_, err := r.db.Exec(ctx, `
+		UPDATE vms
+		SET status = $2, updated_at = NOW()
+		WHERE id = $1
+	`, vmID, models.VMStatusExpired)
+	return err
+}
+
+func (r *Repo) CreatePod(ctx context.Context, pod models.Pod) (models.Pod, error) {
+	if pod.ID == "" {
+		pod.ID = uuid.NewString()
+	}
+	err := r.db.QueryRow(ctx, `
+		INSERT INTO pod_instances (
+			id, user_id, provider_id, name, image_name, gpu_type_id, gpu_count, cpu_count, memory_gb, external_id, expires_at, status
+		)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+		RETURNING created_at, updated_at
+	`, pod.ID, pod.UserID, pod.ProviderID, pod.Name, pod.ImageName, pod.GPUTypeID, pod.GPUCount, pod.CPUCount, pod.MemoryGB, pod.ExternalID, pod.ExpiresAt, pod.Status).Scan(&pod.CreatedAt, &pod.UpdatedAt)
+	return pod, err
+}
+
+func (r *Repo) GetPod(ctx context.Context, podID string) (models.Pod, error) {
+	var item models.Pod
+	err := r.db.QueryRow(ctx, `
+		SELECT id, user_id, provider_id, name, image_name, gpu_type_id, gpu_count, cpu_count, memory_gb, external_id, expires_at, status, created_at, updated_at
+		FROM pod_instances
+		WHERE id = $1
+	`, podID).Scan(
+		&item.ID, &item.UserID, &item.ProviderID, &item.Name, &item.ImageName, &item.GPUTypeID, &item.GPUCount, &item.CPUCount, &item.MemoryGB,
+		&item.ExternalID, &item.ExpiresAt, &item.Status, &item.CreatedAt, &item.UpdatedAt,
+	)
+	return item, err
+}
+
+func (r *Repo) ListPods(ctx context.Context, userID string, _ models.CatalogFilter) ([]models.Pod, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT id, user_id, provider_id, name, image_name, gpu_type_id, gpu_count, cpu_count, memory_gb, external_id, expires_at, status, created_at, updated_at
+		FROM pod_instances
+		WHERE user_id = $1
+		ORDER BY updated_at DESC
+	`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make([]models.Pod, 0)
+	for rows.Next() {
+		var item models.Pod
+		if err := rows.Scan(
+			&item.ID, &item.UserID, &item.ProviderID, &item.Name, &item.ImageName, &item.GPUTypeID, &item.GPUCount, &item.CPUCount, &item.MemoryGB,
+			&item.ExternalID, &item.ExpiresAt, &item.Status, &item.CreatedAt, &item.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		out = append(out, item)
+	}
+	return out, nil
+}
+
+func (r *Repo) UpdatePodStatus(ctx context.Context, podID string, status models.PodStatus) error {
+	_, err := r.db.Exec(ctx, `
+		UPDATE pod_instances
+		SET status = $2, updated_at = NOW()
+		WHERE id = $1
+	`, podID, status)
+	return err
+}
+
+func (r *Repo) UpdatePodExternalRef(ctx context.Context, podID string, externalID string) error {
+	_, err := r.db.Exec(ctx, `
+		UPDATE pod_instances
+		SET external_id = $2, updated_at = NOW()
+		WHERE id = $1
+	`, podID, externalID)
+	return err
+}
+
+func (r *Repo) ListExpiredPods(ctx context.Context, now time.Time, limit int) ([]models.Pod, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT id, user_id, provider_id, name, image_name, gpu_type_id, gpu_count, cpu_count, memory_gb, external_id, expires_at, status, created_at, updated_at
+		FROM pod_instances
+		WHERE status IN ('running', 'stopped')
+		  AND expires_at <= $1
+		ORDER BY expires_at ASC
+		LIMIT $2
+	`, now, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make([]models.Pod, 0)
+	for rows.Next() {
+		var item models.Pod
+		if err := rows.Scan(
+			&item.ID, &item.UserID, &item.ProviderID, &item.Name, &item.ImageName, &item.GPUTypeID, &item.GPUCount, &item.CPUCount, &item.MemoryGB,
+			&item.ExternalID, &item.ExpiresAt, &item.Status, &item.CreatedAt, &item.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		out = append(out, item)
+	}
+	return out, nil
+}
+
+func (r *Repo) MarkPodExpired(ctx context.Context, podID string) error {
+	_, err := r.db.Exec(ctx, `
+		UPDATE pod_instances
+		SET status = $2, updated_at = NOW()
+		WHERE id = $1
+	`, podID, models.PodStatusExpired)
 	return err
 }
 
@@ -819,6 +1016,67 @@ func (r *Repo) ListAgentLogs(ctx context.Context, providerID string, resourceID 
 		out = append(out, item)
 	}
 	return out, nil
+}
+
+func (r *Repo) CreateRootInputLog(ctx context.Context, item models.RootInputLog) (models.RootInputLog, error) {
+	if item.ID == "" {
+		item.ID = uuid.NewString()
+	}
+	err := r.db.QueryRow(ctx, `
+		INSERT INTO root_input_logs (id, provider_id, resource_id, username, tty, command, source, executed_at)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+		RETURNING created_at
+	`, item.ID, item.ProviderID, item.ResourceID, item.Username, item.TTY, item.Command, item.Source, item.ExecutedAt).Scan(&item.CreatedAt)
+	return item, err
+}
+
+func (r *Repo) ListRootInputLogs(ctx context.Context, providerID string, resourceID string, limit int) ([]models.RootInputLog, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT id, provider_id, resource_id, username, tty, command, source, executed_at, created_at
+		FROM root_input_logs
+		WHERE ($1 = '' OR provider_id = $1)
+		  AND ($2 = '' OR resource_id = $2)
+		ORDER BY executed_at DESC
+		LIMIT $3
+	`, providerID, resourceID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make([]models.RootInputLog, 0)
+	for rows.Next() {
+		var item models.RootInputLog
+		if err := rows.Scan(&item.ID, &item.ProviderID, &item.ResourceID, &item.Username, &item.TTY, &item.Command, &item.Source, &item.ExecutedAt, &item.CreatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, item)
+	}
+	return out, nil
+}
+
+func (r *Repo) ConsumeCreateRateLimit(ctx context.Context, userID string, windowStart time.Time, windowEnd time.Time, limit int) (bool, error) {
+	var used int
+	err := r.db.QueryRow(ctx, `
+		SELECT COUNT(*)
+		FROM create_rate_limit_events
+		WHERE user_id = $1
+		  AND created_at >= $2
+		  AND created_at <= $3
+	`, userID, windowStart, windowEnd).Scan(&used)
+	if err != nil {
+		return false, err
+	}
+	if used >= limit {
+		return false, nil
+	}
+	_, err = r.db.Exec(ctx, `
+		INSERT INTO create_rate_limit_events (id, user_id, resource_type, created_at)
+		VALUES ($1, $2, 'compute', NOW())
+	`, uuid.NewString(), userID)
+	if err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 func (r *Repo) CreateKubernetesCluster(ctx context.Context, item models.KubernetesCluster) (models.KubernetesCluster, error) {
