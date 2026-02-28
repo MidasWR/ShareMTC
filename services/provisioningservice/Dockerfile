@@ -7,5 +7,5 @@ RUN cd services/provisioningservice && go mod tidy && CGO_ENABLED=0 go build -o 
 
 FROM alpine:3.20
 RUN apk add --no-cache ca-certificates
-COPY --from=builder /bin/hostagent /provisioningservice
+COPY --from=builder /bin/provisioningservice /provisioningservice
 ENTRYPOINT ["/provisioningservice"]
