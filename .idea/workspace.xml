@@ -4,24 +4,7 @@
     <option name="autoReloadType" value="ALL" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="093339f5-8e40-4fff-8dda-262df5227056" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/charts/ChartsServices/templates/resource/deployment.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/charts/ChartsServices/templates/resource/deployment.yaml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/charts/ChartsServices/values.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/charts/ChartsServices/values.yaml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/go.work" beforeDir="false" afterPath="$PROJECT_DIR$/go.work" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/frontend/src/features/admin/access/AdminAccessPanel.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/services/frontend/src/features/admin/access/AdminAccessPanel.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/frontend/src/features/resources/api/resourcesApi.ts" beforeDir="false" afterPath="$PROJECT_DIR$/services/frontend/src/features/resources/api/resourcesApi.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/frontend/src/types/api.ts" beforeDir="false" afterPath="$PROJECT_DIR$/services/frontend/src/types/api.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/resourceservice/cmd/main.go" beforeDir="false" afterPath="$PROJECT_DIR$/services/resourceservice/cmd/main.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/resourceservice/config/config.go" beforeDir="false" afterPath="$PROJECT_DIR$/services/resourceservice/config/config.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/resourceservice/go.mod" beforeDir="false" afterPath="$PROJECT_DIR$/services/resourceservice/go.mod" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/resourceservice/internal/adapter/http/handlers.go" beforeDir="false" afterPath="$PROJECT_DIR$/services/resourceservice/internal/adapter/http/handlers.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/resourceservice/internal/adapter/storage/postgres.go" beforeDir="false" afterPath="$PROJECT_DIR$/services/resourceservice/internal/adapter/storage/postgres.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/resourceservice/internal/models/resource.go" beforeDir="false" afterPath="$PROJECT_DIR$/services/resourceservice/internal/models/resource.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/resourceservice/internal/service/resource_service.go" beforeDir="false" afterPath="$PROJECT_DIR$/services/resourceservice/internal/service/resource_service.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/resourceservice/internal/service/resource_service_test.go" beforeDir="false" afterPath="$PROJECT_DIR$/services/resourceservice/internal/service/resource_service_test.go" afterDir="false" />
-    </list>
+    <list default="true" id="093339f5-8e40-4fff-8dda-262df5227056" name="Changes" comment="" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
