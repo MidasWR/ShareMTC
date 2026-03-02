@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"strings"
 
@@ -80,42 +81,54 @@ func (r *PostgresRepo) CreateLocalUser(ctx context.Context, email string, passwo
 func (r *PostgresRepo) GetByEmail(ctx context.Context, email string) (models.User, error) {
 	email = strings.ToLower(strings.TrimSpace(email))
 	var user models.User
+	var googleSub sql.NullString
 	err := r.db.QueryRow(ctx, `
 		SELECT id, email, password_hash, google_sub, role, created_at
 		FROM users
 		WHERE email = $1
-	`, email).Scan(&user.ID, &user.Email, &user.PasswordHash, &user.GoogleSub, &user.Role, &user.CreatedAt)
+	`, email).Scan(&user.ID, &user.Email, &user.PasswordHash, &googleSub, &user.Role, &user.CreatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return models.User{}, errors.New("user not found")
 		}
-		return models.User{}, errors.New("user not found")
+		return models.User{}, err
+	}
+	if googleSub.Valid {
+		user.GoogleSub = googleSub.String
 	}
 	return user, nil
 }
 
 func (r *PostgresRepo) UpsertGoogleUser(ctx context.Context, email string, googleSub string, role string) (models.User, error) {
 	var user models.User
+	var userGoogleSub sql.NullString
 	err := r.db.QueryRow(ctx, `
 		INSERT INTO users (id, email, google_sub, role)
 		VALUES ($1, $2, $3, $4)
 		ON CONFLICT (email) DO UPDATE SET google_sub = EXCLUDED.google_sub
 		RETURNING id, email, password_hash, google_sub, role, created_at
 	`, uuid.NewString(), email, googleSub, role).Scan(
-		&user.ID, &user.Email, &user.PasswordHash, &user.GoogleSub, &user.Role, &user.CreatedAt,
+		&user.ID, &user.Email, &user.PasswordHash, &userGoogleSub, &user.Role, &user.CreatedAt,
 	)
+	if userGoogleSub.Valid {
+		user.GoogleSub = userGoogleSub.String
+	}
 	return user, err
 }
 
 func (r *PostgresRepo) GetByID(ctx context.Context, userID string) (models.User, error) {
 	var user models.User
+	var googleSub sql.NullString
 	err := r.db.QueryRow(ctx, `
 		SELECT id, email, password_hash, google_sub, role, created_at
 		FROM users
 		WHERE id = $1
-	`, userID).Scan(&user.ID, &user.Email, &user.PasswordHash, &user.GoogleSub, &user.Role, &user.CreatedAt)
+	`, userID).Scan(&user.ID, &user.Email, &user.PasswordHash, &googleSub, &user.Role, &user.CreatedAt)
 	if err != nil {
 		return models.User{}, errors.New("user not found")
+	}
+	if googleSub.Valid {
+		user.GoogleSub = googleSub.String
 	}
 	return user, nil
 }
