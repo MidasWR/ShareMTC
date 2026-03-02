@@ -5,14 +5,64 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="093339f5-8e40-4fff-8dda-262df5227056" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/.github/workflows/hostagent-release.yml" beforeDir="false" afterPath="$PROJECT_DIR$/.github/workflows/hostagent-release.yml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Makefile" beforeDir="false" afterPath="$PROJECT_DIR$/Makefile" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/charts/ChartsServices/templates/admin/deployment.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/charts/ChartsServices/templates/admin/deployment.yaml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/charts/ChartsServices/values.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/charts/ChartsServices/values.yaml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/adminservice/cmd/main.go" beforeDir="false" afterPath="$PROJECT_DIR$/services/adminservice/cmd/main.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/adminservice/config/config.go" beforeDir="false" afterPath="$PROJECT_DIR$/services/adminservice/config/config.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/adminservice/internal/adapter/http/handlers.go" beforeDir="false" afterPath="$PROJECT_DIR$/services/adminservice/internal/adapter/http/handlers.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/adminservice/internal/adapter/storage/postgres.go" beforeDir="false" afterPath="$PROJECT_DIR$/services/adminservice/internal/adapter/storage/postgres.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/frontend/src/app/i18n/index.ts" beforeDir="false" afterPath="$PROJECT_DIR$/services/frontend/src/app/i18n/index.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/frontend/src/app/shell/AppShell.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/services/frontend/src/app/shell/AppShell.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/frontend/src/design/components/Toast.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/services/frontend/src/design/components/Toast.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/frontend/src/design/patterns/DataFreshnessBadge.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/services/frontend/src/design/patterns/DataFreshnessBadge.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/frontend/src/design/primitives/Button.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/services/frontend/src/design/primitives/Button.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/frontend/src/design/primitives/Input.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/services/frontend/src/design/primitives/Input.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/frontend/src/design/primitives/MultiSelect.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/services/frontend/src/design/primitives/MultiSelect.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/frontend/src/design/primitives/Select.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/services/frontend/src/design/primitives/Select.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/frontend/src/design/primitives/Textarea.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/services/frontend/src/design/primitives/Textarea.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/frontend/src/features/admin/access/AdminAccessPanel.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/services/frontend/src/features/admin/access/AdminAccessPanel.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/frontend/src/features/admin/catalog/AdminPodsPanel.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/services/frontend/src/features/admin/catalog/AdminPodsPanel.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/frontend/src/features/admin/console/AdminConsolePanel.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/services/frontend/src/features/admin/console/AdminConsolePanel.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/frontend/src/features/admin/servers/AdminServersPanel.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/services/frontend/src/features/admin/servers/AdminServersPanel.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/frontend/src/features/admin/servers/components/CreateServerModal.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/services/frontend/src/features/admin/servers/components/CreateServerModal.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/frontend/src/features/admin/servers/hooks/useServers.ts" beforeDir="false" afterPath="$PROJECT_DIR$/services/frontend/src/features/admin/servers/hooks/useServers.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/frontend/src/features/agent/onboarding/AgentOnboardingPanel.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/services/frontend/src/features/agent/onboarding/AgentOnboardingPanel.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/frontend/src/features/auth/api/authApi.ts" beforeDir="false" afterPath="$PROJECT_DIR$/services/frontend/src/features/auth/api/authApi.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/frontend/src/features/catalog/PodsCatalogPanel.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/services/frontend/src/features/catalog/PodsCatalogPanel.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/frontend/src/features/dashboard/admin/AdminDashboardPanel.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/services/frontend/src/features/dashboard/admin/AdminDashboardPanel.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/frontend/src/features/dashboard/core/CoreDashboardPanel.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/services/frontend/src/features/dashboard/core/CoreDashboardPanel.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/frontend/src/features/hifi/mockData.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/frontend/src/features/marketplace/MarketplacePanel.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/services/frontend/src/features/marketplace/MarketplacePanel.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/frontend/src/features/provider/dashboard/ProviderDashboardPanel.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/services/frontend/src/features/provider/dashboard/ProviderDashboardPanel.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/frontend/src/features/rental/ServerRentalPanel.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/services/frontend/src/features/rental/ServerRentalPanel.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/frontend/src/features/resources/api/resourcesApi.ts" beforeDir="false" afterPath="$PROJECT_DIR$/services/frontend/src/features/resources/api/resourcesApi.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/frontend/src/features/resources/components/CreateAllocationModal.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/services/frontend/src/features/resources/components/CreateAllocationModal.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/frontend/src/features/resources/k8s/K8sClustersPanel.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/services/frontend/src/features/resources/k8s/K8sClustersPanel.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/frontend/src/features/resources/shared/SharedPodsPanel.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/services/frontend/src/features/resources/shared/SharedPodsPanel.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/frontend/src/features/resources/vm/VMPanel.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/services/frontend/src/features/resources/vm/VMPanel.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/frontend/src/features/settings/SettingsPanel.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/services/frontend/src/features/settings/SettingsPanel.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/frontend/src/lib/http.ts" beforeDir="false" afterPath="$PROJECT_DIR$/services/frontend/src/lib/http.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/frontend/src/styles.css" beforeDir="false" afterPath="$PROJECT_DIR$/services/frontend/src/styles.css" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/frontend/src/types/api.ts" beforeDir="false" afterPath="$PROJECT_DIR$/services/frontend/src/types/api.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/frontend/src/ui/AuthPanel.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/services/frontend/src/ui/AuthPanel.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/frontend/tests/a11y.spec.ts" beforeDir="false" afterPath="$PROJECT_DIR$/services/frontend/tests/a11y.spec.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/frontend/tsconfig.tsbuildinfo" beforeDir="false" afterPath="$PROJECT_DIR$/services/frontend/tsconfig.tsbuildinfo" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/resourceservice/cmd/main.go" beforeDir="false" afterPath="$PROJECT_DIR$/services/resourceservice/cmd/main.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/resourceservice/internal/adapter/http/handlers.go" beforeDir="false" afterPath="$PROJECT_DIR$/services/resourceservice/internal/adapter/http/handlers.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/resourceservice/internal/adapter/storage/postgres.go" beforeDir="false" afterPath="$PROJECT_DIR$/services/resourceservice/internal/adapter/storage/postgres.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/resourceservice/internal/models/resource.go" beforeDir="false" afterPath="$PROJECT_DIR$/services/resourceservice/internal/models/resource.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/resourceservice/internal/service/resource_service.go" beforeDir="false" afterPath="$PROJECT_DIR$/services/resourceservice/internal/service/resource_service.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/resourceservice/internal/service/resource_service_test.go" beforeDir="false" afterPath="$PROJECT_DIR$/services/resourceservice/internal/service/resource_service_test.go" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
     <option name="LAST_RESOLUTION" value="IGNORE" />
   </component>
-  <component name="GOROOT" url="file://$PROJECT_DIR$/../go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.7.linux-amd64" />
+  <component name="GOROOT" url="file://$USER_HOME$/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.7.linux-amd64" />
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
@@ -40,28 +90,28 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "KUBERNETES_SUPPRESS_CONFIG_CLUSTER_SUGGESTION": "true",
-    "ModuleVcsDetector.initialDetectionPerformed": "true",
-    "RunOnceActivity.GoLinterPluginOnboarding": "true",
-    "RunOnceActivity.GoLinterPluginStorageMigration": "true",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager": "true",
-    "RunOnceActivity.git.unshallow": "true",
-    "RunOnceActivity.go.formatter.settings.were.checked": "true",
-    "RunOnceActivity.go.migrated.go.modules.settings": "true",
-    "RunOnceActivity.go.modules.go.list.on.any.changes.was.set": "true",
-    "git-widget-placeholder": "main",
-    "go.import.settings.migrated": "true",
-    "go.sdk.automatically.set": "true",
-    "last_opened_file_path": "/home/midas/ShareMTC/services/provisioningservice",
-    "node.js.detected.package.eslint": "true",
-    "node.js.selected.package.eslint": "(autodetect)",
-    "nodejs_package_manager_path": "npm",
-    "settings.editor.selected.configurable": "ml.llm.LLMDataSharingConfigurable"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;KUBERNETES_SUPPRESS_CONFIG_CLUSTER_SUGGESTION&quot;: &quot;true&quot;,
+    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.GoLinterPluginOnboarding&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.GoLinterPluginStorageMigration&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.go.formatter.settings.were.checked&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.go.migrated.go.modules.settings&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.go.modules.go.list.on.any.changes.was.set&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;main&quot;,
+    &quot;go.import.settings.migrated&quot;: &quot;true&quot;,
+    &quot;go.sdk.automatically.set&quot;: &quot;true&quot;,
+    &quot;last_opened_file_path&quot;: &quot;/home/midas/ShareMTC/services/provisioningservice&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;ml.llm.LLMDataSharingConfigurable&quot;
   }
-}]]></component>
+}</component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
       <recent name="$PROJECT_DIR$/services/provisioningservice" />
