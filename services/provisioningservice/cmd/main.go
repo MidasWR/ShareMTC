@@ -26,6 +26,14 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	logger.Info().
+		Str("port", cfg.Port).
+		Str("do_base_url", cfg.DigitalOceanBaseURL).
+		Str("runpod_base_url", cfg.RunPodBaseURL).
+		Dur("http_client_timeout", cfg.HTTPClientTimeout).
+		Dur("ttl_worker_interval", cfg.TTLWorkerInterval).
+		Int("max_delete_retry", cfg.MaxDeleteRetry).
+		Msg("provisioningservice configuration loaded")
 	pool, err := db.Connect(context.Background(), cfg.PostgresDSN)
 	if err != nil {
 		logger.Fatal().Err(err).Msg("postgres connect failed")
@@ -33,16 +41,22 @@ func main() {
 	defer pool.Close()
 
 	repo := storage.NewRepo(pool)
+	logger.Info().Msg("provisioning repository initialized")
 	if err := repo.Migrate(context.Background()); err != nil {
 		logger.Fatal().Err(err).Msg("migration failed")
 	}
+	logger.Info().Msg("provisioning database migrations applied")
 
 	doProvider := digitalocean.NewClient(cfg.DigitalOceanBaseURL, cfg.DigitalOceanToken, cfg.HTTPClientTimeout)
 	rpProvider := runpod.NewClient(cfg.RunPodBaseURL, cfg.RunPodAPIKey, cfg.HTTPClientTimeout)
+	logger.Info().Msg("provider clients initialized")
 	svc := service.NewProvisioningService(repo, doProvider, rpProvider, cfg.MaxDeleteRetry)
+	logger.Info().Msg("provisioning service initialized")
 	handler := httpadapter.NewHandler(svc, cfg.ServiceToken)
+	logger.Info().Msg("provisioning http handler initialized")
 
 	go runTTLWorker(logger, svc, cfg.TTLWorkerInterval)
+	logger.Info().Msg("provisioning ttl worker started")
 
 	r := chi.NewRouter()
 	r.Get("/healthz", handler.Health)
@@ -72,6 +86,7 @@ func runTTLWorker(logger zerolog.Logger, svc *service.ProvisioningService, inter
 	}
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
+	logger.Debug().Dur("interval", interval).Msg("ttl worker ticker initialized")
 	for {
 		if err := svc.RunTTLPass(context.Background()); err != nil {
 			logger.Error().Err(err).Msg("ttl worker pass failed")

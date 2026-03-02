@@ -52,7 +52,10 @@ export function deletePodTemplate(templateID: string) {
 }
 
 export function getAgentInstallCommand() {
-  return apiClient.get<{ command: string; installer_url: string }>(`${API_BASE.admin}/v1/admin/agent/install-command`);
+  return apiClient.get<{ command: string; installer_url: string }>(
+    `${API_BASE.admin}/v1/admin/agent/install-command`,
+    { preserveSessionOnAuthError: true }
+  );
 }
 
 export function getPodProxyInfo(podID: string) {

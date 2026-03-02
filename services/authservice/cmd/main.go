@@ -28,6 +28,11 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	logger.Info().
+		Str("port", cfg.Port).
+		Int("token_ttl_minutes", cfg.TokenTTLMinutes).
+		Bool("writer_tls", cfg.MidasWriterTLS).
+		Msg("authservice configuration loaded")
 
 	ctx := context.Background()
 	pool, err := db.Connect(ctx, cfg.PostgresDSN)
@@ -37,12 +42,16 @@ func main() {
 	defer pool.Close()
 
 	repo := storage.NewPostgresRepo(pool)
+	logger.Info().Msg("auth repository initialized")
 	if err := repo.Migrate(ctx); err != nil {
 		logger.Fatal().Err(err).Msg("migration failed")
 	}
+	logger.Info().Msg("auth database migrations applied")
 
 	svc := service.New(repo, cfg.JWTSecret, time.Duration(cfg.TokenTTLMinutes)*time.Minute)
+	logger.Info().Msg("auth service initialized")
 	handler := httpadapter.NewHandler(svc, logger, cfg.GoogleClientID, cfg.GoogleSecret, cfg.GoogleRedirect)
+	logger.Info().Str("google_redirect", cfg.GoogleRedirect).Msg("auth http handler initialized")
 
 	r := chi.NewRouter()
 	r.Get("/healthz", handler.Health)

@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"log"
 	"os"
 	"strconv"
 	"strings"
@@ -33,11 +34,13 @@ type Event struct {
 
 func main() {
 	cfg := loadConfig()
+	log.Printf("vmdaemon config loaded: provider=%s resource=%s type=%s topic=%s interval=%s brokers=%v audit_log=%s", cfg.ProviderID, cfg.ResourceID, cfg.ResourceType, cfg.KafkaTopic, cfg.Interval, cfg.KafkaBrokers, cfg.AuditLogPath)
 	producer, err := newProducer(cfg.KafkaBrokers)
 	if err != nil {
 		panic(err)
 	}
 	defer producer.Close()
+	log.Printf("vmdaemon kafka producer initialized")
 	ctx := context.Background()
 
 	lastAuditOffset := int64(0)
@@ -46,6 +49,7 @@ func main() {
 
 	for {
 		now := time.Now().UTC()
+		log.Printf("vmdaemon tick: resource=%s now=%s", cfg.ResourceID, now.Format(time.RFC3339))
 		_ = publishEvent(ctx, producer, cfg.KafkaTopic, cfg.ResourceID, Event{
 			EventType:  "health_check",
 			ProviderID: cfg.ProviderID,
@@ -97,6 +101,7 @@ func main() {
 
 		lines, nextOffset, err := readAuditDelta(cfg.AuditLogPath, lastAuditOffset)
 		if err == nil {
+			log.Printf("vmdaemon audit delta loaded: lines=%d old_offset=%d new_offset=%d", len(lines), lastAuditOffset, nextOffset)
 			lastAuditOffset = nextOffset
 			for _, line := range lines {
 				if !looksLikeRootExec(line) {
@@ -118,6 +123,7 @@ func main() {
 						"source":   "auditd",
 					},
 				})
+				log.Printf("vmdaemon root command detected and published: resource=%s", cfg.ResourceID)
 			}
 		}
 		<-ticker.C

@@ -10,6 +10,7 @@ import (
 	"github.com/MidasWR/ShareMTC/services/provisioningservice/internal/adapter/providers/digitalocean"
 	"github.com/MidasWR/ShareMTC/services/provisioningservice/internal/adapter/providers/runpod"
 	"github.com/MidasWR/ShareMTC/services/provisioningservice/internal/models"
+	"github.com/rs/zerolog/log"
 )
 
 type Repository interface {
@@ -45,6 +46,7 @@ func NewProvisioningService(repo Repository, doProvider DigitalOceanProvider, ru
 	if maxDeleteRetry <= 0 {
 		maxDeleteRetry = 6
 	}
+	log.Info().Int("max_delete_retry", maxDeleteRetry).Msg("provisioning service initialized")
 	return &ProvisioningService{
 		repo:           repo,
 		doProvider:     doProvider,
@@ -54,13 +56,16 @@ func NewProvisioningService(repo Repository, doProvider DigitalOceanProvider, ru
 }
 
 func (s *ProvisioningService) CreateVM(ctx context.Context, req models.ProvisionVMRequest) (models.ProvisionResult, error) {
+	log.Info().Str("request_id", req.RequestID).Str("provider_id", req.ProviderID).Str("name", req.Name).Msg("provision vm requested")
 	if req.RequestID == "" || req.UserID == "" || req.ProviderID == "" || req.Name == "" || req.Region == "" || req.Size == "" || req.Image == "" {
+		log.Warn().Msg("provision vm rejected: missing required fields")
 		return models.ProvisionResult{}, errors.New("request_id, user_id, provider_id, name, region, size and image are required")
 	}
 	if !req.ExpiresAt.After(time.Now().UTC()) {
 		return models.ProvisionResult{}, errors.New("expires_at must be in the future")
 	}
 	if existing, err := s.repo.GetJobByRequestID(ctx, req.RequestID); err == nil {
+		log.Info().Str("request_id", req.RequestID).Str("job_id", existing.ID).Msg("provision vm idempotency hit")
 		return s.jobToResult(existing), nil
 	}
 
@@ -74,6 +79,7 @@ func (s *ProvisioningService) CreateVM(ctx context.Context, req models.Provision
 		ExpiresAt:    req.ExpiresAt,
 	})
 	if err != nil {
+		log.Error().Err(err).Str("request_id", req.RequestID).Msg("provision vm failed on job create")
 		return models.ProvisionResult{}, err
 	}
 
@@ -86,6 +92,7 @@ func (s *ProvisioningService) CreateVM(ctx context.Context, req models.Provision
 		UserData:           req.UserData,
 	})
 	if err != nil {
+		log.Error().Err(err).Str("job_id", job.ID).Str("request_id", req.RequestID).Msg("provision vm failed on provider create")
 		nextRetry := time.Now().UTC().Add(30 * time.Second)
 		_ = s.repo.MarkJobFailed(ctx, job.ID, nextRetry, err.Error())
 		return models.ProvisionResult{}, err
@@ -93,6 +100,7 @@ func (s *ProvisioningService) CreateVM(ctx context.Context, req models.Provision
 
 	response := map[string]any{"external_id": provisioned.ID, "public_ip": provisioned.PublicIP}
 	if err := s.repo.MarkJobSucceeded(ctx, job.ID, provisioned.ID, response); err != nil {
+		log.Error().Err(err).Str("job_id", job.ID).Msg("provision vm failed on mark success")
 		return models.ProvisionResult{}, err
 	}
 	if _, err := s.repo.UpsertExternalResource(ctx, models.ExternalResource{
@@ -105,10 +113,12 @@ func (s *ProvisioningService) CreateVM(ctx context.Context, req models.Provision
 		PublicIP:     provisioned.PublicIP,
 		ExpiresAt:    req.ExpiresAt,
 	}); err != nil {
+		log.Error().Err(err).Str("job_id", job.ID).Str("external_id", provisioned.ID).Msg("provision vm failed on external resource upsert")
 		return models.ProvisionResult{}, err
 	}
 	job.Status = models.JobStatusSucceeded
 	job.ExternalID = provisioned.ID
+	log.Info().Str("job_id", job.ID).Str("external_id", provisioned.ID).Msg("provision vm completed")
 	return models.ProvisionResult{
 		JobID:        job.ID,
 		RequestID:    job.RequestID,
@@ -124,7 +134,9 @@ func (s *ProvisioningService) CreateVM(ctx context.Context, req models.Provision
 }
 
 func (s *ProvisioningService) CreatePod(ctx context.Context, req models.ProvisionPodRequest) (models.ProvisionResult, error) {
+	log.Info().Str("request_id", req.RequestID).Str("provider_id", req.ProviderID).Str("name", req.Name).Msg("provision pod requested")
 	if req.RequestID == "" || req.UserID == "" || req.ProviderID == "" || req.Name == "" || req.ImageName == "" || req.GPUTypeID == "" {
+		log.Warn().Msg("provision pod rejected: missing required fields")
 		return models.ProvisionResult{}, errors.New("request_id, user_id, provider_id, name, image_name and gpu_type_id are required")
 	}
 	if req.GPUCount <= 0 || req.CPUCount <= 0 || req.MemoryGB <= 0 {
@@ -134,6 +146,7 @@ func (s *ProvisioningService) CreatePod(ctx context.Context, req models.Provisio
 		return models.ProvisionResult{}, errors.New("expires_at must be in the future")
 	}
 	if existing, err := s.repo.GetJobByRequestID(ctx, req.RequestID); err == nil {
+		log.Info().Str("request_id", req.RequestID).Str("job_id", existing.ID).Msg("provision pod idempotency hit")
 		return s.jobToResult(existing), nil
 	}
 	job, err := s.repo.CreateJob(ctx, models.Job{
@@ -146,6 +159,7 @@ func (s *ProvisioningService) CreatePod(ctx context.Context, req models.Provisio
 		ExpiresAt:    req.ExpiresAt,
 	})
 	if err != nil {
+		log.Error().Err(err).Str("request_id", req.RequestID).Msg("provision pod failed on job create")
 		return models.ProvisionResult{}, err
 	}
 
@@ -158,12 +172,14 @@ func (s *ProvisioningService) CreatePod(ctx context.Context, req models.Provisio
 		MemoryGB:  req.MemoryGB,
 	})
 	if err != nil {
+		log.Error().Err(err).Str("job_id", job.ID).Str("request_id", req.RequestID).Msg("provision pod failed on provider create")
 		nextRetry := time.Now().UTC().Add(30 * time.Second)
 		_ = s.repo.MarkJobFailed(ctx, job.ID, nextRetry, err.Error())
 		return models.ProvisionResult{}, err
 	}
 	response := map[string]any{"external_id": provisioned.ID}
 	if err := s.repo.MarkJobSucceeded(ctx, job.ID, provisioned.ID, response); err != nil {
+		log.Error().Err(err).Str("job_id", job.ID).Msg("provision pod failed on mark success")
 		return models.ProvisionResult{}, err
 	}
 	if _, err := s.repo.UpsertExternalResource(ctx, models.ExternalResource{
@@ -175,8 +191,10 @@ func (s *ProvisioningService) CreatePod(ctx context.Context, req models.Provisio
 		Status:       "active",
 		ExpiresAt:    req.ExpiresAt,
 	}); err != nil {
+		log.Error().Err(err).Str("job_id", job.ID).Str("external_id", provisioned.ID).Msg("provision pod failed on external resource upsert")
 		return models.ProvisionResult{}, err
 	}
+	log.Info().Str("job_id", job.ID).Str("external_id", provisioned.ID).Msg("provision pod completed")
 	return models.ProvisionResult{
 		JobID:        job.ID,
 		RequestID:    job.RequestID,
@@ -191,10 +209,13 @@ func (s *ProvisioningService) CreatePod(ctx context.Context, req models.Provisio
 }
 
 func (s *ProvisioningService) DeleteResource(ctx context.Context, req models.DeleteResourceRequest) (models.ProvisionResult, error) {
+	log.Info().Str("request_id", req.RequestID).Str("external_id", req.ExternalID).Str("provider", string(req.Provider)).Str("resource_type", string(req.ResourceType)).Msg("delete resource requested")
 	if req.RequestID == "" || req.ExternalID == "" {
+		log.Warn().Msg("delete resource rejected: missing request_id or external_id")
 		return models.ProvisionResult{}, errors.New("request_id and external_id are required")
 	}
 	if existing, err := s.repo.GetJobByRequestID(ctx, req.RequestID); err == nil {
+		log.Info().Str("request_id", req.RequestID).Str("job_id", existing.ID).Msg("delete resource idempotency hit")
 		return s.jobToResult(existing), nil
 	}
 	job, err := s.repo.CreateJob(ctx, models.Job{
@@ -207,16 +228,20 @@ func (s *ProvisioningService) DeleteResource(ctx context.Context, req models.Del
 		ExternalID:   req.ExternalID,
 	})
 	if err != nil {
+		log.Error().Err(err).Str("request_id", req.RequestID).Msg("delete resource failed on job create")
 		return models.ProvisionResult{}, err
 	}
 	if err := s.deleteExternal(ctx, req.Provider, req.ResourceType, req.ExternalID); err != nil {
+		log.Error().Err(err).Str("job_id", job.ID).Str("external_id", req.ExternalID).Msg("delete resource failed on provider call")
 		nextRetry := time.Now().UTC().Add(30 * time.Second)
 		_ = s.repo.MarkJobFailed(ctx, job.ID, nextRetry, err.Error())
 		return models.ProvisionResult{}, err
 	}
 	if err := s.repo.MarkJobSucceeded(ctx, job.ID, req.ExternalID, map[string]any{"deleted": true}); err != nil {
+		log.Error().Err(err).Str("job_id", job.ID).Msg("delete resource failed on mark success")
 		return models.ProvisionResult{}, err
 	}
+	log.Info().Str("job_id", job.ID).Str("external_id", req.ExternalID).Msg("delete resource completed")
 	return models.ProvisionResult{
 		JobID:        job.ID,
 		RequestID:    job.RequestID,
@@ -231,6 +256,7 @@ func (s *ProvisioningService) DeleteResource(ctx context.Context, req models.Del
 }
 
 func (s *ProvisioningService) GetJob(ctx context.Context, jobID string) (models.ProvisionResult, error) {
+	log.Debug().Str("job_id", jobID).Msg("get provisioning job")
 	job, err := s.repo.GetJobByID(ctx, jobID)
 	if err != nil {
 		return models.ProvisionResult{}, err
@@ -239,19 +265,26 @@ func (s *ProvisioningService) GetJob(ctx context.Context, jobID string) (models.
 }
 
 func (s *ProvisioningService) RunTTLPass(ctx context.Context) error {
+	log.Debug().Msg("ttl pass started")
 	expired, err := s.repo.LockExpiredResources(ctx, time.Now().UTC(), 100)
 	if err != nil {
+		log.Error().Err(err).Msg("ttl pass failed on lock expired resources")
 		return err
 	}
+	log.Info().Int("expired_count", len(expired)).Msg("ttl pass loaded expired resources")
 	for _, item := range expired {
 		if err := s.deleteExternal(ctx, item.Provider, item.ResourceType, item.ExternalID); err != nil {
+			log.Warn().Err(err).Str("resource_id", item.ID).Str("external_id", item.ExternalID).Msg("ttl pass delete failed, marking error")
 			_ = s.repo.MarkExternalResourceDeleteError(ctx, item.ID, err.Error())
 			continue
 		}
 		if err := s.repo.MarkExternalResourceDeleted(ctx, item.ID); err != nil {
+			log.Error().Err(err).Str("resource_id", item.ID).Msg("ttl pass failed on mark deleted")
 			return err
 		}
+		log.Info().Str("resource_id", item.ID).Str("external_id", item.ExternalID).Msg("ttl pass deleted resource")
 	}
+	log.Debug().Msg("ttl pass completed")
 	return nil
 }
 

@@ -30,6 +30,14 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	logger.Info().
+		Str("port", cfg.Port).
+		Dur("heartbeat_max_age", cfg.HeartbeatMaxAge).
+		Int("create_rate_limit_rpm", cfg.CreateRateLimitRPM).
+		Int("vm_ttl_minutes", cfg.VMTTLMinutes).
+		Str("vmdaemon_topic", cfg.VMDaemonKafkaTopic).
+		Strs("kafka_brokers", cfg.KafkaBrokers).
+		Msg("resourceservice configuration loaded")
 	pool, err := db.Connect(context.Background(), cfg.PostgresDSN)
 	if err != nil {
 		logger.Fatal().Err(err).Msg("postgres connect failed")
@@ -37,10 +45,13 @@ func main() {
 	defer pool.Close()
 
 	repo := storage.NewRepo(pool)
+	logger.Info().Msg("resource repository initialized")
 	if err := repo.Migrate(context.Background()); err != nil {
 		logger.Fatal().Err(err).Msg("migration failed")
 	}
+	logger.Info().Msg("resource database migrations applied")
 	provisioningClient := provisioning.NewClient(cfg.ProvisioningURL, cfg.ProvisioningServiceToken, cfg.ProvisioningHTTPTimeout)
+	logger.Info().Str("provisioning_url", cfg.ProvisioningURL).Dur("provisioning_timeout", cfg.ProvisioningHTTPTimeout).Msg("provisioning client initialized")
 	svc := service.NewResourceService(
 		repo,
 		cgroups.NewV2Applier(""),
@@ -53,16 +64,20 @@ func main() {
 		joinCSV(cfg.KafkaBrokers),
 		cfg.VMDaemonKafkaTopic,
 	)
+	logger.Info().Msg("resource service initialized")
 	go runExpiryWorker(logger, svc)
+	logger.Info().Msg("resource expiry worker started")
 	if len(cfg.KafkaBrokers) > 0 {
 		consumer := kafkaadapter.NewConsumer(cfg.KafkaBrokers, cfg.VMDaemonKafkaTopic, cfg.VMDaemonKafkaGroup, kafkaIngestHandler(svc))
 		go func() {
+			logger.Info().Strs("brokers", cfg.KafkaBrokers).Str("topic", cfg.VMDaemonKafkaTopic).Str("group", cfg.VMDaemonKafkaGroup).Msg("vmdaemon kafka consumer started")
 			if err := consumer.Run(context.Background()); err != nil {
 				logger.Error().Err(err).Msg("vmdaemon kafka consumer stopped")
 			}
 		}()
 	}
 	handler := httpadapter.NewHandler(svc)
+	logger.Info().Msg("resource http handler initialized")
 
 	r := chi.NewRouter()
 	r.Get("/healthz", handler.Health)
@@ -127,6 +142,7 @@ func main() {
 func runExpiryWorker(logger zerolog.Logger, svc *service.ResourceService) {
 	ticker := time.NewTicker(15 * time.Second)
 	defer ticker.Stop()
+	logger.Debug().Dur("interval", 15*time.Second).Msg("resource expiry ticker initialized")
 	for {
 		if err := svc.ExpireResources(context.Background(), time.Now().UTC()); err != nil {
 			logger.Error().Err(err).Msg("resource expiry pass failed")
@@ -137,6 +153,8 @@ func runExpiryWorker(logger zerolog.Logger, svc *service.ResourceService) {
 
 func kafkaIngestHandler(svc *service.ResourceService) func(context.Context, kafkaadapter.Event) error {
 	return func(ctx context.Context, event kafkaadapter.Event) error {
+		log := zerolog.Ctx(ctx)
+		log.Debug().Str("event_type", event.EventType).Str("provider_id", event.ProviderID).Str("resource_id", event.ResourceID).Msg("kafka vmdaemon event received")
 		switch event.EventType {
 		case "health_check":
 			return handleHealthCheckEvent(ctx, svc, event)

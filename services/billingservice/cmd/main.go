@@ -24,6 +24,9 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	logger.Info().
+		Str("port", cfg.Port).
+		Msg("billingservice configuration loaded")
 
 	pool, err := db.Connect(context.Background(), cfg.PostgresDSN)
 	if err != nil {
@@ -32,11 +35,15 @@ func main() {
 	defer pool.Close()
 
 	repo := storage.NewRepo(pool)
+	logger.Info().Msg("billing repository initialized")
 	if err := repo.Migrate(context.Background()); err != nil {
 		logger.Fatal().Err(err).Msg("migration failed")
 	}
+	logger.Info().Msg("billing database migrations applied")
 	svc := service.New(repo)
+	logger.Info().Msg("billing service initialized")
 	handler := httpadapter.NewHandler(svc)
+	logger.Info().Msg("billing http handler initialized")
 
 	r := chi.NewRouter()
 	r.Get("/healthz", handler.Health)

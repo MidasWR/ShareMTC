@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/MidasWR/ShareMTC/services/adminservice/internal/models"
+	"github.com/rs/zerolog/log"
 )
 
 type ProviderRepository interface {
@@ -27,14 +28,17 @@ type ProviderService struct {
 }
 
 func NewProviderService(repo ProviderRepository) *ProviderService {
+	log.Info().Msg("provider service initialized")
 	return &ProviderService{repo: repo}
 }
 
 func (s *ProviderService) Create(ctx context.Context, provider models.Provider) (models.Provider, error) {
+	log.Info().Str("provider_type", string(provider.ProviderType)).Str("machine_id", provider.MachineID).Msg("creating provider")
 	return s.repo.Create(ctx, provider)
 }
 
 func (s *ProviderService) List(ctx context.Context) ([]models.Provider, error) {
+	log.Debug().Msg("listing providers")
 	return s.repo.List(ctx)
 }
 
@@ -43,6 +47,7 @@ func (s *ProviderService) UpdateOnlineStatus(ctx context.Context, providerID str
 }
 
 func (s *ProviderService) GetByID(ctx context.Context, providerID string) (models.Provider, error) {
+	log.Debug().Str("provider_id", providerID).Msg("fetching provider by id")
 	return s.repo.GetByID(ctx, providerID)
 }
 
@@ -55,8 +60,10 @@ func (s *ProviderService) ProviderMetrics(ctx context.Context, providerID string
 }
 
 func (s *ProviderService) ListPodCatalog(ctx context.Context) ([]models.PodCatalogItem, error) {
+	log.Debug().Msg("listing pod catalog")
 	items, err := s.repo.ListPodCatalog(ctx)
 	if err != nil {
+		log.Error().Err(err).Msg("list pod catalog failed")
 		return nil, err
 	}
 	for i := range items {
@@ -66,11 +73,13 @@ func (s *ProviderService) ListPodCatalog(ctx context.Context) ([]models.PodCatal
 }
 
 func (s *ProviderService) UpsertPodCatalog(ctx context.Context, item models.PodCatalogItem) (models.PodCatalogItem, error) {
+	log.Info().Str("code", item.Code).Str("name", item.Name).Msg("upserting pod catalog item")
 	item.LogoURL = resolvePodLogoURL(item.Code, item.GPUModel)
 	return s.repo.UpsertPodCatalog(ctx, item)
 }
 
 func (s *ProviderService) DeletePodCatalog(ctx context.Context, id string) error {
+	log.Info().Str("pod_id", id).Msg("deleting pod catalog item")
 	return s.repo.DeletePodCatalog(ctx, id)
 }
 
@@ -79,10 +88,12 @@ func (s *ProviderService) ListPodTemplates(ctx context.Context) ([]models.PodTem
 }
 
 func (s *ProviderService) UpsertPodTemplate(ctx context.Context, item models.PodTemplate) (models.PodTemplate, error) {
+	log.Info().Str("code", item.Code).Str("name", item.Name).Msg("upserting pod template")
 	return s.repo.UpsertPodTemplate(ctx, item)
 }
 
 func (s *ProviderService) DeletePodTemplate(ctx context.Context, id string) error {
+	log.Info().Str("template_id", id).Msg("deleting pod template")
 	return s.repo.DeletePodTemplate(ctx, id)
 }
 

@@ -17,13 +17,23 @@ import (
 
 func main() {
 	cfg := config.Load()
-	logger, err := logging.New(logging.Config{
+	loggerConfig := logging.Config{
 		ServiceName: "adminservice",
 		WriterAddr:  cfg.MidasWriterAddr,
+	}
+	logger, err := logging.New(logging.Config{
+		ServiceName: loggerConfig.ServiceName,
+		WriterAddr:  loggerConfig.WriterAddr,
 	})
 	if err != nil {
 		panic(err)
 	}
+	logger.Info().
+		Str("port", cfg.Port).
+		Bool("synthetic_catalog_seed", cfg.EnableSyntheticCatalogSeed).
+		Str("github_repo", cfg.GitHubRepo).
+		Str("release_tag", cfg.ReleaseTag).
+		Msg("adminservice configuration loaded")
 	pool, err := db.Connect(context.Background(), cfg.PostgresDSN)
 	if err != nil {
 		logger.Fatal().Err(err).Msg("postgres connection failed")
@@ -31,12 +41,16 @@ func main() {
 	defer pool.Close()
 
 	repo := storage.NewProviderRepo(pool, cfg.EnableSyntheticCatalogSeed)
+	logger.Info().Msg("provider repository initialized")
 	if err := repo.Migrate(context.Background()); err != nil {
 		logger.Fatal().Err(err).Msg("migration failed")
 	}
+	logger.Info().Msg("database migrations applied")
 
 	svc := service.NewProviderService(repo)
+	logger.Info().Msg("provider service initialized")
 	handler := httpadapter.NewHandler(svc, cfg.GitHubRepo, cfg.ReleaseTag, cfg.AgentResourceURL, cfg.AgentKafkaBrokers, cfg.AgentImageRepo)
+	logger.Info().Msg("http handler initialized")
 	r := chi.NewRouter()
 	r.Get("/healthz", handler.Health)
 	r.Route("/v1/catalog", func(api chi.Router) {

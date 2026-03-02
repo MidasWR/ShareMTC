@@ -11,6 +11,7 @@ import (
 	"github.com/MidasWR/ShareMTC/services/resourceservice/internal/adapter/provisioning"
 	"github.com/MidasWR/ShareMTC/services/resourceservice/internal/models"
 	"github.com/google/uuid"
+	"github.com/rs/zerolog/log"
 )
 
 type Repository interface {
@@ -107,18 +108,36 @@ func NewResourceService(repo Repository, cgroups CGroupApplier, runtime orchestr
 	if vmTTL <= 0 {
 		vmTTL = 5 * time.Minute
 	}
+	log.Info().
+		Dur("heartbeat_max_age", heartbeatMaxAge).
+		Int("create_rate_limit_rpm", createRateLimitRPM).
+		Dur("vm_ttl", vmTTL).
+		Msg("resource service initialized")
 	return &ResourceService{
 		repo: repo, cgroups: cgroups, orchestrator: runtime, provisioning: provisioningClient, heartbeatMaxAge: heartbeatMaxAge, createRateLimitRPM: createRateLimitRPM, vmTTL: vmTTL, vmDaemonDownloadURL: vmDaemonDownloadURL, vmDaemonKafkaBrokers: vmDaemonKafkaBrokers, vmDaemonKafkaTopic: vmDaemonKafkaTopic,
 	}
 }
 
 func (s *ResourceService) UpdateHeartbeat(ctx context.Context, resource models.HostResource) error {
+	log.Debug().
+		Str("provider_id", resource.ProviderID).
+		Int("cpu_free_cores", resource.CPUFreeCores).
+		Int("ram_free_mb", resource.RAMFreeMB).
+		Int("gpu_free_units", resource.GPUFreeUnits).
+		Msg("upserting host heartbeat")
 	return s.repo.UpsertHostResource(ctx, resource)
 }
 
 func (s *ResourceService) Allocate(ctx context.Context, alloc models.Allocation) (models.Allocation, error) {
+	log.Info().
+		Str("provider_id", alloc.ProviderID).
+		Int("cpu_cores", alloc.CPUCores).
+		Int("ram_mb", alloc.RAMMB).
+		Int("gpu_units", alloc.GPUUnits).
+		Msg("allocation requested")
 	host, err := s.repo.GetHostResource(ctx, alloc.ProviderID)
 	if err != nil {
+		log.Error().Err(err).Str("provider_id", alloc.ProviderID).Msg("allocation failed on heartbeat lookup")
 		return models.Allocation{}, err
 	}
 	if host.ProviderID == "" {
@@ -134,16 +153,30 @@ func (s *ResourceService) Allocate(ctx context.Context, alloc models.Allocation)
 		return models.Allocation{}, errors.New("insufficient free resources")
 	}
 	if err := s.cgroups.Apply(alloc.ProviderID, alloc.CPUCores, alloc.RAMMB, alloc.GPUUnits); err != nil {
+		log.Error().Err(err).Str("provider_id", alloc.ProviderID).Msg("allocation failed on cgroup apply")
 		return models.Allocation{}, err
 	}
-	return s.repo.CreateAllocation(ctx, alloc)
+	created, err := s.repo.CreateAllocation(ctx, alloc)
+	if err != nil {
+		log.Error().Err(err).Str("provider_id", alloc.ProviderID).Msg("allocation failed on repository create")
+		return models.Allocation{}, err
+	}
+	log.Info().Str("allocation_id", created.ID).Str("provider_id", created.ProviderID).Msg("allocation created")
+	return created, nil
 }
 
 func (s *ResourceService) Release(ctx context.Context, allocationID string) error {
+	log.Info().Str("allocation_id", allocationID).Msg("release allocation requested")
 	if err := s.cgroups.Release(allocationID); err != nil {
+		log.Error().Err(err).Str("allocation_id", allocationID).Msg("release allocation failed on cgroup release")
 		return err
 	}
-	return s.repo.ReleaseAllocation(ctx, allocationID)
+	if err := s.repo.ReleaseAllocation(ctx, allocationID); err != nil {
+		log.Error().Err(err).Str("allocation_id", allocationID).Msg("release allocation failed on repository release")
+		return err
+	}
+	log.Info().Str("allocation_id", allocationID).Msg("allocation released")
+	return nil
 }
 
 func (s *ResourceService) List(ctx context.Context, providerID string) ([]models.Allocation, error) {
@@ -159,16 +192,20 @@ func (s *ResourceService) Stats(ctx context.Context) (models.ResourceStats, erro
 }
 
 func (s *ResourceService) RuntimeInventory(ctx context.Context) (models.RuntimeInventory, error) {
+	log.Debug().Msg("runtime inventory requested")
 	vms, err := s.repo.ListAllVMs(ctx, 1000)
 	if err != nil {
+		log.Error().Err(err).Msg("runtime inventory failed on vm list")
 		return models.RuntimeInventory{}, err
 	}
 	pods, err := s.repo.ListAllPods(ctx, 1000)
 	if err != nil {
+		log.Error().Err(err).Msg("runtime inventory failed on pod list")
 		return models.RuntimeInventory{}, err
 	}
 	offers, err := s.repo.ListSharedInventoryOffers(ctx, "", "")
 	if err != nil {
+		log.Error().Err(err).Msg("runtime inventory failed on shared offers list")
 		return models.RuntimeInventory{}, err
 	}
 
@@ -217,7 +254,7 @@ func (s *ResourceService) RuntimeInventory(ctx context.Context) (models.RuntimeI
 		}
 	}
 
-	return models.RuntimeInventory{
+	inventory := models.RuntimeInventory{
 		GeneratedAt:      time.Now().UTC(),
 		ProviderStats:    providerStats,
 		RunPodPods:       runPodPods,
@@ -226,7 +263,13 @@ func (s *ResourceService) RuntimeInventory(ctx context.Context) (models.RuntimeI
 		PodTotal:         len(pods),
 		PodRunning:       podRunning,
 		SharedOfferTotal: len(offers),
-	}, nil
+	}
+	log.Info().
+		Int("vm_total", inventory.VMTotal).
+		Int("pod_total", inventory.PodTotal).
+		Int("shared_offer_total", inventory.SharedOfferTotal).
+		Msg("runtime inventory generated")
+	return inventory, nil
 }
 
 func ensureProviderStat(statsByProvider map[string]*models.RuntimeProviderStat, providerID string) *models.RuntimeProviderStat {
@@ -292,6 +335,11 @@ func (s *ResourceService) ListVMTemplates(ctx context.Context, filter models.Cat
 }
 
 func (s *ResourceService) CreateVM(ctx context.Context, vm models.VM) (models.VM, error) {
+	log.Info().
+		Str("user_id", vm.UserID).
+		Str("provider_id", vm.ProviderID).
+		Str("name", vm.Name).
+		Msg("create vm requested")
 	if vm.UserID == "" || vm.ProviderID == "" || vm.Name == "" || vm.OSName == "" {
 		return models.VM{}, errors.New("user_id, provider_id, name and os_name are required")
 	}
@@ -302,6 +350,7 @@ func (s *ResourceService) CreateVM(ctx context.Context, vm models.VM) (models.VM
 	windowStart := windowEnd.Add(-1 * time.Minute)
 	allowed, err := s.repo.ConsumeCreateRateLimit(ctx, vm.UserID, windowStart, windowEnd, s.createRateLimitRPM)
 	if err != nil {
+		log.Error().Err(err).Str("user_id", vm.UserID).Msg("create vm failed on rate limit check")
 		return models.VM{}, err
 	}
 	if !allowed {
@@ -330,6 +379,7 @@ func (s *ResourceService) CreateVM(ctx context.Context, vm models.VM) (models.VM
 	}
 	created, err := s.repo.CreateVM(ctx, vm)
 	if err != nil {
+		log.Error().Err(err).Str("user_id", vm.UserID).Msg("create vm failed on repository create")
 		return models.VM{}, err
 	}
 	cloudInit := provisioning.BuildVMCloudInit(created, s.vmDaemonDownloadURL, s.vmDaemonKafkaBrokers, s.vmDaemonKafkaTopic)
@@ -350,6 +400,7 @@ func (s *ResourceService) CreateVM(ctx context.Context, vm models.VM) (models.VM
 		},
 	})
 	if err != nil {
+		log.Error().Err(err).Str("vm_id", created.ID).Msg("create vm failed on provisioning create")
 		_ = s.repo.UpdateVMStatus(ctx, created.ID, models.VMStatusTerminated)
 		return models.VM{}, err
 	}
@@ -360,12 +411,20 @@ func (s *ResourceService) CreateVM(ctx context.Context, vm models.VM) (models.VM
 		created.IPAddress = fmt.Sprintf("10.%d.%d.%d", time.Now().UTC().Second()%255, time.Now().UTC().Minute()%255, time.Now().UTC().Hour()%255)
 	}
 	if err := s.repo.UpdateVMExternalRef(ctx, created.ID, created.ExternalID, created.IPAddress); err != nil {
+		log.Error().Err(err).Str("vm_id", created.ID).Str("external_id", created.ExternalID).Msg("create vm failed on update external ref")
 		return models.VM{}, err
 	}
 	if err := s.repo.UpdateVMStatus(ctx, created.ID, models.VMStatusRunning); err != nil {
+		log.Error().Err(err).Str("vm_id", created.ID).Msg("create vm failed on update running status")
 		return models.VM{}, err
 	}
-	return s.repo.GetVM(ctx, created.ID)
+	out, err := s.repo.GetVM(ctx, created.ID)
+	if err != nil {
+		log.Error().Err(err).Str("vm_id", created.ID).Msg("create vm failed on final read")
+		return models.VM{}, err
+	}
+	log.Info().Str("vm_id", out.ID).Str("external_id", out.ExternalID).Str("status", string(out.Status)).Msg("create vm completed")
+	return out, nil
 }
 
 func (s *ResourceService) GetVM(ctx context.Context, vmID string) (models.VM, error) {
@@ -412,6 +471,7 @@ func (s *ResourceService) RebootVM(ctx context.Context, vmID string) (models.VM,
 }
 
 func (s *ResourceService) TerminateVM(ctx context.Context, vmID string) (models.VM, error) {
+	log.Info().Str("vm_id", vmID).Msg("terminate vm requested")
 	vm, err := s.repo.GetVM(ctx, vmID)
 	if err != nil {
 		return models.VM{}, err
@@ -421,16 +481,28 @@ func (s *ResourceService) TerminateVM(ctx context.Context, vmID string) (models.
 			RequestID: uuid.NewString(),
 			TraceID:   uuid.NewString(),
 		}); err != nil {
+			log.Error().Err(err).Str("vm_id", vmID).Str("external_id", vm.ExternalID).Msg("terminate vm failed on provisioning delete")
 			return models.VM{}, err
 		}
 	}
 	if err := s.repo.UpdateVMStatus(ctx, vmID, models.VMStatusTerminated); err != nil {
 		return models.VM{}, err
 	}
-	return s.repo.GetVM(ctx, vmID)
+	out, err := s.repo.GetVM(ctx, vmID)
+	if err != nil {
+		log.Error().Err(err).Str("vm_id", vmID).Msg("terminate vm failed on final read")
+		return models.VM{}, err
+	}
+	log.Info().Str("vm_id", vmID).Str("status", string(out.Status)).Msg("terminate vm completed")
+	return out, nil
 }
 
 func (s *ResourceService) CreatePod(ctx context.Context, pod models.Pod) (models.Pod, error) {
+	log.Info().
+		Str("user_id", pod.UserID).
+		Str("provider_id", pod.ProviderID).
+		Str("name", pod.Name).
+		Msg("create pod requested")
 	if pod.UserID == "" || pod.ProviderID == "" || pod.Name == "" || pod.ImageName == "" || pod.GPUTypeID == "" {
 		return models.Pod{}, errors.New("user_id, provider_id, name, image_name and gpu_type_id are required")
 	}
@@ -441,6 +513,7 @@ func (s *ResourceService) CreatePod(ctx context.Context, pod models.Pod) (models
 	windowStart := windowEnd.Add(-1 * time.Minute)
 	allowed, err := s.repo.ConsumeCreateRateLimit(ctx, pod.UserID, windowStart, windowEnd, s.createRateLimitRPM)
 	if err != nil {
+		log.Error().Err(err).Str("user_id", pod.UserID).Msg("create pod failed on rate limit check")
 		return models.Pod{}, err
 	}
 	if !allowed {
@@ -450,6 +523,7 @@ func (s *ResourceService) CreatePod(ctx context.Context, pod models.Pod) (models
 	pod.ExpiresAt = time.Now().UTC().Add(s.vmTTL)
 	created, err := s.repo.CreatePod(ctx, pod)
 	if err != nil {
+		log.Error().Err(err).Str("user_id", pod.UserID).Msg("create pod failed on repository create")
 		return models.Pod{}, err
 	}
 	provisioned, err := s.provisioning.CreatePod(ctx, provisioning.CreatePodRequest{
@@ -469,17 +543,25 @@ func (s *ResourceService) CreatePod(ctx context.Context, pod models.Pod) (models
 		},
 	})
 	if err != nil {
+		log.Error().Err(err).Str("pod_id", created.ID).Msg("create pod failed on provisioning create")
 		_ = s.repo.UpdatePodStatus(ctx, created.ID, models.PodStatusTerminated)
 		return models.Pod{}, err
 	}
 	created.ExternalID = provisioned.ExternalID
 	if err := s.repo.UpdatePodExternalRef(ctx, created.ID, created.ExternalID); err != nil {
+		log.Error().Err(err).Str("pod_id", created.ID).Str("external_id", created.ExternalID).Msg("create pod failed on update external ref")
 		return models.Pod{}, err
 	}
 	if err := s.repo.UpdatePodStatus(ctx, created.ID, models.PodStatusRunning); err != nil {
 		return models.Pod{}, err
 	}
-	return s.repo.GetPod(ctx, created.ID)
+	out, err := s.repo.GetPod(ctx, created.ID)
+	if err != nil {
+		log.Error().Err(err).Str("pod_id", created.ID).Msg("create pod failed on final read")
+		return models.Pod{}, err
+	}
+	log.Info().Str("pod_id", out.ID).Str("external_id", out.ExternalID).Str("status", string(out.Status)).Msg("create pod completed")
+	return out, nil
 }
 
 func (s *ResourceService) ListPods(ctx context.Context, userID string, filter models.CatalogFilter) ([]models.Pod, error) {
@@ -491,6 +573,7 @@ func (s *ResourceService) GetPod(ctx context.Context, podID string) (models.Pod,
 }
 
 func (s *ResourceService) TerminatePod(ctx context.Context, podID string) (models.Pod, error) {
+	log.Info().Str("pod_id", podID).Msg("terminate pod requested")
 	pod, err := s.repo.GetPod(ctx, podID)
 	if err != nil {
 		return models.Pod{}, err
@@ -500,13 +583,20 @@ func (s *ResourceService) TerminatePod(ctx context.Context, podID string) (model
 			RequestID: uuid.NewString(),
 			TraceID:   uuid.NewString(),
 		}); err != nil {
+			log.Error().Err(err).Str("pod_id", podID).Str("external_id", pod.ExternalID).Msg("terminate pod failed on provisioning delete")
 			return models.Pod{}, err
 		}
 	}
 	if err := s.repo.UpdatePodStatus(ctx, podID, models.PodStatusTerminated); err != nil {
 		return models.Pod{}, err
 	}
-	return s.repo.GetPod(ctx, podID)
+	out, err := s.repo.GetPod(ctx, podID)
+	if err != nil {
+		log.Error().Err(err).Str("pod_id", podID).Msg("terminate pod failed on final read")
+		return models.Pod{}, err
+	}
+	log.Info().Str("pod_id", podID).Str("status", string(out.Status)).Msg("terminate pod completed")
+	return out, nil
 }
 
 func (s *ResourceService) ShareVM(ctx context.Context, item models.SharedVM) (models.SharedVM, error) {
@@ -680,41 +770,52 @@ func mapDropletImage(vm models.VM) string {
 }
 
 func (s *ResourceService) ExpireResources(ctx context.Context, now time.Time) error {
+	log.Debug().Time("now", now).Msg("resource expiry pass started")
 	expiredVMs, err := s.repo.ListExpiredVMs(ctx, now, 100)
 	if err != nil {
+		log.Error().Err(err).Msg("resource expiry pass failed on list expired vms")
 		return err
 	}
+	log.Info().Int("expired_vm_count", len(expiredVMs)).Msg("resource expiry found expired vms")
 	for _, vm := range expiredVMs {
 		if strings.TrimSpace(vm.ExternalID) != "" {
 			if err := s.provisioning.DeleteVM(ctx, vm.ExternalID, provisioning.DeleteRequest{
 				RequestID: uuid.NewString(),
 				TraceID:   uuid.NewString(),
 			}); err != nil {
+				log.Warn().Err(err).Str("vm_id", vm.ID).Str("external_id", vm.ExternalID).Msg("resource expiry could not delete vm externally")
 				continue
 			}
 		}
 		_ = s.repo.MarkVMExpired(ctx, vm.ID)
+		log.Info().Str("vm_id", vm.ID).Msg("expired vm marked")
 	}
 
 	expiredPods, err := s.repo.ListExpiredPods(ctx, now, 100)
 	if err != nil {
+		log.Error().Err(err).Msg("resource expiry pass failed on list expired pods")
 		return err
 	}
+	log.Info().Int("expired_pod_count", len(expiredPods)).Msg("resource expiry found expired pods")
 	for _, pod := range expiredPods {
 		if strings.TrimSpace(pod.ExternalID) != "" {
 			if err := s.provisioning.DeletePod(ctx, pod.ExternalID, provisioning.DeleteRequest{
 				RequestID: uuid.NewString(),
 				TraceID:   uuid.NewString(),
 			}); err != nil {
+				log.Warn().Err(err).Str("pod_id", pod.ID).Str("external_id", pod.ExternalID).Msg("resource expiry could not delete pod externally")
 				continue
 			}
 		}
 		_ = s.repo.MarkPodExpired(ctx, pod.ID)
+		log.Info().Str("pod_id", pod.ID).Msg("expired pod marked")
 	}
+	log.Debug().Msg("resource expiry pass completed")
 	return nil
 }
 
 func (s *ResourceService) CreateKubernetesCluster(ctx context.Context, cluster models.KubernetesCluster) (models.KubernetesCluster, error) {
+	log.Info().Str("user_id", cluster.UserID).Str("provider_id", cluster.ProviderID).Str("name", cluster.Name).Msg("create kubernetes cluster requested")
 	if cluster.UserID == "" || cluster.Name == "" || cluster.ProviderID == "" {
 		return models.KubernetesCluster{}, errors.New("user_id, name and provider_id are required")
 	}
@@ -730,21 +831,30 @@ func (s *ResourceService) CreateKubernetesCluster(ctx context.Context, cluster m
 		K8sVersion: cluster.K8sVersion,
 	})
 	if err != nil {
+		log.Error().Err(err).Str("cluster_name", cluster.Name).Msg("create kubernetes cluster failed on orchestrator provision")
 		return models.KubernetesCluster{}, err
 	}
 	cluster.Endpoint = runtimeCluster.Endpoint
 	cluster.Kubeconfig = runtimeCluster.Kubeconfig
 	created, err := s.repo.CreateKubernetesCluster(ctx, cluster)
 	if err != nil {
+		log.Error().Err(err).Str("cluster_id", cluster.ID).Msg("create kubernetes cluster failed on repository create")
 		return models.KubernetesCluster{}, err
 	}
 	if err := s.repo.UpdateKubernetesClusterStatus(ctx, created.ID, models.ClusterStatusRunning); err != nil {
 		return models.KubernetesCluster{}, err
 	}
-	return s.repo.GetKubernetesCluster(ctx, created.ID)
+	out, err := s.repo.GetKubernetesCluster(ctx, created.ID)
+	if err != nil {
+		log.Error().Err(err).Str("cluster_id", created.ID).Msg("create kubernetes cluster failed on final read")
+		return models.KubernetesCluster{}, err
+	}
+	log.Info().Str("cluster_id", out.ID).Str("status", string(out.Status)).Msg("create kubernetes cluster completed")
+	return out, nil
 }
 
 func (s *ResourceService) RefreshKubernetesCluster(ctx context.Context, clusterID string) (models.KubernetesCluster, error) {
+	log.Debug().Str("cluster_id", clusterID).Msg("refresh kubernetes cluster requested")
 	state, err := s.orchestrator.RefreshClusterStatus(ctx, clusterID)
 	if err != nil {
 		return models.KubernetesCluster{}, err
@@ -754,9 +864,16 @@ func (s *ResourceService) RefreshKubernetesCluster(ctx context.Context, clusterI
 		nextState = models.ClusterStatusFailed
 	}
 	if err := s.repo.UpdateKubernetesClusterStatus(ctx, clusterID, nextState); err != nil {
+		log.Error().Err(err).Str("cluster_id", clusterID).Str("status", string(nextState)).Msg("refresh kubernetes cluster failed on status update")
 		return models.KubernetesCluster{}, err
 	}
-	return s.repo.GetKubernetesCluster(ctx, clusterID)
+	out, err := s.repo.GetKubernetesCluster(ctx, clusterID)
+	if err != nil {
+		log.Error().Err(err).Str("cluster_id", clusterID).Msg("refresh kubernetes cluster failed on final read")
+		return models.KubernetesCluster{}, err
+	}
+	log.Info().Str("cluster_id", clusterID).Str("status", string(out.Status)).Msg("refresh kubernetes cluster completed")
+	return out, nil
 }
 
 func (s *ResourceService) ListKubernetesClusters(ctx context.Context, userID string) ([]models.KubernetesCluster, error) {
@@ -764,11 +881,19 @@ func (s *ResourceService) ListKubernetesClusters(ctx context.Context, userID str
 }
 
 func (s *ResourceService) DeleteKubernetesCluster(ctx context.Context, clusterID string) error {
+	log.Info().Str("cluster_id", clusterID).Msg("delete kubernetes cluster requested")
 	if err := s.repo.UpdateKubernetesClusterStatus(ctx, clusterID, models.ClusterStatusDeleting); err != nil {
+		log.Error().Err(err).Str("cluster_id", clusterID).Msg("delete kubernetes cluster failed on mark deleting")
 		return err
 	}
 	if err := s.orchestrator.DeleteCluster(ctx, clusterID); err != nil {
+		log.Error().Err(err).Str("cluster_id", clusterID).Msg("delete kubernetes cluster failed on orchestrator delete")
 		return err
 	}
-	return s.repo.DeleteKubernetesCluster(ctx, clusterID)
+	if err := s.repo.DeleteKubernetesCluster(ctx, clusterID); err != nil {
+		log.Error().Err(err).Str("cluster_id", clusterID).Msg("delete kubernetes cluster failed on repository delete")
+		return err
+	}
+	log.Info().Str("cluster_id", clusterID).Msg("delete kubernetes cluster completed")
+	return nil
 }

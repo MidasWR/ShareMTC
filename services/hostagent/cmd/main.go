@@ -22,6 +22,13 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	logger.Info().
+		Str("provider_id", cfg.ProviderID).
+		Dur("interval", cfg.Interval).
+		Str("resource_api_url", cfg.ResourceAPIURL).
+		Strs("kafka_brokers", cfg.KafkaBrokers).
+		Str("kafka_topic", cfg.KafkaTopic).
+		Msg("hostagent configuration loaded")
 
 	var producer *kafka.Producer
 	if len(cfg.KafkaBrokers) > 0 {
@@ -30,6 +37,7 @@ func main() {
 			logger.Fatal().Err(err).Msg("kafka connect failed")
 		}
 		defer producer.Close()
+		logger.Info().Msg("kafka producer initialized")
 	}
 	if producer == nil && cfg.ResourceAPIURL == "" {
 		logger.Fatal().Err(errors.New("no output configured")).Msg("set KAFKA_BROKERS or RESOURCE_API_URL")
@@ -45,12 +53,17 @@ func main() {
 		Str("resource_api_url", cfg.ResourceAPIURL).
 		Msg("hostagent started")
 	for range ticker.C {
+		logger.Debug().Msg("hostagent collection tick")
 		metric, nextState, err := service.Collect(cfg.ProviderID, state)
 		if err != nil {
 			logger.Error().Err(err).Msg("collect metric failed")
 			continue
 		}
 		state = nextState
+		logger.Debug().
+			Int64("last_net_bytes", state.LastBytes).
+			Time("last_at", state.LastAt).
+			Msg("network state updated")
 		if producer != nil {
 			if err := producer.PublishMetric(context.Background(), cfg.KafkaTopic, metric); err != nil {
 				logger.Error().Err(err).Msg("publish metric failed")
