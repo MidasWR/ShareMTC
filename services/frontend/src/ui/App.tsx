@@ -15,6 +15,11 @@ const ProvideComputePanel = lazy(() => import("../features/provider/ProvideCompu
 const MarketplacePanel = lazy(() => import("../features/marketplace/MarketplacePanel").then((module) => ({ default: module.MarketplacePanel })));
 const AdminWorkspacePanel = lazy(() => import("../features/admin/AdminWorkspacePanel").then((module) => ({ default: module.AdminWorkspacePanel })));
 
+function isAdminAccessPath(pathname: string): boolean {
+  const normalized = pathname.replace(/\/+$/, "") || "/";
+  return normalized === "/admin" || normalized === "/section-admin";
+}
+
 export function App() {
   const { isAuthenticated, role, refreshSession, logout } = useSessionState();
   const canAdmin = role === "admin" || role === "super-admin" || role === "ops-admin";
@@ -38,7 +43,7 @@ export function App() {
   }
 
   useEffect(() => {
-    if (window.location.pathname === "/admin") {
+    if (isAdminAccessPath(window.location.pathname)) {
       navigateToTab("admin", false);
     }
   }, [navigateToTab]);
@@ -75,7 +80,7 @@ export function App() {
   }, [canAdmin, navigateToTab]);
 
   if (!isAuthenticated) {
-    if (window.location.pathname === "/admin") {
+    if (isAdminAccessPath(window.location.pathname)) {
       return (
         <ToastProvider>
           <main className="page-container section-stack flex min-h-screen max-w-3xl flex-col justify-center">

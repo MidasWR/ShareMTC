@@ -11,14 +11,20 @@ type Props = {
   onSuccess: () => void;
 };
 
+const ENABLE_ADMIN_QUICK_ACCESS = import.meta.env.VITE_ENABLE_ADMIN_QUICK_ACCESS === "true";
 const PREFILL_ADMIN_USERNAME = import.meta.env.VITE_ADMIN_PREFILL_USERNAME ?? "admin";
-const PREFILL_ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PREFILL_PASSWORD ?? "admin";
+const PREFILL_ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PREFILL_PASSWORD ?? "admin123";
 
 export function AdminAccessPanel({ onSuccess }: Props) {
-  const [username, setUsername] = useState(PREFILL_ADMIN_USERNAME);
-  const [password, setPassword] = useState(PREFILL_ADMIN_PASSWORD);
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const { push } = useToast();
+
+  function fillQuickAccess() {
+    setUsername(PREFILL_ADMIN_USERNAME);
+    setPassword(PREFILL_ADMIN_PASSWORD);
+  }
 
   async function submitCredentials() {
     if (!username.trim() || !password.trim()) {
@@ -55,6 +61,11 @@ export function AdminAccessPanel({ onSuccess }: Props) {
           <Input label="Access key" type="password" value={password} onChange={(event) => setPassword(event.target.value)} />
           <div className="flex flex-wrap gap-2">
             <Button type="submit" loading={loading}>Enter /admin</Button>
+            {ENABLE_ADMIN_QUICK_ACCESS ? (
+              <Button type="button" variant="secondary" onClick={fillQuickAccess}>
+                Quick access
+              </Button>
+            ) : null}
           </div>
         </form>
       </Card>
