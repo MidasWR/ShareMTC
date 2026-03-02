@@ -63,7 +63,7 @@ export function MultiSelect({ label, options, value, onChange, placeholder = "Se
                   <button
                     type="button"
                     className={cx(
-                      "focus-ring flex min-h-9 w-full items-center justify-between rounded-md border px-2 py-1.5 text-left text-sm",
+                      "focus-ring flex min-h-11 w-full items-center justify-between rounded-md border px-2 py-1.5 text-left text-sm",
                       checked ? "border-brand bg-brand/10 text-textPrimary" : "border-transparent text-textSecondary hover:border-border hover:bg-elevated"
                     )}
                     onClick={() => toggle(option.value)}

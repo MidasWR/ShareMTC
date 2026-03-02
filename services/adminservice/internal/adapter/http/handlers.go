@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
-	"net/http/httputil"
 	"net/http"
+	"net/http/httputil"
 	"net/url"
 	"strings"
 
@@ -218,31 +218,43 @@ func (h *Handler) AgentInstallCommand(w http.ResponseWriter, r *http.Request) {
 	if kafkaBrokers == "" {
 		kafkaBrokers = "host-kafka-kafka-bootstrap:9092"
 	}
-	releaseTag := h.releaseTag
-	if releaseTag == "" {
-		releaseTag = "latest"
-	}
 	repo := h.gitHubRepo
 	if repo == "" {
 		repo = "MidasWR/ShareMTC"
+	}
+	releaseTag := h.releaseTag
+	if releaseTag == "" {
+		releaseTag = "latest"
 	}
 	imageRepo := h.agentImageRepo
 	if imageRepo == "" {
 		imageRepo = "midaswr/host-hostagent"
 	}
+	installerURL := buildInstallerURL(repo, releaseTag)
 	installCommand := fmt.Sprintf(
-		"curl -fsSL https://raw.githubusercontent.com/%s/%s/installer/hostagent-node-installer.sh | sudo RESOURCE_API_URL=%s KAFKA_BROKERS=%s IMAGE_REPO=%s IMAGE_TAG=%s bash",
-		repo,
-		releaseTag,
-		resourceURL,
-		kafkaBrokers,
-		imageRepo,
-		releaseTag,
+		"curl -fsSL %s | sudo RESOURCE_API_URL=%s KAFKA_BROKERS=%s IMAGE_REPO=%s IMAGE_TAG=%s bash",
+		shellQuote(installerURL),
+		shellQuote(resourceURL),
+		shellQuote(kafkaBrokers),
+		shellQuote(imageRepo),
+		shellQuote(releaseTag),
 	)
 	httpx.JSON(w, http.StatusOK, models.AgentInstallCommand{
 		Command:      installCommand,
-		InstallerURL: "https://github.com/MidasWR/ShareMTC/releases/latest/download/hostagent-node-installer.sh",
+		InstallerURL: installerURL,
 	})
+}
+
+func buildInstallerURL(repo string, releaseTag string) string {
+	if strings.TrimSpace(releaseTag) == "" || strings.EqualFold(strings.TrimSpace(releaseTag), "latest") {
+		return fmt.Sprintf("https://github.com/%s/releases/latest/download/hostagent-node-installer.sh", strings.TrimSpace(repo))
+	}
+	return fmt.Sprintf("https://github.com/%s/releases/download/%s/hostagent-node-installer.sh", strings.TrimSpace(repo), strings.TrimSpace(releaseTag))
+}
+
+func shellQuote(value string) string {
+	escaped := strings.ReplaceAll(value, "'", `'"'"'`)
+	return "'" + escaped + "'"
 }
 
 func (h *Handler) PodProxyInfo(w http.ResponseWriter, r *http.Request) {

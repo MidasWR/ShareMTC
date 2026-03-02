@@ -6,8 +6,11 @@ import { Input } from "../../../design/primitives/Input";
 import { Select } from "../../../design/primitives/Select";
 import { Button } from "../../../design/primitives/Button";
 import { Table } from "../../../design/components/Table";
+import { Modal } from "../../../design/components/Modal";
+import { DataFreshnessBadge } from "../../../design/patterns/DataFreshnessBadge";
 import { EmptyState } from "../../../design/patterns/EmptyState";
 import { useToast } from "../../../design/components/Toast";
+import { formatOperationMessage } from "../../../design/utils/operationFeedback";
 import { resolvePodLogoURL } from "../../../lib/logoResolver";
 
 export function AdminPodsPanel() {
@@ -20,15 +23,24 @@ export function AdminPodsPanel() {
   const [routeTarget, setRouteTarget] = useState("");
   const [templateName, setTemplateName] = useState("");
   const [templateClass, setTemplateClass] = useState("all");
+  const [loading, setLoading] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<PodCatalogItem | null>(null);
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
+  const [templateError, setTemplateError] = useState("");
+  const [podErrors, setPodErrors] = useState<Record<string, string>>({});
   const { push } = useToast();
 
   async function refresh() {
+    setLoading(true);
     try {
       const [podRows, templateRows] = await Promise.all([listPodCatalog(), listPodTemplates()]);
       setPods(podRows);
       setTemplates(templateRows);
+      setLastUpdatedAt(new Date());
     } catch (error) {
-      push("error", error instanceof Error ? error.message : "Failed to load catalog");
+      push("error", error instanceof Error ? error.message : "Failed to load catalog", "Admin POD catalog");
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -38,7 +50,11 @@ export function AdminPodsPanel() {
 
   async function createTemplate(event: FormEvent) {
     event.preventDefault();
-    if (!templateName.trim()) return;
+    if (!templateName.trim()) {
+      setTemplateError("Template name is required");
+      return;
+    }
+    setTemplateError("");
     try {
       await upsertPodTemplate({
         id: "",
@@ -49,15 +65,24 @@ export function AdminPodsPanel() {
       });
       setTemplateName("");
       await refresh();
-      push("success", "Template added");
+      push("success", formatOperationMessage({ action: "Create", entityType: "Template", entityName: templateName.trim(), result: "success" }), "Admin POD catalog");
     } catch (error) {
-      push("error", error instanceof Error ? error.message : "Error adding template");
+      push("error", error instanceof Error ? error.message : "Error adding template", "Admin POD catalog");
     }
   }
 
   async function createPod(event: FormEvent) {
     event.preventDefault();
-    if (!podName.trim()) return;
+    const nextErrors: Record<string, string> = {};
+    if (!podName.trim()) nextErrors.podName = "Instance name is required";
+    if (!hostIP.trim()) nextErrors.hostIP = "Host IP is required";
+    if (!sshUser.trim()) nextErrors.sshUser = "SSH user is required";
+    setPodErrors(nextErrors);
+    const firstError = Object.values(nextErrors)[0];
+    if (firstError) {
+      push("error", firstError, "Admin POD catalog");
+      return;
+    }
     try {
       await upsertPodCatalog({
         id: "",
@@ -83,29 +108,29 @@ export function AdminPodsPanel() {
       setHostIP("");
       setRouteTarget("");
       await refresh();
-      push("success", "Instance added to catalog");
+      push("success", formatOperationMessage({ action: "Create", entityType: "Instance", entityName: podName.trim(), result: "success" }), "Admin POD catalog");
     } catch (error) {
-      push("error", error instanceof Error ? error.message : "Error adding instance");
+      push("error", error instanceof Error ? error.message : "Error adding instance", "Admin POD catalog");
     }
   }
 
-  async function removePod(id: string) {
+  async function removePod(id: string, name: string) {
     try {
       await deletePodCatalog(id);
       await refresh();
-      push("info", "Instance removed");
+      push("info", formatOperationMessage({ action: "Delete", entityType: "Instance", entityName: name, entityId: id, result: "success" }), "Admin POD catalog");
     } catch (error) {
-      push("error", error instanceof Error ? error.message : "Error removing instance");
+      push("error", error instanceof Error ? error.message : "Error removing instance", "Admin POD catalog");
     }
   }
 
   async function showProxy(id: string) {
     try {
       const info = await getPodProxyInfo(id);
-      push("info", `Proxy target: ${info.route_target || "-"} | host: ${info.host_ip || "-"}`);
+      push("info", `Proxy target: ${info.route_target || "-"} | host: ${info.host_ip || "-"}`, "Admin POD catalog");
       window.open(getPodProxyURL(id, "/"), "_blank", "noopener,noreferrer");
     } catch (error) {
-      push("error", error instanceof Error ? error.message : "Failed to resolve proxy info");
+      push("error", error instanceof Error ? error.message : "Failed to resolve proxy info", "Admin POD catalog");
     }
   }
 
@@ -113,7 +138,7 @@ export function AdminPodsPanel() {
     <section className="section-stack">
       <Card title="Manage Templates" description="CRUD operations for environment templates.">
         <form className="grid gap-3 md:grid-cols-3 items-end" onSubmit={createTemplate}>
-          <Input label="New Template Name" value={templateName} onChange={(event) => setTemplateName(event.target.value)} />
+          <Input label="New Template Name" required error={templateError} value={templateName} onChange={(event) => setTemplateName(event.target.value)} />
           <Select 
             label="Template Type" 
             value={templateClass} 
@@ -130,14 +155,17 @@ export function AdminPodsPanel() {
 
       <Card title="Manage Catalog Instances" description="Add or remove hardware instances from catalog.">
         <form className="grid gap-2 md:grid-cols-3" onSubmit={createPod}>
-          <Input label="Instance Name" value={podName} onChange={(event) => setPodName(event.target.value)} />
-          <Input label="Host IP" value={hostIP} onChange={(event) => setHostIP(event.target.value)} />
-          <Input label="SSH User" value={sshUser} onChange={(event) => setSSHUser(event.target.value)} />
+          <Input label="Instance Name" required error={podErrors.podName} value={podName} onChange={(event) => setPodName(event.target.value)} />
+          <Input label="Host IP" required error={podErrors.hostIP} value={hostIP} onChange={(event) => setHostIP(event.target.value)} />
+          <Input label="SSH User" required error={podErrors.sshUser} value={sshUser} onChange={(event) => setSSHUser(event.target.value)} />
           <Input label="SSH Auth Ref" value={sshAuthRef} onChange={(event) => setSSHAuthRef(event.target.value)} />
           <Input label="Route target" value={routeTarget} onChange={(event) => setRouteTarget(event.target.value)} placeholder="http://10.0.0.2:3000" />
           <Button className="mt-7" type="submit" variant="secondary">Add Instance</Button>
         </form>
         <div className="mt-4">
+          <div className="mb-3 flex justify-end">
+            <DataFreshnessBadge ts={lastUpdatedAt} label="Catalog" />
+          </div>
           <Table
             ariaLabel="Admin Catalog"
             rowKey={(row) => row.id}
@@ -156,7 +184,7 @@ export function AdminPodsPanel() {
                 render: (row) => (
                   <div className="flex gap-2">
                     <Button variant="ghost" size="sm" onClick={() => showProxy(row.id)}>Proxy</Button>
-                    <Button variant="ghost" size="sm" onClick={() => removePod(row.id)}>Delete</Button>
+                    <Button variant="ghost" size="sm" onClick={() => setDeleteTarget(row)} disabled={loading}>Delete</Button>
                   </div>
                 )
               }
@@ -164,6 +192,19 @@ export function AdminPodsPanel() {
           />
         </div>
       </Card>
+      <Modal
+        open={Boolean(deleteTarget)}
+        title="Delete catalog instance"
+        description={deleteTarget ? `Instance ${deleteTarget.name} will be removed from catalog.` : undefined}
+        confirmLabel="Delete"
+        confirmVariant="destructive"
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={() => {
+          if (!deleteTarget) return;
+          void removePod(deleteTarget.id, deleteTarget.name);
+          setDeleteTarget(null);
+        }}
+      />
     </section>
   );
 }

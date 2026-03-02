@@ -7,6 +7,7 @@ import {
   MetricPoint,
   MetricSummary,
   ResourceStats,
+  RuntimeInventory,
   SharedInventoryOffer,
   SharedPod,
   SharedVM,
@@ -52,6 +53,10 @@ export function sendHeartbeat(payload: {
 
 export function getResourceStats() {
   return apiClient.get<ResourceStats>(`${API_BASE.resource}/v1/resources/admin/stats`);
+}
+
+export function getRuntimeInventory() {
+  return apiClient.get<RuntimeInventory>(`${API_BASE.resource}/v1/resources/admin/runtime-inventory`);
 }
 
 export function listVMTemplates(params?: CatalogFilter) {

@@ -22,11 +22,16 @@ export function Select({ className, options, error, label, helpText, ...props }:
 
   return (
     <label className="block space-y-1.5">
-      {label ? <span className="text-sm font-medium text-textSecondary">{label}</span> : null}
+      {label ? (
+        <span className="text-sm font-medium text-textSecondary">
+          {label}
+          {props.required ? <span className="ml-1 text-danger">*</span> : null}
+        </span>
+      ) : null}
       <select
         id={selectId}
         className={cx(
-          "focus-ring h-10 w-full rounded-md border bg-canvas px-3 text-sm text-textPrimary disabled:cursor-not-allowed disabled:opacity-60",
+          "focus-ring h-12 w-full rounded-md border bg-canvas px-3 text-sm text-textPrimary disabled:cursor-not-allowed disabled:opacity-60",
           error ? "border-danger bg-danger/5" : "border-border",
           className
         )}

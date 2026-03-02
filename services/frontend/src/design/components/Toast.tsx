@@ -2,10 +2,10 @@ import { createContext, ReactNode, useCallback, useContext, useMemo, useState } 
 import { cx } from "../utils/cx";
 
 type ToastKind = "success" | "error" | "info";
-type ToastItem = { id: string; kind: ToastKind; message: string };
+type ToastItem = { id: string; kind: ToastKind; message: string; context?: string; createdAt: Date };
 
 type ToastContextValue = {
-  push: (kind: ToastKind, message: string) => void;
+  push: (kind: ToastKind, message: string, context?: string) => void;
 };
 
 const ToastContext = createContext<ToastContextValue | undefined>(undefined);
@@ -13,9 +13,9 @@ const ToastContext = createContext<ToastContextValue | undefined>(undefined);
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<ToastItem[]>([]);
 
-  const push = useCallback((kind: ToastKind, message: string) => {
+  const push = useCallback((kind: ToastKind, message: string, context?: string) => {
     const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    setItems((prev) => [...prev, { id, kind, message }]);
+    setItems((prev) => [...prev, { id, kind, message, context, createdAt: new Date() }]);
     window.setTimeout(() => {
       setItems((prev) => prev.filter((item) => item.id !== id));
     }, 3200);
@@ -39,7 +39,11 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               item.kind === "info" && "border-info/40 bg-info/15 text-info"
             )}
           >
-            {item.message}
+            <p>{item.message}</p>
+            <p className="mt-0.5 text-[11px] opacity-85">
+              {item.context ? `${item.context} · ` : ""}
+              {item.createdAt.toLocaleTimeString()}
+            </p>
           </div>
         ))}
       </div>

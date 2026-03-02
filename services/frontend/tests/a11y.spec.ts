@@ -8,5 +8,7 @@ test("admin access page keeps credentials empty by default", async ({ page }) =>
   await expect(accessKey).toBeVisible();
   await expect(username).toHaveValue("");
   await expect(accessKey).toHaveValue("");
+  await expect(username).toHaveAttribute("aria-invalid", "false");
+  await expect(accessKey).toHaveAttribute("aria-invalid", "false");
   await expect(page.getByRole("button", { name: "Quick access" })).toHaveCount(0);
 });

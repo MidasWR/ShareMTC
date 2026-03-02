@@ -2,6 +2,9 @@ import { ApiError } from "../types/api";
 import { clearSession, readToken } from "./auth";
 
 type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+type RequestOptions = RequestInit & {
+  preserveSessionOnAuthError?: boolean;
+};
 
 function buildHeaders(headers?: HeadersInit): Headers {
   const merged = new Headers(headers);
@@ -11,10 +14,15 @@ function buildHeaders(headers?: HeadersInit): Headers {
   return merged;
 }
 
-export async function fetchJSON<T>(url: string, init?: RequestInit): Promise<T> {
+function shouldPreserveSessionForRequest(url: string): boolean {
+  return /\/v1\/auth\/(login|register|admin\/direct)(\?.*)?$/.test(url);
+}
+
+export async function fetchJSON<T>(url: string, init?: RequestOptions): Promise<T> {
+  const { preserveSessionOnAuthError = false, ...requestInit } = init ?? {};
   const response = await fetch(url, {
-    ...init,
-    headers: buildHeaders(init?.headers)
+    ...requestInit,
+    headers: buildHeaders(requestInit.headers)
   });
   const contentType = response.headers.get("content-type") ?? "";
   let data: (T & ApiError) | null = null;
@@ -32,7 +40,10 @@ export async function fetchJSON<T>(url: string, init?: RequestInit): Promise<T> 
 
   if (!response.ok) {
     if (response.status === 401 || response.status === 403) {
-      clearSession();
+      const preserveSession = preserveSessionOnAuthError || shouldPreserveSessionForRequest(url);
+      if (!preserveSession) {
+        clearSession();
+      }
     }
     const nonJsonMessage = textBody.trim() ? `${response.status} ${response.statusText}: ${textBody.trim()}` : `${response.status} ${response.statusText}`;
     throw new Error(data?.error ?? nonJsonMessage ?? "Request failed");
@@ -47,7 +58,7 @@ export async function fetchJSON<T>(url: string, init?: RequestInit): Promise<T> 
   return {} as T;
 }
 
-function request<T>(method: HttpMethod, url: string, body?: unknown, init?: RequestInit): Promise<T> {
+function request<T>(method: HttpMethod, url: string, body?: unknown, init?: RequestOptions): Promise<T> {
   const payload = body === undefined ? undefined : JSON.stringify(body);
   return fetchJSON<T>(url, {
     ...init,
@@ -57,19 +68,19 @@ function request<T>(method: HttpMethod, url: string, body?: unknown, init?: Requ
 }
 
 export const apiClient = {
-  get<T>(url: string, init?: RequestInit) {
+  get<T>(url: string, init?: RequestOptions) {
     return request<T>("GET", url, undefined, init);
   },
-  post<T>(url: string, body?: unknown, init?: RequestInit) {
+  post<T>(url: string, body?: unknown, init?: RequestOptions) {
     return request<T>("POST", url, body, init);
   },
-  put<T>(url: string, body?: unknown, init?: RequestInit) {
+  put<T>(url: string, body?: unknown, init?: RequestOptions) {
     return request<T>("PUT", url, body, init);
   },
-  patch<T>(url: string, body?: unknown, init?: RequestInit) {
+  patch<T>(url: string, body?: unknown, init?: RequestOptions) {
     return request<T>("PATCH", url, body, init);
   },
-  del<T>(url: string, init?: RequestInit) {
+  del<T>(url: string, init?: RequestOptions) {
     return request<T>("DELETE", url, undefined, init);
   }
 };

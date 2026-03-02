@@ -109,6 +109,7 @@ func main() {
 			admin.Use(sdkauth.RequireAnyRole("admin", "super-admin", "ops-admin"))
 			admin.Get("/admin/allocations", handler.ListAll)
 			admin.Get("/admin/stats", handler.Stats)
+			admin.Get("/admin/runtime-inventory", handler.RuntimeInventory)
 		})
 	})
 

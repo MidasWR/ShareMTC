@@ -1,4 +1,5 @@
 import { Badge } from "../primitives/Badge";
+import { formatUpdatedAtLabel } from "../utils/operationFeedback";
 
 type Props = {
   ts: Date | null;
@@ -6,8 +7,6 @@ type Props = {
 };
 
 export function DataFreshnessBadge({ ts, label = "Data" }: Props) {
-  if (!ts) {
-    return <Badge variant="warning">{label}: stale</Badge>;
-  }
-  return <Badge variant="success">{label}: {ts.toLocaleTimeString()}</Badge>;
+  if (!ts) return <Badge variant="warning">{formatUpdatedAtLabel(null, label)}</Badge>;
+  return <Badge variant="success">{formatUpdatedAtLabel(ts, label)}</Badge>;
 }

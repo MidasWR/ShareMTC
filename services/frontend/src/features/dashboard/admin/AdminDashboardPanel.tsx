@@ -6,11 +6,13 @@ import { listAgentLogs, listAllAllocations, getResourceStats, listHealthChecks, 
 import { useToast } from "../../../design/components/Toast";
 import { Table } from "../../../design/components/Table";
 import { EmptyState } from "../../../design/patterns/EmptyState";
+import { DataFreshnessBadge } from "../../../design/patterns/DataFreshnessBadge";
 import { MetricTile } from "../../../design/patterns/MetricTile";
 import { PageSectionHeader } from "../../../design/patterns/PageSectionHeader";
 import { Button } from "../../../design/primitives/Button";
 import { Card } from "../../../design/primitives/Card";
 import { Badge } from "../../../design/primitives/Badge";
+import { formatOperationMessage } from "../../../design/utils/operationFeedback";
 import { AgentLog } from "../../../types/api";
 
 type ProviderLoad = {
@@ -35,6 +37,7 @@ export function AdminDashboardPanel() {
   const [metricRowsCount, setMetricRowsCount] = useState(0);
   const [agentLogRowsCount, setAgentLogRowsCount] = useState(0);
   const [agentLogRows, setAgentLogRows] = useState<AgentLog[]>([]);
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
   const { push } = useToast();
 
   async function refresh() {
@@ -97,9 +100,10 @@ export function AdminDashboardPanel() {
         .filter((item): item is { provider: string; issue: string; severity: string } => item !== null)
         .slice(0, 12);
       setRiskRows(risks);
-      push("info", "Admin dashboard updated");
+      setLastUpdatedAt(new Date());
+      push("info", formatOperationMessage({ action: "Refresh", entityType: "Admin dashboard", result: "updated" }), "Admin");
     } catch (error) {
-      push("error", error instanceof Error ? error.message : "Failed to load admin dashboard");
+      push("error", error instanceof Error ? error.message : "Failed to load admin dashboard", "Admin");
     } finally {
       setLoading(false);
     }
@@ -115,9 +119,12 @@ export function AdminDashboardPanel() {
         title="Admin Dashboard"
         description="Operational cockpit for supply, risk, and monetization."
         actions={
-          <Button variant="secondary" onClick={refresh} loading={loading}>
-            Refresh data
-          </Button>
+          <div className="flex items-center gap-2">
+            <DataFreshnessBadge ts={lastUpdatedAt} label="Admin data" />
+            <Button variant="secondary" onClick={refresh} loading={loading}>
+              Refresh data
+            </Button>
+          </div>
         }
       />
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">

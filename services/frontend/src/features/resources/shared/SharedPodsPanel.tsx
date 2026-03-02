@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 import { useToast } from "../../../design/components/Toast";
 import { Table } from "../../../design/components/Table";
+import { DataFreshnessBadge } from "../../../design/patterns/DataFreshnessBadge";
 import { EmptyState } from "../../../design/patterns/EmptyState";
 import { PageSectionHeader } from "../../../design/patterns/PageSectionHeader";
 import { Button } from "../../../design/primitives/Button";
 import { Card } from "../../../design/primitives/Card";
 import { Input } from "../../../design/primitives/Input";
+import { formatOperationMessage } from "../../../design/utils/operationFeedback";
 import { listSharedOffers, listSharedPods, sharePod, upsertSharedOffer } from "../api/resourcesApi";
 import { SharedInventoryOffer, SharedPod } from "../../../types/api";
 
@@ -22,6 +24,8 @@ export function SharedPodsPanel() {
   const [gpuUnits, setGpuUnits] = useState("1");
   const [networkMbps, setNetworkMbps] = useState("1000");
   const [offers, setOffers] = useState<SharedInventoryOffer[]>([]);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
   const { push } = useToast();
 
   async function refresh() {
@@ -30,8 +34,9 @@ export function SharedPodsPanel() {
       const [podRows, offerRows] = await Promise.all([listSharedPods(), listSharedOffers({ status: "active" })]);
       setRows(podRows);
       setOffers(offerRows.filter((item) => item.resource_type === "pod"));
+      setLastUpdatedAt(new Date());
     } catch (error) {
-      push("error", error instanceof Error ? error.message : "Failed to load shared POD list");
+      push("error", error instanceof Error ? error.message : "Failed to load shared POD list", "Shared PODs");
     } finally {
       setLoading(false);
     }
@@ -42,6 +47,7 @@ export function SharedPodsPanel() {
   }, []);
 
   async function createShare() {
+    const nextErrors: Record<string, string> = {};
     const sharedWith = targets.split(",").map((item) => item.trim()).filter(Boolean);
     const qty = Math.max(1, Number(shareQty) || 1);
     const cpu = Number(cpuCores) || 0;
@@ -49,16 +55,18 @@ export function SharedPodsPanel() {
     const gpu = Number(gpuUnits) || 0;
     const network = Number(networkMbps) || 0;
     const price = Number(priceHourlyUSD) || 0;
-    if (!podCode.trim() || !providerID.trim()) {
-      push("error", "POD code and Provider ID are required");
-      return;
-    }
-    if (sharedWith.length === 0) {
-      push("error", "Provide at least one target user");
-      return;
-    }
-    if (cpu <= 0 || ram <= 0 || gpu < 0 || network <= 0 || price < 0) {
-      push("error", "CPU, RAM and Network must be greater than 0; GPU and price cannot be negative");
+    if (!podCode.trim()) nextErrors.podCode = "POD code is required";
+    if (!providerID.trim()) nextErrors.providerID = "Provider ID is required";
+    if (sharedWith.length === 0) nextErrors.targets = "Provide at least one target user";
+    if (cpu <= 0) nextErrors.cpuCores = "CPU must be greater than 0";
+    if (ram <= 0) nextErrors.ramMb = "RAM must be greater than 0";
+    if (gpu < 0) nextErrors.gpuUnits = "GPU cannot be negative";
+    if (network <= 0) nextErrors.networkMbps = "Network must be greater than 0";
+    if (price < 0) nextErrors.price = "Price cannot be negative";
+    setErrors(nextErrors);
+    const firstError = Object.values(nextErrors)[0];
+    if (firstError) {
+      push("error", firstError, "Share POD");
       return;
     }
     setLoading(true);
@@ -83,9 +91,13 @@ export function SharedPodsPanel() {
       setShareQty("1");
       setPriceHourlyUSD("0.59");
       await refresh();
-      push("success", "POD shared and marketplace offer published");
+      push(
+        "success",
+        formatOperationMessage({ action: "Share", entityType: "POD", entityName: podCode.trim(), result: "success" }),
+        "Shared marketplace"
+      );
     } catch (error) {
-      push("error", error instanceof Error ? error.message : "Failed to share POD");
+      push("error", error instanceof Error ? error.message : "Failed to share POD", "Shared marketplace");
     } finally {
       setLoading(false);
     }
@@ -96,15 +108,15 @@ export function SharedPodsPanel() {
       <PageSectionHeader title="Shared PODs" description="Track and manage POD sharing across users/providers." />
       <Card title="Quick Share POD" description="Publish share access and explicit marketplace capacity parameters.">
         <div className="grid items-end gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <Input label="POD Code" value={podCode} onChange={(event) => setPodCode(event.target.value)} />
-          <Input label="Provider ID" value={providerID} onChange={(event) => setProviderID(event.target.value)} />
-          <Input label="Share with" value={targets} onChange={(event) => setTargets(event.target.value)} placeholder="user1,user2" />
+          <Input label="POD Code" error={errors.podCode} value={podCode} onChange={(event) => setPodCode(event.target.value)} />
+          <Input label="Provider ID" error={errors.providerID} value={providerID} onChange={(event) => setProviderID(event.target.value)} />
+          <Input label="Share with" error={errors.targets} value={targets} onChange={(event) => setTargets(event.target.value)} placeholder="user1,user2" />
           <Input type="number" min={1} step={1} label="Qty" value={shareQty} onChange={(event) => setShareQty(event.target.value)} />
-          <Input type="number" min={1} step={1} label="CPU Cores" value={cpuCores} onChange={(event) => setCpuCores(event.target.value)} />
-          <Input type="number" min={1} step={512} label="RAM (MB)" value={ramMb} onChange={(event) => setRamMb(event.target.value)} />
-          <Input type="number" min={0} step={1} label="GPU Units" value={gpuUnits} onChange={(event) => setGpuUnits(event.target.value)} />
-          <Input type="number" min={1} step={100} label="Network (Mbps)" value={networkMbps} onChange={(event) => setNetworkMbps(event.target.value)} />
-          <Input type="number" min={0} step={0.01} label="Price $/hr" value={priceHourlyUSD} onChange={(event) => setPriceHourlyUSD(event.target.value)} />
+          <Input type="number" min={1} step={1} label="CPU Cores" error={errors.cpuCores} value={cpuCores} onChange={(event) => setCpuCores(event.target.value)} />
+          <Input type="number" min={1} step={512} label="RAM (MB)" error={errors.ramMb} value={ramMb} onChange={(event) => setRamMb(event.target.value)} />
+          <Input type="number" min={0} step={1} label="GPU Units" error={errors.gpuUnits} value={gpuUnits} onChange={(event) => setGpuUnits(event.target.value)} />
+          <Input type="number" min={1} step={100} label="Network (Mbps)" error={errors.networkMbps} value={networkMbps} onChange={(event) => setNetworkMbps(event.target.value)} />
+          <Input type="number" min={0} step={0.01} label="Price $/hr" error={errors.price} value={priceHourlyUSD} onChange={(event) => setPriceHourlyUSD(event.target.value)} />
           <Button onClick={createShare} loading={loading}>Share</Button>
         </div>
       </Card>
@@ -126,7 +138,12 @@ export function SharedPodsPanel() {
       <Card
         title="Shared POD Entries"
         description="POD shares with owner and access level."
-        actions={<Button variant="secondary" onClick={refresh} loading={loading}>Refresh</Button>}
+        actions={(
+          <div className="flex items-center gap-2">
+            <DataFreshnessBadge ts={lastUpdatedAt} label="Shared PODs" />
+            <Button variant="secondary" onClick={refresh} loading={loading}>Refresh</Button>
+          </div>
+        )}
       >
         <div className="mt-3">
           <Table

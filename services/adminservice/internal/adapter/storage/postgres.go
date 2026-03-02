@@ -11,11 +11,15 @@ import (
 )
 
 type ProviderRepo struct {
-	db *pgxpool.Pool
+	db                *pgxpool.Pool
+	enableSeedCatalog bool
 }
 
-func NewProviderRepo(db *pgxpool.Pool) *ProviderRepo {
-	return &ProviderRepo{db: db}
+func NewProviderRepo(db *pgxpool.Pool, enableSeedCatalog bool) *ProviderRepo {
+	return &ProviderRepo{
+		db:                db,
+		enableSeedCatalog: enableSeedCatalog,
+	}
 }
 
 func (r *ProviderRepo) Migrate(ctx context.Context) error {
@@ -69,6 +73,9 @@ func (r *ProviderRepo) Migrate(ctx context.Context) error {
 	`)
 	if err != nil {
 		return err
+	}
+	if !r.enableSeedCatalog {
+		return nil
 	}
 	return r.seedPodCatalog(ctx)
 }

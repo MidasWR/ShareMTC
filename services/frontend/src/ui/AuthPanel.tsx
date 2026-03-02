@@ -12,6 +12,7 @@ import { InlineAlert } from "../design/patterns/InlineAlert";
 import { API_BASE } from "../config/apiBase";
 import { setSession } from "../lib/auth";
 import { fetchJSON } from "../lib/http";
+import { formatOperationMessage } from "../design/utils/operationFeedback";
 
 type AuthPanelProps = {
   onAuthenticated?: () => void;
@@ -77,10 +78,10 @@ export function AuthPanel({ onAuthenticated }: AuthPanelProps) {
       });
       setSession(json.token, json.user);
       onAuthenticated?.();
-      push("success", locale === "ru" ? `Вход выполнен: ${json.user.email}` : `Signed in as ${json.user.email}`);
+      push("success", formatOperationMessage({ action: "Sign in", entityType: "User", entityName: json.user.email, result: "success" }), "Authentication");
     } catch (requestError) {
       setError(normalizeAuthError(requestError, path));
-      push("error", locale === "ru" ? "Ошибка аутентификации" : "Authentication failed");
+      push("error", locale === "ru" ? "Ошибка аутентификации" : "Authentication failed", "Authentication");
     } finally {
       setLoading("");
     }
@@ -101,13 +102,20 @@ export function AuthPanel({ onAuthenticated }: AuthPanelProps) {
       });
       setSession(json.token, json.user);
       onAuthenticated?.();
-      push("success", locale === "ru" ? `Вход выполнен: ${json.user.email}` : `Signed in as ${json.user.email}`);
+      push("success", formatOperationMessage({ action: "Sign in", entityType: "User", entityName: json.user.email, result: "success" }), "Authentication");
     } catch (requestError) {
       setError(normalizeAuthError(requestError, "login"));
-      push("error", locale === "ru" ? "Ошибка аутентификации" : "Authentication failed");
+      push("error", locale === "ru" ? "Ошибка аутентификации" : "Authentication failed", "Authentication");
     } finally {
       setLoading("");
     }
+  }
+
+  function openMarketplace() {
+    const url = new URL(window.location.href);
+    url.searchParams.set("section", "marketplace");
+    window.history.pushState({}, "", url);
+    window.dispatchEvent(new PopStateEvent("popstate"));
   }
 
   return (
@@ -123,14 +131,14 @@ export function AuthPanel({ onAuthenticated }: AuthPanelProps) {
         <div className="mb-4 inline-flex rounded-md border border-border p-1">
           <button
             type="button"
-            className={`rounded px-3 py-1 text-sm ${mode === "login" ? "bg-brand text-white" : "text-textSecondary"}`}
+            className={`focus-ring min-h-11 rounded px-3 py-1 text-sm ${mode === "login" ? "bg-brand text-white" : "text-textSecondary"}`}
             onClick={() => setMode("login")}
           >
             {locale === "ru" ? "Вход" : "Sign in"}
           </button>
           <button
             type="button"
-            className={`rounded px-3 py-1 text-sm ${mode === "register" ? "bg-brand text-white" : "text-textSecondary"}`}
+            className={`focus-ring min-h-11 rounded px-3 py-1 text-sm ${mode === "register" ? "bg-brand text-white" : "text-textSecondary"}`}
             onClick={() => setMode("register")}
           >
             {locale === "ru" ? "Регистрация" : "Register"}
@@ -187,7 +195,7 @@ export function AuthPanel({ onAuthenticated }: AuthPanelProps) {
             <FcGoogle size={18} />
             {locale === "ru" ? "Продолжить через Google" : "Continue with Google"}
           </a>
-          <Button variant="ghost" className="w-full">
+          <Button variant="ghost" className="w-full" onClick={openMarketplace}>
             {locale === "ru" ? "Создать первый инстанс" : "Create first instance"}
           </Button>
         </div>

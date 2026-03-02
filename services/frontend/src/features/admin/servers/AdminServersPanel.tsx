@@ -63,6 +63,7 @@ export function AdminServersPanel() {
         open={state.isCreateOpen}
         creating={state.creating}
         form={state.form}
+        errors={state.formErrors}
         onClose={() => state.setIsCreateOpen(false)}
         onSubmit={state.create}
         onChange={(name, value) => state.setForm((prev) => ({ ...prev, [name]: value }))}

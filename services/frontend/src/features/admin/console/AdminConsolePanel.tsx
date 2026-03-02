@@ -14,6 +14,8 @@ import { AdminServersPanel } from "../servers/AdminServersPanel";
 import { SharingAdminPanel } from "../sharing/SharingAdminPanel";
 import { getAgentInstallCommand } from "../api/adminApi";
 import { AdminPodsPanel } from "../catalog/AdminPodsPanel";
+import { copyTextToClipboard } from "../../../lib/clipboard";
+import { formatOperationMessage } from "../../../design/utils/operationFeedback";
 
 type AdminTab = "overview" | "providers" | "pods" | "allocations" | "billing" | "risk";
 const adminTabs: AdminTab[] = ["overview", "providers", "pods", "allocations", "billing", "risk"];
@@ -46,9 +48,9 @@ export function AdminConsolePanel() {
       setAllocations(allocRows);
       setAccruals(accrualRows);
       setLastDataRefreshAt(new Date());
-      push("info", "Admin console data refreshed");
+      push("info", formatOperationMessage({ action: "Refresh", entityType: "Admin console", result: "updated" }), "Admin");
     } catch (error) {
-      push("error", error instanceof Error ? error.message : "Failed to refresh admin console");
+      push("error", error instanceof Error ? error.message : "Failed to refresh admin console", "Admin");
     } finally {
       setLoading(false);
     }
@@ -62,7 +64,7 @@ export function AdminConsolePanel() {
       setInstallerURL(payload.installer_url);
       setLastCommandRefreshAt(new Date());
     } catch (error) {
-      push("error", error instanceof Error ? error.message : "Failed to fetch install command");
+      push("error", error instanceof Error ? error.message : "Failed to fetch install command", "Admin");
     } finally {
       setCommandLoading(false);
     }
@@ -70,14 +72,27 @@ export function AdminConsolePanel() {
 
   async function copyInstallerURL() {
     if (!installerURL) {
-      push("error", "Installer URL is empty");
+      push("error", "Installer URL is empty", "Admin");
       return;
     }
-    try {
-      await navigator.clipboard.writeText(installerURL);
-      push("success", "Installer URL copied");
-    } catch {
-      push("error", "Clipboard unavailable");
+    const copied = await copyTextToClipboard(installerURL);
+    if (copied) {
+      push("success", "Installer URL copied", "Admin");
+    } else {
+      push("error", "Clipboard unavailable", "Admin");
+    }
+  }
+
+  async function copyInstallCommand() {
+    if (!installCommand) {
+      push("error", "Install command is empty", "Admin");
+      return;
+    }
+    const copied = await copyTextToClipboard(installCommand);
+    if (copied) {
+      push("success", "Curl command copied", "Admin");
+    } else {
+      push("error", "Clipboard unavailable", "Admin");
     }
   }
 
@@ -157,6 +172,9 @@ export function AdminConsolePanel() {
           <div className="mb-2 uppercase tracking-wide text-textMuted">Direct installer URL</div>
           <div className="break-all font-mono">{installerURL || "Press 'Refresh curl' to fetch installer URL."}</div>
           <div className="mt-3 flex flex-wrap gap-2">
+            <Button variant="secondary" onClick={copyInstallCommand} disabled={!installCommand}>
+              Copy curl command
+            </Button>
             <Button variant="secondary" onClick={copyInstallerURL} disabled={!installerURL}>
               Copy installer URL
             </Button>

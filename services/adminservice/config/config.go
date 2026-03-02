@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"strconv"
 
 	sdkconfig "github.com/MidasWR/ShareMTC/services/sdk/config"
 )
@@ -16,6 +17,7 @@ type Config struct {
 	AgentResourceURL string
 	AgentKafkaBrokers string
 	AgentImageRepo    string
+	EnableSyntheticCatalogSeed bool
 }
 
 func Load() Config {
@@ -29,6 +31,7 @@ func Load() Config {
 		AgentResourceURL: env("AGENT_RESOURCE_API_URL", ""),
 		AgentKafkaBrokers: env("AGENT_KAFKA_BROKERS", ""),
 		AgentImageRepo:    env("AGENT_IMAGE_REPO", "midaswr/host-hostagent"),
+		EnableSyntheticCatalogSeed: envBool("ENABLE_SYNTHETIC_CATALOG_SEED", false),
 	}
 }
 
@@ -38,6 +41,18 @@ func env(name, fallback string) string {
 		return fallback
 	}
 	return v
+}
+
+func envBool(name string, fallback bool) bool {
+	v := os.Getenv(name)
+	if v == "" {
+		return fallback
+	}
+	parsed, err := strconv.ParseBool(v)
+	if err != nil {
+		return fallback
+	}
+	return parsed
 }
 
 func postgresDSN() string {

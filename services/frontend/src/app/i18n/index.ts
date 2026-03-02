@@ -1,6 +1,6 @@
 import { useSettings } from "../providers/SettingsProvider";
 
-const translations = {
+export const translations = {
   en: {
     sidebar: {
       title: "ShareMTC Control Plane",
@@ -18,7 +18,7 @@ const translations = {
       myCompute: "My Compute",
       provideCompute: "Provide Compute",
       billing: "Billing",
-      admin: "Admin",
+      admin: "Админка",
       settings: "Settings",
       // Legacy labels stay for deep screens and old links.
       myTemplates: "My Templates",
@@ -38,6 +38,9 @@ const translations = {
       vip: "VIP Policy"
     },
     common: {
+      navigation: {
+        skipToContent: "Skip to content"
+      },
       auth: {
         title: "Platform Access",
         signIn: "Sign in",
@@ -97,6 +100,9 @@ const translations = {
       vip: "VIP политика"
     },
     common: {
+      navigation: {
+        skipToContent: "Пропустить навигацию"
+      },
       auth: {
         title: "Доступ к платформе",
         signIn: "Вход",
@@ -104,19 +110,19 @@ const translations = {
         createFirstInstance: "Создать первый инстанс"
       },
       marketplace: {
-        title: "Marketplace / Deploy",
+        title: "Маркетплейс / Деплой",
         filters: "Фильтры",
-        deployWizard: "Deploy wizard",
-        reviewDeploy: "Review & Deploy"
+        deployWizard: "Мастер деплоя",
+        reviewDeploy: "Проверить и задеплоить"
       },
       instances: {
-        title: "My Instances",
-        details: "Instance Details",
+        title: "Мои инстансы",
+        details: "Детали инстанса",
         actions: "Действия"
       },
       settings: {
         title: "Настройки",
-        ssh: "SSH keys CRUD"
+        ssh: "Управление SSH-ключами"
       }
     }
   }

@@ -1,7 +1,8 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Table } from "../../../design/components/Table";
 import { useToast } from "../../../design/components/Toast";
 import { EmptyState } from "../../../design/patterns/EmptyState";
+import { DataFreshnessBadge } from "../../../design/patterns/DataFreshnessBadge";
 import { InlineAlert } from "../../../design/patterns/InlineAlert";
 import { MetricTile } from "../../../design/patterns/MetricTile";
 import { PageSectionHeader } from "../../../design/patterns/PageSectionHeader";
@@ -10,10 +11,13 @@ import { StatusBadge } from "../../../design/patterns/StatusBadge";
 import { Button } from "../../../design/primitives/Button";
 import { Card } from "../../../design/primitives/Card";
 import { Input } from "../../../design/primitives/Input";
-import { AgentLog, Allocation, UsageAccrual } from "../../../types/api";
+import { AgentLog, Allocation, RuntimeInventory, UsageAccrual } from "../../../types/api";
 import { loadProviderDashboard } from "../api/providerApi";
-import { listAgentLogs, listHealthChecks, listMetrics, listSharedOffers, upsertSharedOffer } from "../../resources/api/resourcesApi";
+import { getRuntimeInventory, listAgentLogs, listHealthChecks, listMetrics, listSharedOffers, upsertSharedOffer } from "../../resources/api/resourcesApi";
 import { PROVIDER_SHARED_CAPACITY_DEFAULTS } from "../../resources/defaults";
+import { getAgentInstallCommand } from "../../admin/api/adminApi";
+import { copyTextToClipboard } from "../../../lib/clipboard";
+import { formatOperationMessage } from "../../../design/utils/operationFeedback";
 
 
 export function ProviderDashboardPanel() {
@@ -28,18 +32,29 @@ export function ProviderDashboardPanel() {
   const [agentLogsCount, setAgentLogsCount] = useState(0);
   const [recentLogs, setRecentLogs] = useState<AgentLog[]>([]);
   const [sharedOfferQty, setSharedOfferQty] = useState(0);
+  const [runtimeInventory, setRuntimeInventory] = useState<RuntimeInventory | null>(null);
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
   const { push } = useToast();
-  const detectedHost = typeof window !== "undefined" ? window.location.hostname : "localhost";
-  const detectedProto = typeof window !== "undefined" ? window.location.protocol.replace(":", "") : "http";
-  const installerCommand =
-    `curl -fsSL https://raw.githubusercontent.com/MidasWR/ShareMTC/latest/installer/hostagent-node-installer.sh | sudo RESOURCE_API_URL=${detectedProto}://${detectedHost} KAFKA_BROKERS=${detectedHost}:9092 IMAGE_REPO=midaswr/host-hostagent IMAGE_TAG=latest bash`;
+  const [installerCommand, setInstallerCommand] = useState("");
+  useEffect(() => {
+    async function loadInstallerCommand() {
+      try {
+        const payload = await getAgentInstallCommand();
+        setInstallerCommand(payload.command);
+      } catch {
+        setInstallerCommand("");
+      }
+    }
+    void loadInstallerCommand();
+  }, []);
+
 
   const runningCount = useMemo(() => allocations.filter((item) => !item.released_at).length, [allocations]);
   const totalRevenue = useMemo(() => accruals.reduce((sum, item) => sum + item.total_usd, 0), [accruals]);
 
   async function refresh() {
     if (!providerID.trim()) {
-      push("error", "Provider ID is required");
+      push("error", "Provider ID is required", "Provider dashboard");
       return;
     }
     setLoading(true);
@@ -62,27 +77,38 @@ export function ProviderDashboardPanel() {
       setAgentLogsCount(agentLogs.length);
       setRecentLogs(agentLogs.slice(0, 8));
       setSharedOfferQty(sharedOffers.reduce((sum, item) => sum + (item.available_qty || 0), 0));
-      push("info", "Provider data synchronized");
+      try {
+        const inventory = await getRuntimeInventory();
+        setRuntimeInventory(inventory);
+      } catch {
+        setRuntimeInventory(null);
+      }
+      setLastUpdatedAt(new Date());
+      push("info", formatOperationMessage({ action: "Refresh", entityType: "Provider dashboard", entityName: providerID.trim(), result: "updated" }), "Provider");
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Failed to refresh provider dashboard");
-      push("error", requestError instanceof Error ? requestError.message : "Failed to refresh provider dashboard");
+      push("error", requestError instanceof Error ? requestError.message : "Failed to refresh provider dashboard", "Provider");
     } finally {
       setLoading(false);
     }
   }
 
   async function copyInstallerCommand() {
-    try {
-      await navigator.clipboard.writeText(installerCommand);
+    if (!installerCommand) {
+      push("error", "Installer command is empty", "Provider");
+      return;
+    }
+    const copied = await copyTextToClipboard(installerCommand);
+    if (copied) {
       push("success", "Installer command copied");
-    } catch {
-      push("error", "Clipboard unavailable");
+    } else {
+      push("error", "Clipboard unavailable", "Provider");
     }
   }
 
   async function publishSharedCapacity() {
     if (!providerID.trim()) {
-      push("error", "Provider ID is required");
+      push("error", "Provider ID is required", "Publish shared capacity");
       return;
     }
     try {
@@ -100,10 +126,10 @@ export function ProviderDashboardPanel() {
         price_hourly_usd: PROVIDER_SHARED_CAPACITY_DEFAULTS.priceHourlyUSD,
         status: "active"
       });
-      push("success", "Shared capacity published");
+      push("success", formatOperationMessage({ action: "Publish", entityType: "Shared capacity", entityName: providerID.trim(), result: "success" }), "Provider");
       await refresh();
     } catch (error) {
-      push("error", error instanceof Error ? error.message : "Failed to publish shared capacity");
+      push("error", error instanceof Error ? error.message : "Failed to publish shared capacity", "Provider");
     }
   }
 
@@ -117,9 +143,12 @@ export function ProviderDashboardPanel() {
       <Card title="Provider Selector" description="Load dashboard data by provider ID.">
         <div className="grid gap-3 md:grid-cols-[2fr_auto]">
           <Input label="Provider ID" value={providerID} onChange={(event) => setProviderID(event.target.value)} placeholder="Provider UUID" />
-          <Button className="md:mt-7" onClick={refresh} loading={loading}>
-            Load dashboard
-          </Button>
+          <div className="flex items-end gap-2">
+            <DataFreshnessBadge ts={lastUpdatedAt} label="Provider data" />
+            <Button onClick={refresh} loading={loading}>
+              Load dashboard
+            </Button>
+          </div>
         </div>
         {!loading && error ? <div className="mt-4"><InlineAlert kind="error">{error}</InlineAlert></div> : null}
         <div className="mt-4 grid gap-3 md:grid-cols-4">
@@ -142,11 +171,46 @@ export function ProviderDashboardPanel() {
 
       <Card title="Hostagent Install" description="One-command installer for provider hosts with auto-detected control-plane endpoint.">
         <div className="rounded-md border border-border bg-canvas p-3">
-          <pre className="overflow-auto font-mono text-xs text-textSecondary">{installerCommand}</pre>
+          <pre className="overflow-auto font-mono text-xs text-textSecondary">
+            {installerCommand || "Installer command is unavailable. Open Admin Console and refresh installer command."}
+          </pre>
         </div>
         <div className="mt-3">
-          <Button variant="secondary" onClick={copyInstallerCommand}>Copy curl command</Button>
+          <Button variant="secondary" onClick={copyInstallerCommand} disabled={!installerCommand}>Copy curl command</Button>
         </div>
+      </Card>
+
+      <Card title="Hoster Runtime Inventory" description="Real-time aggregated provider/runtime state from backend APIs, including RunPod pods.">
+        {runtimeInventory ? (
+          <div className="grid gap-3 md:grid-cols-4">
+            <MetricTile label="VM total" value={`${runtimeInventory.vm_total}`} />
+            <MetricTile label="VM running" value={`${runtimeInventory.vm_running}`} />
+            <MetricTile label="Pod total" value={`${runtimeInventory.pod_total}`} />
+            <MetricTile label="RunPod pods" value={`${runtimeInventory.runpod_pods.length}`} />
+          </div>
+        ) : (
+          <EmptyState title="No runtime inventory loaded" description="Load dashboard data to fetch runtime inventory." />
+        )}
+        {runtimeInventory ? (
+          <div className="mt-4">
+            <Table
+              dense
+              ariaLabel="RunPod pods inventory"
+              rowKey={(row) => row.id || `${row.provider_id}-${row.name}-${row.created_at}`}
+              items={runtimeInventory.runpod_pods}
+              emptyState={<EmptyState title="No RunPod pods" description="RunPod pod inventory is currently empty." />}
+              columns={[
+                { key: "id", header: "Pod ID", render: (row) => row.id || "-" },
+                { key: "name", header: "Name", render: (row) => row.name },
+                { key: "provider", header: "Provider", render: (row) => row.provider_id },
+                { key: "status", header: "Status", render: (row) => row.status || "-" },
+                { key: "gpu", header: "GPU", render: (row) => row.gpu_count },
+                { key: "cpu", header: "CPU", render: (row) => row.cpu_count },
+                { key: "memory", header: "Memory GB", render: (row) => row.memory_gb }
+              ]}
+            />
+          </div>
+        ) : null}
       </Card>
 
       <Card title="Allocation Feed" description="Current and historical resource allocations.">

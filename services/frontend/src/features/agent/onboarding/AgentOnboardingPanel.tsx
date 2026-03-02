@@ -9,6 +9,7 @@ import { Input } from "../../../design/primitives/Input";
 import { Select } from "../../../design/primitives/Select";
 import { API_BASE } from "../../../config/apiBase";
 import { fetchJSON } from "../../../lib/http";
+import { copyTextToClipboard } from "../../../lib/clipboard";
 
 
 const installCommands = {
@@ -28,10 +29,10 @@ export function AgentOnboardingPanel() {
   const { push } = useToast();
 
   async function copyCommand() {
-    try {
-      await navigator.clipboard.writeText(installCommands[os]);
+    const copied = await copyTextToClipboard(installCommands[os]);
+    if (copied) {
       push("success", "Install command copied");
-    } catch {
+    } else {
       push("error", "Clipboard unavailable");
     }
   }

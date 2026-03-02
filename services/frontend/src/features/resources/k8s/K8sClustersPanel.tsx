@@ -2,10 +2,12 @@ import { FormEvent, useEffect, useState } from "react";
 import { useToast } from "../../../design/components/Toast";
 import { Table } from "../../../design/components/Table";
 import { EmptyState } from "../../../design/patterns/EmptyState";
+import { DataFreshnessBadge } from "../../../design/patterns/DataFreshnessBadge";
 import { PageSectionHeader } from "../../../design/patterns/PageSectionHeader";
 import { Button } from "../../../design/primitives/Button";
 import { Card } from "../../../design/primitives/Card";
 import { Input } from "../../../design/primitives/Input";
+import { formatOperationMessage } from "../../../design/utils/operationFeedback";
 import { createK8sCluster, deleteK8sCluster, listK8sClusters, refreshK8sCluster } from "../api/resourcesApi";
 import { KubernetesCluster } from "../../../types/api";
 import { StatusBadge } from "../../../design/patterns/StatusBadge";
@@ -18,14 +20,16 @@ export function K8sClustersPanel() {
   const [providerID, setProviderID] = useState("provider-default");
   const [loading, setLoading] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<KubernetesCluster | null>(null);
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
   const { push } = useToast();
 
   async function refresh() {
     setLoading(true);
     try {
       setRows(await listK8sClusters());
+      setLastUpdatedAt(new Date());
     } catch (error) {
-      push("error", error instanceof Error ? error.message : "Failed to load clusters");
+      push("error", error instanceof Error ? error.message : "Failed to load clusters", "Kubernetes clusters");
     } finally {
       setLoading(false);
     }
@@ -39,7 +43,7 @@ export function K8sClustersPanel() {
     event.preventDefault();
     setLoading(true);
     try {
-      await createK8sCluster({
+      const created = await createK8sCluster({
         name,
         provider_id: providerID,
         node_count: 3,
@@ -47,9 +51,13 @@ export function K8sClustersPanel() {
         k8s_version: "1.30"
       });
       await refresh();
-      push("success", "Kubernetes cluster created");
+      push(
+        "success",
+        formatOperationMessage({ action: "Create", entityType: "Cluster", entityName: created.name || name, entityId: created.id, result: "success" }),
+        "Kubernetes"
+      );
     } catch (error) {
-      push("error", error instanceof Error ? error.message : "Failed to create cluster");
+      push("error", error instanceof Error ? error.message : "Failed to create cluster", "Kubernetes");
     } finally {
       setLoading(false);
     }
@@ -60,9 +68,9 @@ export function K8sClustersPanel() {
     try {
       await refreshK8sCluster(clusterID);
       await refresh();
-      push("info", "Cluster status refreshed");
+      push("info", formatOperationMessage({ action: "Refresh", entityType: "Cluster", entityId: clusterID, result: "updated" }), "Kubernetes");
     } catch (error) {
-      push("error", error instanceof Error ? error.message : "Failed to refresh cluster");
+      push("error", error instanceof Error ? error.message : "Failed to refresh cluster", "Kubernetes");
     } finally {
       setLoading(false);
     }
@@ -73,9 +81,9 @@ export function K8sClustersPanel() {
     try {
       await deleteK8sCluster(clusterID);
       await refresh();
-      push("info", "Cluster deleted");
+      push("info", formatOperationMessage({ action: "Delete", entityType: "Cluster", entityId: clusterID, result: "success" }), "Kubernetes");
     } catch (error) {
-      push("error", error instanceof Error ? error.message : "Failed to delete cluster");
+      push("error", error instanceof Error ? error.message : "Failed to delete cluster", "Kubernetes");
     } finally {
       setLoading(false);
     }
@@ -94,7 +102,12 @@ export function K8sClustersPanel() {
       <Card
         title="Clusters"
         description="Cluster status, endpoint and lifecycle actions."
-        actions={<Button variant="secondary" onClick={refresh} loading={loading}>Refresh</Button>}
+        actions={(
+          <div className="flex items-center gap-2">
+            <DataFreshnessBadge ts={lastUpdatedAt} label="Clusters" />
+            <Button variant="secondary" onClick={refresh} loading={loading}>Refresh</Button>
+          </div>
+        )}
       >
         <div className="mt-3">
           <Table

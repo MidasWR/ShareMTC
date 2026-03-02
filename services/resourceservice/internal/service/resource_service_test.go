@@ -78,6 +78,12 @@ func (r *repoStub) ListVMs(_ context.Context, _ string, _ models.CatalogFilter) 
 	}
 	return []models.VM{r.vm}, nil
 }
+func (r *repoStub) ListAllVMs(_ context.Context, _ int) ([]models.VM, error) {
+	if r.vm.ID == "" {
+		return []models.VM{}, nil
+	}
+	return []models.VM{r.vm}, nil
+}
 func (r *repoStub) UpdateVMStatus(_ context.Context, vmID string, status models.VMStatus) error {
 	if vmID != r.vm.ID {
 		return errors.New("not found")
@@ -124,6 +130,9 @@ func (r *repoStub) GetPod(_ context.Context, podID string) (models.Pod, error) {
 	return models.Pod{}, errors.New("not found")
 }
 func (r *repoStub) ListPods(_ context.Context, _ string, _ models.CatalogFilter) ([]models.Pod, error) {
+	return r.pods, nil
+}
+func (r *repoStub) ListAllPods(_ context.Context, _ int) ([]models.Pod, error) {
 	return r.pods, nil
 }
 func (r *repoStub) UpdatePodStatus(_ context.Context, podID string, status models.PodStatus) error {

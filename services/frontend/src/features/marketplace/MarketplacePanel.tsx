@@ -1,6 +1,7 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { LuArrowRight, LuCircleCheckBig, LuFilter, LuGlobe, LuHardDrive, LuKeyRound, LuMapPin, LuNetwork, LuServer, LuTriangleAlert } from "react-icons/lu";
 import { EmptyState } from "../../design/patterns/EmptyState";
+import { DataFreshnessBadge } from "../../design/patterns/DataFreshnessBadge";
 import { PageSectionHeader } from "../../design/patterns/PageSectionHeader";
 import { StatusBadge } from "../../design/patterns/StatusBadge";
 import { Button } from "../../design/primitives/Button";
@@ -10,8 +11,11 @@ import { Input } from "../../design/primitives/Input";
 import { MultiSelect } from "../../design/primitives/MultiSelect";
 import { Select } from "../../design/primitives/Select";
 import { useSettings } from "../../app/providers/SettingsProvider";
-import { countryOptions, deployCatalog } from "../hifi/mockData";
+import { useToast } from "../../design/components/Toast";
+import { formatOperationMessage } from "../../design/utils/operationFeedback";
 import { flagFromCountry, formatUSD } from "../hifi/formatters";
+import { listVMTemplates } from "../resources/api/resourcesApi";
+import { listPodCatalog } from "../admin/api/adminApi";
 
 const steps = [
   "Template",
@@ -24,10 +28,25 @@ const steps = [
 ] as const;
 
 type PricingModel = "on-demand" | "spot" | "savings";
+type CatalogItem = {
+  id: string;
+  gpuModel: string;
+  vramGb: number;
+  vcpu: number;
+  ramGb: number;
+  country: string;
+  region: string;
+  datacenter: string;
+  pricePerHour: number;
+  availability: "high" | "medium" | "low";
+  networkFeatures: string[];
+  computeType: "GPU" | "CPU";
+};
 
 export function MarketplacePanel() {
   const { settings } = useSettings();
   const locale = settings.language === "ru" ? "ru" : "en";
+  const { push } = useToast();
   const [computeType, setComputeType] = useState<"ALL" | "GPU" | "CPU">("GPU");
   const [countries, setCountries] = useState<string[]>([]);
   const [search, setSearch] = useState("");
@@ -35,7 +54,9 @@ export function MarketplacePanel() {
   const [maxPrice, setMaxPrice] = useState(4.5);
   const [availability, setAvailability] = useState<"" | "high" | "medium" | "low">("");
   const [networkFeature, setNetworkFeature] = useState("");
-  const [selectedId, setSelectedId] = useState<string>(deployCatalog[0]?.id || "");
+  const [catalog, setCatalog] = useState<CatalogItem[]>([]);
+  const [catalogLoading, setCatalogLoading] = useState(false);
+  const [selectedId, setSelectedId] = useState<string>("");
   const [activeStep, setActiveStep] = useState<number>(1);
   const [instanceName, setInstanceName] = useState("mts-instance-01");
   const [gpuCount, setGpuCount] = useState(1);
@@ -46,10 +67,81 @@ export function MarketplacePanel() {
   const [sshKey, setSshKey] = useState("default-ed25519");
   const [pricingModel, setPricingModel] = useState<PricingModel>("on-demand");
   const [deploySubmitted, setDeploySubmitted] = useState(false);
+  const [instanceNameError, setInstanceNameError] = useState("");
+  const [lastCatalogRefreshAt, setLastCatalogRefreshAt] = useState<Date | null>(null);
+  const countryOptions = useMemo(
+    () =>
+      [...new Set(catalog.map((item) => item.country).filter(Boolean))]
+        .sort((a, b) => a.localeCompare(b))
+        .map((country) => ({ value: country, label: `${country} (${country})` })),
+    [catalog]
+  );
+
+  useEffect(() => {
+    async function loadCatalog() {
+      setCatalogLoading(true);
+      try {
+        const [templates, pods] = await Promise.all([listVMTemplates(), listPodCatalog()]);
+        const templateItems: CatalogItem[] = templates.map((item) => {
+          const region = item.region || "global";
+          const normalizedCountry = region.slice(0, 2).toUpperCase();
+          return {
+            id: item.id || item.code,
+            gpuModel: item.name,
+            vramGb: item.vram_gb || 0,
+            vcpu: item.cpu_cores,
+            ramGb: Math.max(1, Math.round(item.ram_mb / 1024)),
+            country: normalizedCountry,
+            region,
+            datacenter: item.code,
+            pricePerHour: Number((item.gpu_units * 0.25 + item.cpu_cores * 0.02 + item.ram_mb / 1024 * 0.01).toFixed(2)),
+            availability: item.availability_tier || "medium",
+            networkFeatures: ["IPv4", ...(item.global_networking_supported ? ["IPv6"] : [])],
+            computeType: item.gpu_units > 0 ? "GPU" : "CPU"
+          };
+        });
+        const podItems: CatalogItem[] = pods.map((item) => ({
+          id: item.id,
+          gpuModel: item.gpu_model,
+          vramGb: item.gpu_vram_gb,
+          vcpu: item.cpu_cores,
+          ramGb: item.ram_gb,
+          country: "US",
+          region: "runpod",
+          datacenter: item.code,
+          pricePerHour: item.hourly_price_usd,
+          availability: "high",
+          networkFeatures: ["IPv4", "SSH"],
+          computeType: "GPU"
+        }));
+        const nextCatalog = [...templateItems, ...podItems];
+        setCatalog(nextCatalog);
+        setLastCatalogRefreshAt(new Date());
+        if (nextCatalog.length > 0) {
+          setSelectedId(nextCatalog[0].id);
+        }
+
+      } finally {
+        setCatalogLoading(false);
+      }
+    }
+    void loadCatalog();
+  }, []);
+
+  function submitDeployRequest() {
+    if (!instanceName.trim()) {
+      setInstanceNameError(locale === "ru" ? "Имя инстанса обязательно" : "Instance name is required");
+      push("error", locale === "ru" ? "Укажите имя инстанса" : "Please provide instance name", "Deploy wizard");
+      return;
+    }
+    setInstanceNameError("");
+    setDeploySubmitted(true);
+    push("info", formatOperationMessage({ action: "Deploy request", entityType: "Instance", entityName: instanceName.trim(), result: "started" }), "Marketplace");
+  }
 
   const filteredCatalog = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
-    return deployCatalog.filter((item) => {
+    return catalog.filter((item) => {
       const typeMatch = computeType === "ALL" || item.computeType === computeType;
       const countryMatch = countries.length === 0 || countries.includes(item.country);
       const vramMatch = item.vramGb >= minVram;
@@ -63,7 +155,7 @@ export function MarketplacePanel() {
         item.country.toLowerCase().includes(normalizedSearch);
       return typeMatch && countryMatch && vramMatch && priceMatch && availabilityMatch && networkMatch && searchMatch;
     });
-  }, [availability, computeType, countries, maxPrice, minVram, networkFeature, search]);
+  }, [availability, catalog, computeType, countries, maxPrice, minVram, networkFeature, search]);
 
   const selected = useMemo(() => filteredCatalog.find((item) => item.id === selectedId) || filteredCatalog[0] || null, [filteredCatalog, selectedId]);
 
@@ -82,13 +174,24 @@ export function MarketplacePanel() {
     return values;
   }, [pricingModel, selected, sshKey]);
 
+  function openSettings() {
+    const url = new URL(window.location.href);
+    url.searchParams.set("section", "settings");
+    window.history.pushState({}, "", url);
+    window.dispatchEvent(new PopStateEvent("popstate"));
+  }
+
   return (
     <section className="section-stack">
       <PageSectionHeader
         title={locale === "ru" ? "Marketplace / Deploy" : "Marketplace / Deploy"}
         description={locale === "ru" ? "Каталог, фильтры и пошаговый wizard деплоя на одном экране." : "Catalog, filters and step-by-step deploy wizard on a single screen."}
       />
-      <Card title={locale === "ru" ? "Фильтры" : "Filters"} description={locale === "ru" ? "Compute type, регион, VRAM, цена, availability и сеть." : "Compute type, region, VRAM, price, availability and network."}>
+      <Card
+        title={locale === "ru" ? "Фильтры" : "Filters"}
+        description={locale === "ru" ? "Compute type, регион, VRAM, цена, availability и сеть." : "Compute type, region, VRAM, price, availability and network."}
+        actions={<DataFreshnessBadge ts={lastCatalogRefreshAt} label="Catalog" />}
+      >
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
           <Select
             label="Compute type"
@@ -103,12 +206,32 @@ export function MarketplacePanel() {
           <MultiSelect label="Country / Region" value={countries} onChange={setCountries} options={countryOptions.map((item) => ({ value: item.value, label: `${flagFromCountry(item.value)} ${item.label}`, meta: item.value }))} />
           <Input label="Search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="GPU, region, country..." leftIcon={<Icon glyph={LuFilter} size={16} />} />
           <div className="space-y-1.5">
-            <span className="text-sm font-medium text-textSecondary">VRAM slider: {minVram} GB</span>
-            <input className="focus-ring h-10 w-full accent-brand" type="range" min={0} max={160} step={4} value={minVram} onChange={(event) => setMinVram(Number(event.target.value))} />
+            <label htmlFor="marketplace-vram-range" className="text-sm font-medium text-textSecondary">VRAM slider: {minVram} GB</label>
+            <input
+              id="marketplace-vram-range"
+              aria-label="Minimum VRAM in GB"
+              className="focus-ring h-12 w-full accent-brand"
+              type="range"
+              min={0}
+              max={160}
+              step={4}
+              value={minVram}
+              onChange={(event) => setMinVram(Number(event.target.value))}
+            />
           </div>
           <div className="space-y-1.5">
-            <span className="text-sm font-medium text-textSecondary">Price range: {formatUSD(maxPrice, locale)}</span>
-            <input className="focus-ring h-10 w-full accent-brand" type="range" min={0.18} max={4.5} step={0.05} value={maxPrice} onChange={(event) => setMaxPrice(Number(event.target.value))} />
+            <label htmlFor="marketplace-price-range" className="text-sm font-medium text-textSecondary">Price range: {formatUSD(maxPrice, locale)}</label>
+            <input
+              id="marketplace-price-range"
+              aria-label="Maximum price per hour"
+              className="focus-ring h-12 w-full accent-brand"
+              type="range"
+              min={0.18}
+              max={4.5}
+              step={0.05}
+              value={maxPrice}
+              onChange={(event) => setMaxPrice(Number(event.target.value))}
+            />
           </div>
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
             <Select
@@ -164,7 +287,12 @@ export function MarketplacePanel() {
               );
             })}
           </div>
-          {filteredCatalog.length === 0 ? (
+          {catalogLoading ? (
+            <div className="mt-3">
+              <EmptyState title={locale === "ru" ? "Загрузка каталога" : "Loading catalog"} description={locale === "ru" ? "Получаем реальные позиции из API..." : "Loading real catalog entries from API..."} />
+            </div>
+          ) : null}
+          {filteredCatalog.length === 0 && !catalogLoading ? (
             <div className="mt-3">
               <EmptyState title={locale === "ru" ? "Ничего не найдено" : "No results"} description={locale === "ru" ? "Измените фильтры и попробуйте снова." : "Adjust filters and try again."} />
             </div>
@@ -178,7 +306,7 @@ export function MarketplacePanel() {
               const done = index + 1 < activeStep;
               return (
                 <li key={step}>
-                  <button type="button" className={`focus-ring flex min-h-9 w-full items-center justify-between rounded-md px-2 py-1.5 text-left ${current ? "bg-brand/20 text-textPrimary" : "text-textSecondary hover:bg-elevated"}`} onClick={() => setActiveStep(index + 1)}>
+                  <button type="button" className={`focus-ring flex min-h-11 w-full items-center justify-between rounded-md px-2 py-1.5 text-left ${current ? "bg-brand/20 text-textPrimary" : "text-textSecondary hover:bg-elevated"}`} onClick={() => setActiveStep(index + 1)}>
                     <span>{index + 1}. {step}</span>
                     {done ? <Icon glyph={LuCircleCheckBig} size={16} className="text-success" /> : <Icon glyph={LuArrowRight} size={16} />}
                   </button>
@@ -188,7 +316,7 @@ export function MarketplacePanel() {
           </ol>
 
           <div className="space-y-3">
-            <Input label="1) Template / Pod Name" value={instanceName} onChange={(event) => setInstanceName(event.target.value)} />
+            <Input label="1) Template / Pod Name" required error={instanceNameError} value={instanceName} onChange={(event) => setInstanceName(event.target.value)} />
             <Input label="2) Location (country / region / datacenter)" value={selected ? `${selected.country}/${selected.region}/${selected.datacenter}` : ""} readOnly />
             <div className="grid gap-3 sm:grid-cols-3">
               <Input type="number" min={1} label="3) GPU count" value={String(gpuCount)} onChange={(event) => setGpuCount(Number(event.target.value) || 1)} />
@@ -202,7 +330,7 @@ export function MarketplacePanel() {
             <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
               <Select label="5) Access / SSH key" value={sshKey} onChange={(event) => setSshKey(event.target.value)} options={[{ value: "default-ed25519", label: "default-ed25519" }, { value: "ml-team-rsa", label: "ml-team-rsa" }, { value: "", label: "No key selected" }]} />
               <div className="sm:mt-7">
-                <Button variant="secondary" leftIcon={<Icon glyph={LuKeyRound} size={16} />}>Add SSH key</Button>
+                <Button variant="secondary" leftIcon={<Icon glyph={LuKeyRound} size={16} />} onClick={openSettings}>Add SSH key</Button>
               </div>
             </div>
             <Select
@@ -234,14 +362,14 @@ export function MarketplacePanel() {
               ) : null}
             </div>
             <div className="flex flex-wrap gap-2">
-              <Button onClick={() => setDeploySubmitted(true)} leftIcon={<Icon glyph={LuGlobe} size={16} />}>
+              <Button onClick={submitDeployRequest} leftIcon={<Icon glyph={LuGlobe} size={16} />}>
                 {locale === "ru" ? "Review & Deploy" : "Review & Deploy"}
               </Button>
               <Button variant="ghost" onClick={() => setActiveStep((prev) => Math.min(7, prev + 1))}>Next step</Button>
             </div>
             {deploySubmitted ? (
               <p className="rounded-md border border-success/40 bg-success/10 p-2 text-sm text-textSecondary">
-                {locale === "ru" ? "Запуск деплоя принят. Проверьте My Instances для статуса provisioning/queued." : "Deployment request accepted. Check My Instances for provisioning/queued status."}
+                {locale === "ru" ? "Запрос на деплой отправлен. Статус ресурса проверьте в My Instances." : "Deploy request submitted. Check My Instances for runtime status."}
               </p>
             ) : null}
           </div>

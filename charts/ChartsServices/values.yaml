@@ -21,6 +21,7 @@ admin:
   dns: adminservice
   image: midaswr/host-adminservice
   port: 8082
+  enableSyntheticCatalogSeed: false
   agentInstaller:
     resourceApiURL: ""
     kafkaBrokers: ""

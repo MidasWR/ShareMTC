@@ -13,17 +13,18 @@ type Props = {
     provider_type: "internal" | "donor";
     network_mbps: string;
   };
+  errors?: Partial<Record<"display_name" | "machine_id" | "network_mbps", string>>;
   onClose: () => void;
   onSubmit: (event: FormEvent) => void;
   onChange: (name: "display_name" | "machine_id" | "provider_type" | "network_mbps", value: string) => void;
 };
 
-export function CreateServerModal({ open, creating, form, onClose, onSubmit, onChange }: Props) {
+export function CreateServerModal({ open, creating, form, errors, onClose, onSubmit, onChange }: Props) {
   return (
     <Modal open={open} title="Add server" description="Register a provider node in admin service." onClose={onClose}>
       <form className="space-y-3" onSubmit={onSubmit}>
-        <Input label="Display name" value={form.display_name} onChange={(event) => onChange("display_name", event.target.value)} />
-        <Input label="Machine ID" value={form.machine_id} onChange={(event) => onChange("machine_id", event.target.value)} />
+        <Input label="Display name" required error={errors?.display_name} value={form.display_name} onChange={(event) => onChange("display_name", event.target.value)} />
+        <Input label="Machine ID" required error={errors?.machine_id} value={form.machine_id} onChange={(event) => onChange("machine_id", event.target.value)} />
         <Select
           label="Provider type"
           value={form.provider_type}
@@ -33,7 +34,16 @@ export function CreateServerModal({ open, creating, form, onClose, onSubmit, onC
             { value: "internal", label: "Internal" }
           ]}
         />
-        <Input label="Network Mbps" value={form.network_mbps} onChange={(event) => onChange("network_mbps", event.target.value)} />
+        <Input
+          label="Network Mbps"
+          type="number"
+          min={1}
+          step={100}
+          required
+          error={errors?.network_mbps}
+          value={form.network_mbps}
+          onChange={(event) => onChange("network_mbps", event.target.value)}
+        />
         <Button type="submit" className="w-full" loading={creating}>
           Add server
         </Button>

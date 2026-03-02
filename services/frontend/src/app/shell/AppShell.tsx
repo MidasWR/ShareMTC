@@ -3,6 +3,7 @@ import { SidebarNav } from "../navigation/SidebarNav";
 import { AppTab } from "../navigation/menu";
 import { Button } from "../../design/primitives/Button";
 import { Drawer } from "../../design/components/Drawer";
+import { useSettings } from "../providers/SettingsProvider";
 
 type Props = {
   tab: AppTab;
@@ -15,6 +16,8 @@ type Props = {
 };
 
 export function AppShell({ tab, enabledMenu, onNavigate, onShortcuts, onLogout, children }: Props) {
+  const { settings } = useSettings();
+  const locale = settings.language === "ru" ? "ru" : "en";
   const activeItem = enabledMenu.find((item) => item.id === tab);
   const groupLabel = activeItem?.group === "account" ? "Account" : "Workspace";
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -25,7 +28,7 @@ export function AppShell({ tab, enabledMenu, onNavigate, onShortcuts, onLogout, 
         href="#content"
         className="focus-ring sr-only absolute left-2 top-2 z-[1500] rounded bg-surface px-3 py-2 text-sm text-textPrimary focus:not-sr-only"
       >
-        Skip to content
+        {locale === "ru" ? "Пропустить навигацию" : "Skip to content"}
       </a>
       <div className="hidden lg:block">
         <SidebarNav

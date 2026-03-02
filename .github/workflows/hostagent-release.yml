@@ -50,6 +50,13 @@ jobs:
           CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o dist/hostagent-windows-amd64.exe ./services/hostagent/cmd
           cp installer/hostagent-node-installer.sh dist/hostagent-node-installer.sh
 
+      - name: Verify hostagent release assets
+        run: |
+          test -f dist/hostagent-linux-amd64
+          test -f dist/hostagent-darwin-amd64
+          test -f dist/hostagent-windows-amd64.exe
+          test -f dist/hostagent-node-installer.sh
+
       - name: Login to Docker Hub
         if: ${{ inputs.publish_image }}
         uses: docker/login-action@v3

@@ -565,6 +565,37 @@ func (r *Repo) ListVMs(ctx context.Context, userID string, filter models.Catalog
 	return out, nil
 }
 
+func (r *Repo) ListAllVMs(ctx context.Context, limit int) ([]models.VM, error) {
+	if limit <= 0 {
+		limit = 500
+	}
+	rows, err := r.db.Query(ctx, `
+		SELECT id, user_id, provider_id, name, template, os_name, ip_address, region, cloud_type, cpu_cores, vcpu, ram_mb, system_ram_gb, gpu_units, vram_gb, network_mbps,
+		       network_volume_supported, global_networking_supported, availability_tier, max_instances, external_id, expires_at, status, created_at, updated_at
+		FROM vms
+		ORDER BY updated_at DESC
+		LIMIT $1
+	`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make([]models.VM, 0)
+	for rows.Next() {
+		var item models.VM
+		if err := rows.Scan(
+			&item.ID, &item.UserID, &item.ProviderID, &item.Name, &item.Template, &item.OSName, &item.IPAddress,
+			&item.Region, &item.CloudType, &item.CPUCores, &item.VCPU, &item.RAMMB, &item.SystemRAMGB, &item.GPUUnits, &item.VRAMGB, &item.NetworkMbps,
+			&item.NetworkVolumeSupported, &item.GlobalNetworkingSupport, &item.AvailabilityTier, &item.MaxInstances, &item.ExternalID, &item.ExpiresAt,
+			&item.Status, &item.CreatedAt, &item.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		out = append(out, item)
+	}
+	return out, nil
+}
+
 func (r *Repo) UpdateVMStatus(ctx context.Context, vmID string, status models.VMStatus) error {
 	_, err := r.db.Exec(ctx, `
 		UPDATE vms
@@ -656,6 +687,34 @@ func (r *Repo) ListPods(ctx context.Context, userID string, _ models.CatalogFilt
 		WHERE user_id = $1
 		ORDER BY updated_at DESC
 	`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make([]models.Pod, 0)
+	for rows.Next() {
+		var item models.Pod
+		if err := rows.Scan(
+			&item.ID, &item.UserID, &item.ProviderID, &item.Name, &item.ImageName, &item.GPUTypeID, &item.GPUCount, &item.CPUCount, &item.MemoryGB,
+			&item.ExternalID, &item.ExpiresAt, &item.Status, &item.CreatedAt, &item.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		out = append(out, item)
+	}
+	return out, nil
+}
+
+func (r *Repo) ListAllPods(ctx context.Context, limit int) ([]models.Pod, error) {
+	if limit <= 0 {
+		limit = 500
+	}
+	rows, err := r.db.Query(ctx, `
+		SELECT id, user_id, provider_id, name, image_name, gpu_type_id, gpu_count, cpu_count, memory_gb, external_id, expires_at, status, created_at, updated_at
+		FROM pod_instances
+		ORDER BY updated_at DESC
+		LIMIT $1
+	`, limit)
 	if err != nil {
 		return nil, err
 	}

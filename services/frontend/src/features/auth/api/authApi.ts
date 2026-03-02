@@ -8,7 +8,11 @@ type AuthResponse = {
 };
 
 export function loginDirectAdmin(username: string, password: string) {
-  return apiClient.post<AuthResponse>(`${API_BASE.auth}/v1/auth/admin/direct`, { username, password });
+  return apiClient.post<AuthResponse>(
+    `${API_BASE.auth}/v1/auth/admin/direct`,
+    { username, password },
+    { preserveSessionOnAuthError: true }
+  );
 }
 
 export function getUserSettings() {

@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useToast } from "../../../../design/components/Toast";
+import { formatOperationMessage } from "../../../../design/utils/operationFeedback";
 import { Provider } from "../../../../types/api";
 import { createProvider, listProviders } from "../../api/adminApi";
 
@@ -27,6 +28,7 @@ export function useServers() {
     provider_type: "donor",
     network_mbps: "100"
   });
+  const [formErrors, setFormErrors] = useState<Partial<Record<"display_name" | "machine_id" | "network_mbps", string>>>({});
   const { push } = useToast();
 
   async function refresh() {
@@ -37,7 +39,7 @@ export function useServers() {
       setProviders(list);
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Failed to load servers");
-      push("error", "Server list failed to load");
+      push("error", "Server list failed to load", "Admin servers");
     } finally {
       setLoading(false);
     }
@@ -45,8 +47,14 @@ export function useServers() {
 
   async function create(event: FormEvent) {
     event.preventDefault();
-    if (!form.display_name.trim() || !form.machine_id.trim()) {
-      push("error", "Display name and machine ID are required");
+    const nextErrors: Partial<Record<"display_name" | "machine_id" | "network_mbps", string>> = {};
+    if (!form.display_name.trim()) nextErrors.display_name = "Display name is required";
+    if (!form.machine_id.trim()) nextErrors.machine_id = "Machine ID is required";
+    if ((Number(form.network_mbps) || 0) <= 0) nextErrors.network_mbps = "Network Mbps must be greater than 0";
+    setFormErrors(nextErrors);
+    const firstError = Object.values(nextErrors)[0];
+    if (firstError) {
+      push("error", firstError, "Add server");
       return;
     }
     setCreating(true);
@@ -57,12 +65,13 @@ export function useServers() {
         provider_type: form.provider_type,
         network_mbps: Number(form.network_mbps) || 0
       });
-      push("success", "Server added");
+      push("success", formatOperationMessage({ action: "Create", entityType: "Server", entityName: form.display_name.trim(), result: "success" }), "Admin servers");
       setIsCreateOpen(false);
       setForm({ display_name: "", machine_id: "", provider_type: "donor", network_mbps: "100" });
+      setFormErrors({});
       await refresh();
     } catch (requestError) {
-      push("error", requestError instanceof Error ? requestError.message : "Create server failed");
+      push("error", requestError instanceof Error ? requestError.message : "Create server failed", "Admin servers");
     } finally {
       setCreating(false);
     }
@@ -111,6 +120,7 @@ export function useServers() {
     setIsCreateOpen,
     creating,
     form,
+    formErrors,
     setForm,
     onlineCount,
     filteredProviders,

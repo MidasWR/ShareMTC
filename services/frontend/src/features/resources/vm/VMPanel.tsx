@@ -1,12 +1,15 @@
 import { useEffect, useState } from "react";
 import { useToast } from "../../../design/components/Toast";
 import { Table } from "../../../design/components/Table";
+import { Modal } from "../../../design/components/Modal";
+import { DataFreshnessBadge } from "../../../design/patterns/DataFreshnessBadge";
 import { EmptyState } from "../../../design/patterns/EmptyState";
 import { PageSectionHeader } from "../../../design/patterns/PageSectionHeader";
 import { Button } from "../../../design/primitives/Button";
 import { Card } from "../../../design/primitives/Card";
 import { Input } from "../../../design/primitives/Input";
 import { Select } from "../../../design/primitives/Select";
+import { formatOperationMessage } from "../../../design/utils/operationFeedback";
 import { createVM, listVMTemplates, listVMs, rebootVM, startVM, stopVM, terminateVM } from "../api/resourcesApi";
 import { VM, VMTemplate } from "../../../types/api";
 import { StatusBadge } from "../../../design/patterns/StatusBadge";
@@ -36,6 +39,8 @@ export function VMPanel() {
   const [networkVolumeSupported, setNetworkVolumeSupported] = useState<boolean>(VM_TEMPLATE_FALLBACK.networkVolumeSupported);
   const [globalNetworkingSupported, setGlobalNetworkingSupported] = useState<boolean>(VM_TEMPLATE_FALLBACK.globalNetworkingSupported);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
+  const [terminateTarget, setTerminateTarget] = useState<VM | null>(null);
   const { push } = useToast();
 
   const selectedTemplate = templates.find((item) => item.code === template);
@@ -47,13 +52,14 @@ export function VMPanel() {
       const [data, templateRows] = await Promise.all([listVMs({ search }), listVMTemplates()]);
       setRows(data);
       setTemplates(templateRows);
+      setLastUpdatedAt(new Date());
       if (templateRows.length > 0 && !templateRows.some((item) => item.code === template)) {
         const first = templateRows[0];
         setTemplate(first.code);
         setOsName(first.os_name || osName);
       }
     } catch (error) {
-      push("error", error instanceof Error ? error.message : "Failed to load VMs");
+      push("error", error instanceof Error ? error.message : "Failed to load VMs", "VM fleet");
     } finally {
       setLoading(false);
     }
@@ -88,12 +94,12 @@ export function VMPanel() {
     setErrors(nextErrors);
     const firstError = Object.values(nextErrors)[0];
     if (firstError) {
-      push("error", firstError);
+      push("error", firstError, "Create VM");
       return;
     }
     setLoading(true);
     try {
-      await createVM({
+      const created = await createVM({
         provider_id: providerID.trim(),
         name: name.trim(),
         template,
@@ -113,9 +119,13 @@ export function VMPanel() {
         max_instances: maxInstances
       });
       await refresh();
-      push("success", "VM created successfully");
+      push(
+        "success",
+        formatOperationMessage({ action: "Create", entityType: "VM", entityName: created.name || name.trim(), entityId: created.id, result: "success" }),
+        "VM deployment"
+      );
     } catch (error) {
-      push("error", error instanceof Error ? error.message : "Failed to create VM");
+      push("error", error instanceof Error ? error.message : "Failed to create VM", "VM deployment");
     } finally {
       setLoading(false);
     }
@@ -129,9 +139,13 @@ export function VMPanel() {
       if (action === "reboot") await rebootVM(vmID);
       if (action === "terminate") await terminateVM(vmID);
       await refresh();
-      push("success", `VM ${action} completed successfully`);
+      push(
+        "success",
+        formatOperationMessage({ action: action[0].toUpperCase() + action.slice(1), entityType: "VM", entityId: vmID, result: "success" }),
+        "VM lifecycle"
+      );
     } catch (error) {
-      push("error", error instanceof Error ? error.message : `Failed to ${action} VM`);
+      push("error", error instanceof Error ? error.message : `Failed to ${action} VM`, "VM lifecycle");
     } finally {
       setLoading(false);
     }
@@ -273,7 +287,12 @@ export function VMPanel() {
       <Card
         title="VM Fleet"
         description="Search and manage lifecycle actions."
-        actions={<Button variant="secondary" onClick={refresh} loading={loading}>Refresh</Button>}
+        actions={(
+          <div className="flex items-center gap-2">
+            <DataFreshnessBadge ts={lastUpdatedAt} label="VM list" />
+            <Button variant="secondary" onClick={refresh} loading={loading}>Refresh</Button>
+          </div>
+        )}
       >
         <div className="mb-3 grid gap-3 md:grid-cols-[2fr_auto]">
           <Input label="Search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="VM name or ID" />
@@ -315,6 +334,10 @@ export function VMPanel() {
                   ]}
                   onSelect={(action) => {
                     if (!row.id) return;
+                    if (action === "terminate") {
+                      setTerminateTarget(row);
+                      return;
+                    }
                     mutate(row.id, action as "start" | "stop" | "reboot" | "terminate");
                   }}
                 />
@@ -323,6 +346,22 @@ export function VMPanel() {
           ]}
         />
       </Card>
+      <Modal
+        open={Boolean(terminateTarget)}
+        title="Terminate VM"
+        description={terminateTarget ? `VM ${terminateTarget.name} will be terminated and removed from runtime list.` : undefined}
+        confirmLabel="Terminate"
+        confirmVariant="destructive"
+        onClose={() => setTerminateTarget(null)}
+        onConfirm={() => {
+          if (!terminateTarget?.id) {
+            setTerminateTarget(null);
+            return;
+          }
+          void mutate(terminateTarget.id, "terminate");
+          setTerminateTarget(null);
+        }}
+      />
     </section>
   );
 }

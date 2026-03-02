@@ -46,6 +46,13 @@ export function PodsCatalogPanel() {
   const [loading, setLoading] = useState(false);
   const { push } = useToast();
 
+  function openMarketplace() {
+    const url = new URL(window.location.href);
+    url.searchParams.set("section", "marketplace");
+    window.history.pushState({}, "", url);
+    window.dispatchEvent(new PopStateEvent("popstate"));
+  }
+
   async function loadCatalog() {
     setLoading(true);
     try {
@@ -203,9 +210,8 @@ export function PodsCatalogPanel() {
       <Card title="Featured GPUs" description="High availability options with best capacity windows.">
         <div className="grid gap-2 md:grid-cols-4">
           {featuredTemplates.map((item) => (
-            <button
+            <article
               key={item.code}
-              type="button"
               className="aspect-[3/2] w-full rounded-none border border-border bg-surface p-3 text-left transition-colors hover:border-info/60 hover:bg-elevated/50"
             >
               <div className="flex items-start justify-between gap-2">
@@ -222,7 +228,7 @@ export function PodsCatalogPanel() {
                 <div>{item.system_ram_gb || 0} GB RAM • {item.vcpu || item.cpu_cores} vCPU</div>
                 <div>{item.max_instances || 1} max • {item.region || "any"} • {item.cloud_type || "secure"}</div>
               </div>
-            </button>
+            </article>
           ))}
         </div>
       </Card>
@@ -230,9 +236,8 @@ export function PodsCatalogPanel() {
       <Card title="NVIDIA latest generation" description="Full list matching current filters and search.">
         <div className="grid gap-2 md:grid-cols-4">
           {latestGeneration.map((item) => (
-            <button
+            <article
               key={item.code}
-              type="button"
               className="aspect-[3/2] w-full rounded-none border border-border bg-surface p-3 text-left transition-colors hover:border-brand/60 hover:bg-elevated/40"
             >
               <div className="flex items-start justify-between gap-2">
@@ -247,7 +252,7 @@ export function PodsCatalogPanel() {
                 <div>{item.system_ram_gb || 0} GB RAM • {item.vcpu || item.cpu_cores} vCPU</div>
                 <div>{item.network_volume_supported ? "Network volume" : "No network volume"} • {item.global_networking_supported ? "Global networking" : "Local networking"}</div>
               </div>
-            </button>
+            </article>
           ))}
         </div>
       </Card>
@@ -296,7 +301,7 @@ export function PodsCatalogPanel() {
                   </div>
                 </div>
                 <div className="mt-3 flex justify-end">
-                  <Button>Rent this Pod</Button>
+                  <Button variant="secondary" onClick={openMarketplace}>Open deploy flow</Button>
                 </div>
               </article>
             );

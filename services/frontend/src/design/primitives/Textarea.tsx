@@ -15,7 +15,12 @@ export function Textarea({ className, error, label, helpText, id, ...props }: Te
   const describedBy = error ? errorId : helpText ? helpId : undefined;
   return (
     <label className="block space-y-1.5">
-      {label ? <span className="text-sm font-medium text-textSecondary">{label}</span> : null}
+      {label ? (
+        <span className="text-sm font-medium text-textSecondary">
+          {label}
+          {props.required ? <span className="ml-1 text-danger">*</span> : null}
+        </span>
+      ) : null}
       <textarea
         id={textareaId}
         className={cx(

@@ -17,13 +17,18 @@ export function Input({ className, error, label, helpText, id, leftIcon, rightSl
   const describedBy = error ? errorId : helpText ? helpId : undefined;
   return (
     <label className="block space-y-1.5">
-      {label ? <span className="text-sm font-medium text-textSecondary">{label}</span> : null}
+      {label ? (
+        <span className="text-sm font-medium text-textSecondary">
+          {label}
+          {props.required ? <span className="ml-1 text-danger">*</span> : null}
+        </span>
+      ) : null}
       <div className="relative">
         {leftIcon ? <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-textMuted">{leftIcon}</span> : null}
         <input
           id={inputId}
           className={cx(
-            "focus-ring h-10 w-full rounded-md border bg-canvas px-3 text-sm text-textPrimary placeholder:text-textMuted disabled:cursor-not-allowed disabled:opacity-60",
+            "focus-ring h-12 w-full rounded-md border bg-canvas px-3 text-sm text-textPrimary placeholder:text-textMuted disabled:cursor-not-allowed disabled:opacity-60",
             leftIcon ? "pl-9" : "",
             rightSlot ? "pr-11" : "",
             error ? "border-danger bg-danger/5" : "border-border",

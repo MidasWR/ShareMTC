@@ -37,6 +37,8 @@ spec:
               value: {{ .Values.admin.agentInstaller.kafkaBrokers | quote }}
             - name: AGENT_IMAGE_REPO
               value: {{ .Values.admin.agentInstaller.imageRepo | quote }}
+            - name: ENABLE_SYNTHETIC_CATALOG_SEED
+              value: {{ .Values.admin.enableSyntheticCatalogSeed | quote }}
             - name: PGUSER
               valueFrom:
                 secretKeyRef:

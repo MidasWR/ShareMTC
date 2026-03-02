@@ -11,7 +11,9 @@ import { Select } from "../../design/primitives/Select";
 import { Button } from "../../design/primitives/Button";
 import { Textarea } from "../../design/primitives/Textarea";
 import { Table } from "../../design/components/Table";
+import { Modal } from "../../design/components/Modal";
 import { EmptyState } from "../../design/patterns/EmptyState";
+import { formatOperationMessage } from "../../design/utils/operationFeedback";
 import { useSettings } from "../../app/providers/SettingsProvider";
 
 function truncateSSHKey(value: string, head = 28, tail = 16) {
@@ -24,6 +26,7 @@ export function SettingsPanel() {
   const [sshKeys, setSSHKeys] = useState<SSHKey[]>([]);
   const [keyName, setKeyName] = useState("");
   const [keyValue, setKeyValue] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<SSHKey | null>(null);
   const [loading, setLoading] = useState(false);
   const { push } = useToast();
   const locale = settings.language === "ru" ? "ru" : "en";
@@ -46,9 +49,9 @@ export function SettingsPanel() {
     try {
       const saved = await upsertUserSettings(settings);
       updateSettingsState(saved);
-      push("success", locale === "ru" ? "Настройки сохранены" : "Settings saved");
+      push("success", locale === "ru" ? "Настройки сохранены" : "Settings saved", "Settings");
     } catch (error) {
-      push("error", error instanceof Error ? error.message : locale === "ru" ? "Не удалось сохранить настройки" : "Failed to save settings");
+      push("error", error instanceof Error ? error.message : locale === "ru" ? "Не удалось сохранить настройки" : "Failed to save settings", "Settings");
     } finally {
       setLoading(false);
     }
@@ -57,7 +60,7 @@ export function SettingsPanel() {
   async function addSSHKey(event: FormEvent) {
     event.preventDefault();
     if (!keyValue.startsWith("ssh-")) {
-      push("error", locale === "ru" ? "SSH key должен начинаться с ssh-rsa/ssh-ed25519" : "SSH key must start with ssh-rsa/ssh-ed25519");
+      push("error", locale === "ru" ? "SSH key должен начинаться с ssh-rsa/ssh-ed25519" : "SSH key must start with ssh-rsa/ssh-ed25519", "SSH keys");
       return;
     }
     setLoading(true);
@@ -66,9 +69,9 @@ export function SettingsPanel() {
       setSSHKeys((prev) => [created, ...prev]);
       setKeyName("");
       setKeyValue("");
-      push("success", locale === "ru" ? "SSH ключ добавлен" : "SSH key added");
+      push("success", formatOperationMessage({ action: "Create", entityType: "SSH key", entityName: created.name, entityId: created.id, result: "success" }), "SSH keys");
     } catch (error) {
-      push("error", error instanceof Error ? error.message : locale === "ru" ? "Не удалось добавить SSH ключ" : "Failed to add SSH key");
+      push("error", error instanceof Error ? error.message : locale === "ru" ? "Не удалось добавить SSH ключ" : "Failed to add SSH key", "SSH keys");
     } finally {
       setLoading(false);
     }
@@ -80,9 +83,9 @@ export function SettingsPanel() {
     try {
       await deleteSSHKey(id);
       setSSHKeys((prev) => prev.filter((item) => item.id !== id));
-      push("info", locale === "ru" ? "SSH ключ удален" : "SSH key removed");
+      push("info", formatOperationMessage({ action: "Delete", entityType: "SSH key", entityId: id, result: "success" }), "SSH keys");
     } catch (error) {
-      push("error", error instanceof Error ? error.message : locale === "ru" ? "Не удалось удалить SSH ключ" : "Failed to remove SSH key");
+      push("error", error instanceof Error ? error.message : locale === "ru" ? "Не удалось удалить SSH ключ" : "Failed to remove SSH key", "SSH keys");
     } finally {
       setLoading(false);
     }
@@ -91,9 +94,9 @@ export function SettingsPanel() {
   async function copySSHKey(value: string) {
     try {
       await navigator.clipboard.writeText(value);
-      push("success", locale === "ru" ? "SSH ключ скопирован" : "SSH key copied");
+      push("success", locale === "ru" ? "SSH ключ скопирован" : "SSH key copied", "SSH keys");
     } catch {
-      push("error", locale === "ru" ? "Clipboard недоступен" : "Clipboard access is not available");
+      push("error", locale === "ru" ? "Clipboard недоступен" : "Clipboard access is not available", "SSH keys");
     }
   }
 
@@ -179,11 +182,24 @@ export function SettingsPanel() {
                 )
               },
               { key: "created", header: locale === "ru" ? "Создан" : "Created", render: (row) => (row.created_at ? new Date(row.created_at).toLocaleString() : "-") },
-              { key: "actions", header: locale === "ru" ? "Действия" : "Actions", render: (row) => <Button variant="ghost" size="sm" onClick={() => removeSSHKey(row.id)}>{locale === "ru" ? "Удалить" : "Delete"}</Button> }
+              { key: "actions", header: locale === "ru" ? "Действия" : "Actions", render: (row) => <Button variant="ghost" size="sm" onClick={() => setDeleteTarget(row)}>{locale === "ru" ? "Удалить" : "Delete"}</Button> }
             ]}
           />
         </div>
       </Card>
+      <Modal
+        open={Boolean(deleteTarget)}
+        title={locale === "ru" ? "Удалить SSH ключ" : "Delete SSH key"}
+        description={deleteTarget ? `${deleteTarget.name} will be removed permanently.` : undefined}
+        confirmLabel={locale === "ru" ? "Удалить" : "Delete"}
+        confirmVariant="destructive"
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={() => {
+          if (!deleteTarget?.id) return;
+          void removeSSHKey(deleteTarget.id);
+          setDeleteTarget(null);
+        }}
+      />
     </section>
   );
 }

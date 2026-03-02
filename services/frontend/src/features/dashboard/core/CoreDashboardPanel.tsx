@@ -7,10 +7,12 @@ import { useToast } from "../../../design/components/Toast";
 import { Card } from "../../../design/primitives/Card";
 import { Button } from "../../../design/primitives/Button";
 import { MetricTile } from "../../../design/patterns/MetricTile";
+import { DataFreshnessBadge } from "../../../design/patterns/DataFreshnessBadge";
 import { PageSectionHeader } from "../../../design/patterns/PageSectionHeader";
 import { SkeletonBlock } from "../../../design/patterns/SkeletonBlock";
 import { Table } from "../../../design/components/Table";
 import { EmptyState } from "../../../design/patterns/EmptyState";
+import { formatOperationMessage } from "../../../design/utils/operationFeedback";
 
 type ChartPoint = {
   day: string;
@@ -33,6 +35,7 @@ export function CoreDashboardPanel() {
   const [metricSummaryCount, setMetricSummaryCount] = useState(0);
   const [anomalies, setAnomalies] = useState<Array<{ scope: string; issue: string; severity: "high" | "medium" | "low" }>>([]);
   const [series, setSeries] = useState<ChartPoint[]>([]);
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
   const { push } = useToast();
 
   const onlineRatio = useMemo(() => {
@@ -81,9 +84,10 @@ export function CoreDashboardPanel() {
         .slice(-14)
         .map(([day, revenue]) => ({ day: day.slice(5), revenue: Number(revenue.toFixed(2)) }));
       setSeries(chartData);
-      push("info", "Core dashboard updated");
+      setLastUpdatedAt(new Date());
+      push("info", formatOperationMessage({ action: "Refresh", entityType: "Core dashboard", result: "updated" }), "Core");
     } catch (error) {
-      push("error", error instanceof Error ? error.message : "Failed to load core dashboard");
+      push("error", error instanceof Error ? error.message : "Failed to load core dashboard", "Core");
     } finally {
       setLoading(false);
     }
@@ -99,9 +103,12 @@ export function CoreDashboardPanel() {
         title="Core Dashboard"
         description="System health, resource utilization, and revenue trend in one operational view."
         actions={
-          <Button variant="secondary" onClick={refresh} loading={loading}>
-            Refresh dashboard
-          </Button>
+          <div className="flex items-center gap-2">
+            <DataFreshnessBadge ts={lastUpdatedAt} label="Core data" />
+            <Button variant="secondary" onClick={refresh} loading={loading}>
+              Refresh dashboard
+            </Button>
+          </div>
         }
       />
 

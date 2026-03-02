@@ -52,6 +52,27 @@ export type ResourceStats = {
   gpu_units_running: number;
 };
 
+export type RuntimeProviderStat = {
+  provider_id: string;
+  vm_total: number;
+  vm_running: number;
+  pod_total: number;
+  pod_running: number;
+  shared_offer_total: number;
+  shared_offer_active: number;
+};
+
+export type RuntimeInventory = {
+  generated_at: string;
+  provider_stats: RuntimeProviderStat[];
+  runpod_pods: Pod[];
+  vm_total: number;
+  vm_running: number;
+  pod_total: number;
+  pod_running: number;
+  shared_offer_total: number;
+};
+
 export type BillingStats = {
   accrual_count: number;
   total_amount_usd: number;

@@ -110,6 +110,15 @@ func (h *Handler) Stats(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusOK, stats)
 }
 
+func (h *Handler) RuntimeInventory(w http.ResponseWriter, r *http.Request) {
+	inventory, err := h.svc.RuntimeInventory(r.Context())
+	if err != nil {
+		httpx.Error(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	httpx.JSON(w, http.StatusOK, inventory)
+}
+
 func (h *Handler) UpsertVMTemplate(w http.ResponseWriter, r *http.Request) {
 	var req models.VMTemplate
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {

@@ -27,6 +27,7 @@ type Repository interface {
 	CreateVM(ctx context.Context, vm models.VM) (models.VM, error)
 	GetVM(ctx context.Context, vmID string) (models.VM, error)
 	ListVMs(ctx context.Context, userID string, filter models.CatalogFilter) ([]models.VM, error)
+	ListAllVMs(ctx context.Context, limit int) ([]models.VM, error)
 	UpdateVMStatus(ctx context.Context, vmID string, status models.VMStatus) error
 	UpdateVMExternalRef(ctx context.Context, vmID string, externalID string, ipAddress string) error
 	ListExpiredVMs(ctx context.Context, now time.Time, limit int) ([]models.VM, error)
@@ -35,6 +36,7 @@ type Repository interface {
 	CreatePod(ctx context.Context, pod models.Pod) (models.Pod, error)
 	GetPod(ctx context.Context, podID string) (models.Pod, error)
 	ListPods(ctx context.Context, userID string, filter models.CatalogFilter) ([]models.Pod, error)
+	ListAllPods(ctx context.Context, limit int) ([]models.Pod, error)
 	UpdatePodStatus(ctx context.Context, podID string, status models.PodStatus) error
 	UpdatePodExternalRef(ctx context.Context, podID string, externalID string) error
 	ListExpiredPods(ctx context.Context, now time.Time, limit int) ([]models.Pod, error)
@@ -154,6 +156,89 @@ func (s *ResourceService) ListAll(ctx context.Context, limit int, offset int) ([
 
 func (s *ResourceService) Stats(ctx context.Context) (models.ResourceStats, error) {
 	return s.repo.Stats(ctx)
+}
+
+func (s *ResourceService) RuntimeInventory(ctx context.Context) (models.RuntimeInventory, error) {
+	vms, err := s.repo.ListAllVMs(ctx, 1000)
+	if err != nil {
+		return models.RuntimeInventory{}, err
+	}
+	pods, err := s.repo.ListAllPods(ctx, 1000)
+	if err != nil {
+		return models.RuntimeInventory{}, err
+	}
+	offers, err := s.repo.ListSharedInventoryOffers(ctx, "", "")
+	if err != nil {
+		return models.RuntimeInventory{}, err
+	}
+
+	statsByProvider := make(map[string]*models.RuntimeProviderStat)
+	for _, vm := range vms {
+		stat := ensureProviderStat(statsByProvider, vm.ProviderID)
+		stat.VMTotal++
+		if vm.Status == models.VMStatusRunning {
+			stat.VMRunning++
+		}
+	}
+	runPodPods := make([]models.Pod, 0)
+	for _, pod := range pods {
+		stat := ensureProviderStat(statsByProvider, pod.ProviderID)
+		stat.PodTotal++
+		if pod.Status == models.PodStatusRunning {
+			stat.PodRunning++
+		}
+		if strings.TrimSpace(pod.ExternalID) != "" {
+			runPodPods = append(runPodPods, pod)
+		}
+	}
+	for _, offer := range offers {
+		stat := ensureProviderStat(statsByProvider, offer.ProviderID)
+		stat.SharedOfferTotal++
+		if offer.Status == models.SharedInventoryStatusActive {
+			stat.SharedOfferActive++
+		}
+	}
+
+	providerStats := make([]models.RuntimeProviderStat, 0, len(statsByProvider))
+	for _, item := range statsByProvider {
+		providerStats = append(providerStats, *item)
+	}
+
+	vmRunning := 0
+	for _, vm := range vms {
+		if vm.Status == models.VMStatusRunning {
+			vmRunning++
+		}
+	}
+	podRunning := 0
+	for _, pod := range pods {
+		if pod.Status == models.PodStatusRunning {
+			podRunning++
+		}
+	}
+
+	return models.RuntimeInventory{
+		GeneratedAt:      time.Now().UTC(),
+		ProviderStats:    providerStats,
+		RunPodPods:       runPodPods,
+		VMTotal:          len(vms),
+		VMRunning:        vmRunning,
+		PodTotal:         len(pods),
+		PodRunning:       podRunning,
+		SharedOfferTotal: len(offers),
+	}, nil
+}
+
+func ensureProviderStat(statsByProvider map[string]*models.RuntimeProviderStat, providerID string) *models.RuntimeProviderStat {
+	key := strings.TrimSpace(providerID)
+	if key == "" {
+		key = "unknown-provider"
+	}
+	if item, ok := statsByProvider[key]; ok {
+		return item
+	}
+	statsByProvider[key] = &models.RuntimeProviderStat{ProviderID: key}
+	return statsByProvider[key]
 }
 
 func (s *ResourceService) UpsertVMTemplate(ctx context.Context, tpl models.VMTemplate) (models.VMTemplate, error) {

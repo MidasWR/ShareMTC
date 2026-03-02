@@ -30,7 +30,7 @@ func main() {
 	}
 	defer pool.Close()
 
-	repo := storage.NewProviderRepo(pool)
+	repo := storage.NewProviderRepo(pool, cfg.EnableSyntheticCatalogSeed)
 	if err := repo.Migrate(context.Background()); err != nil {
 		logger.Fatal().Err(err).Msg("migration failed")
 	}

@@ -18,6 +18,7 @@ const PREFILL_ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PREFILL_PASSWORD ?? "a
 export function AdminAccessPanel({ onSuccess }: Props) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [errors, setErrors] = useState<{ username?: string; password?: string }>({});
   const [loading, setLoading] = useState(false);
   const { push } = useToast();
 
@@ -27,18 +28,22 @@ export function AdminAccessPanel({ onSuccess }: Props) {
   }
 
   async function submitCredentials() {
-    if (!username.trim() || !password.trim()) {
-      push("error", "Username and access key are required");
+    const nextErrors: { username?: string; password?: string } = {};
+    if (!username.trim()) nextErrors.username = "Username is required";
+    if (!password.trim()) nextErrors.password = "Access key is required";
+    setErrors(nextErrors);
+    if (nextErrors.username || nextErrors.password) {
+      push("error", "Username and access key are required", "/admin");
       return;
     }
     setLoading(true);
     try {
       const response = await loginDirectAdmin(username, password);
       setSession(response.token, response.user);
-      push("success", "Admin access granted");
+      push("success", "Admin access granted", "/admin");
       onSuccess();
     } catch (error) {
-      push("error", error instanceof Error ? error.message : "Access denied");
+      push("error", error instanceof Error ? error.message : "Access denied", "/admin");
     } finally {
       setLoading(false);
     }
@@ -56,9 +61,9 @@ export function AdminAccessPanel({ onSuccess }: Props) {
         description="Use dedicated administrator credentials and press Enter /admin to continue."
       />
       <Card title="Administrator Login" description="This login flow is dedicated to admin module access.">
-        <form className="space-y-3" onSubmit={submit}>
-          <Input label="Username" value={username} onChange={(event) => setUsername(event.target.value)} />
-          <Input label="Access key" type="password" value={password} onChange={(event) => setPassword(event.target.value)} />
+        <form className="space-y-3" onSubmit={submit} noValidate>
+          <Input label="Username" required error={errors.username} value={username} onChange={(event) => setUsername(event.target.value)} />
+          <Input label="Access key" required error={errors.password} type="password" value={password} onChange={(event) => setPassword(event.target.value)} />
           <div className="flex flex-wrap gap-2">
             <Button type="submit" loading={loading}>Enter /admin</Button>
             {ENABLE_ADMIN_QUICK_ACCESS ? (

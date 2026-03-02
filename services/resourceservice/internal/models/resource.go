@@ -34,6 +34,27 @@ type ResourceStats struct {
 	GPUUnitsRunning     int `json:"gpu_units_running"`
 }
 
+type RuntimeProviderStat struct {
+	ProviderID         string `json:"provider_id"`
+	VMTotal            int    `json:"vm_total"`
+	VMRunning          int    `json:"vm_running"`
+	PodTotal           int    `json:"pod_total"`
+	PodRunning         int    `json:"pod_running"`
+	SharedOfferTotal   int    `json:"shared_offer_total"`
+	SharedOfferActive  int    `json:"shared_offer_active"`
+}
+
+type RuntimeInventory struct {
+	GeneratedAt     time.Time            `json:"generated_at"`
+	ProviderStats   []RuntimeProviderStat `json:"provider_stats"`
+	RunPodPods      []Pod                `json:"runpod_pods"`
+	VMTotal         int                  `json:"vm_total"`
+	VMRunning       int                  `json:"vm_running"`
+	PodTotal        int                  `json:"pod_total"`
+	PodRunning      int                  `json:"pod_running"`
+	SharedOfferTotal int                 `json:"shared_offer_total"`
+}
+
 type VMStatus string
 
 const (
