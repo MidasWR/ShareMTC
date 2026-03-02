@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"time"
 
@@ -37,16 +36,7 @@ func main() {
 	}
 
 	svc := service.NewProviderService(repo)
-	installCommand := fmt.Sprintf(
-		"curl -fsSL https://raw.githubusercontent.com/%s/%s/installer/hostagent-node-installer.sh | sudo RESOURCE_API_URL=%s KAFKA_BROKERS=%s IMAGE_REPO=%s IMAGE_TAG=%s bash",
-		cfg.GitHubRepo,
-		cfg.ReleaseTag,
-		cfg.AgentResourceURL,
-		cfg.AgentKafkaBrokers,
-		cfg.AgentImageRepo,
-		cfg.ReleaseTag,
-	)
-	handler := httpadapter.NewHandler(svc, installCommand)
+	handler := httpadapter.NewHandler(svc, cfg.GitHubRepo, cfg.ReleaseTag, cfg.AgentResourceURL, cfg.AgentKafkaBrokers, cfg.AgentImageRepo)
 	r := chi.NewRouter()
 	r.Get("/healthz", handler.Health)
 	r.Route("/v1/catalog", func(api chi.Router) {

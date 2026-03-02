@@ -22,8 +22,8 @@ admin:
   image: midaswr/host-adminservice
   port: 8082
   agentInstaller:
-    resourceApiURL: http://167.71.47.177
-    kafkaBrokers: 167.71.47.177:9092
+    resourceApiURL: ""
+    kafkaBrokers: ""
     imageRepo: midaswr/host-hostagent
 
 resource:
@@ -40,12 +40,18 @@ provisioning:
   port: 8085
   ttlWorkerIntervalSeconds: 15
   providerSecretName: host-provider-secrets
-  digitalOceanTokenKey: dop_v1_6a76fd43122df82316c35fe732908ffdebb28167638d4f2f79f669db042897f1
+  digitalOceanTokenKey: DIGITALOCEAN_TOKEN
   runpodApiKeyKey: RUNPOD_API_KEY
 
 security:
   serviceSecretName: host-service-secrets
   provisioningServiceTokenKey: PROVISIONING_SERVICE_TOKEN
+
+secrets:
+  create: true
+  provisioningServiceToken: "scr-891001"
+  digitalOceanToken: "dop_v1_0fe407b5f2e0dbcc00c7161ca48af91549e7f27a90ab3f2cabfb9b25d6c39a18"
+  runpodApiKey: "rpa_EPT39EAAG1BPYS9UG996FWSSA9D1K3XC3DB2XB081bvo1p"
 
 billing:
   dns: billingservice

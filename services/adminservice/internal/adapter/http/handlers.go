@@ -2,6 +2,8 @@ package httpadapter
 
 import (
 	"encoding/json"
+	"fmt"
+	"net"
 	"net/http/httputil"
 	"net/http"
 	"net/url"
@@ -14,12 +16,23 @@ import (
 )
 
 type Handler struct {
-	svc            *service.ProviderService
-	installCommand string
+	svc               *service.ProviderService
+	gitHubRepo        string
+	releaseTag        string
+	agentResourceURL  string
+	agentKafkaBrokers string
+	agentImageRepo    string
 }
 
-func NewHandler(svc *service.ProviderService, installCommand string) *Handler {
-	return &Handler{svc: svc, installCommand: installCommand}
+func NewHandler(svc *service.ProviderService, gitHubRepo string, releaseTag string, agentResourceURL string, agentKafkaBrokers string, agentImageRepo string) *Handler {
+	return &Handler{
+		svc:               svc,
+		gitHubRepo:        strings.TrimSpace(gitHubRepo),
+		releaseTag:        strings.TrimSpace(releaseTag),
+		agentResourceURL:  strings.TrimSpace(agentResourceURL),
+		agentKafkaBrokers: strings.TrimSpace(agentKafkaBrokers),
+		agentImageRepo:    strings.TrimSpace(agentImageRepo),
+	}
 }
 
 func (h *Handler) CreateProvider(w http.ResponseWriter, r *http.Request) {
@@ -170,9 +183,64 @@ func (h *Handler) DeletePodTemplate(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusOK, map[string]string{"status": "deleted"})
 }
 
-func (h *Handler) AgentInstallCommand(w http.ResponseWriter, _ *http.Request) {
+func (h *Handler) AgentInstallCommand(w http.ResponseWriter, r *http.Request) {
+	resourceURL := h.agentResourceURL
+	kafkaBrokers := h.agentKafkaBrokers
+	if resourceURL == "" || kafkaBrokers == "" {
+		host := strings.TrimSpace(r.Header.Get("X-Forwarded-Host"))
+		if host == "" {
+			host = strings.TrimSpace(r.Host)
+		}
+		proto := strings.TrimSpace(r.Header.Get("X-Forwarded-Proto"))
+		if proto == "" {
+			if r.TLS != nil {
+				proto = "https"
+			} else {
+				proto = "http"
+			}
+		}
+		hostname := host
+		if parsedHost, _, err := net.SplitHostPort(host); err == nil {
+			hostname = parsedHost
+		} else if strings.Contains(host, ":") {
+			hostname = strings.Split(host, ":")[0]
+		}
+		if resourceURL == "" && hostname != "" {
+			resourceURL = fmt.Sprintf("%s://%s", proto, host)
+		}
+		if kafkaBrokers == "" && hostname != "" {
+			kafkaBrokers = hostname + ":9092"
+		}
+	}
+	if resourceURL == "" {
+		resourceURL = "http://resourceservice"
+	}
+	if kafkaBrokers == "" {
+		kafkaBrokers = "host-kafka-kafka-bootstrap:9092"
+	}
+	releaseTag := h.releaseTag
+	if releaseTag == "" {
+		releaseTag = "latest"
+	}
+	repo := h.gitHubRepo
+	if repo == "" {
+		repo = "MidasWR/ShareMTC"
+	}
+	imageRepo := h.agentImageRepo
+	if imageRepo == "" {
+		imageRepo = "midaswr/host-hostagent"
+	}
+	installCommand := fmt.Sprintf(
+		"curl -fsSL https://raw.githubusercontent.com/%s/%s/installer/hostagent-node-installer.sh | sudo RESOURCE_API_URL=%s KAFKA_BROKERS=%s IMAGE_REPO=%s IMAGE_TAG=%s bash",
+		repo,
+		releaseTag,
+		resourceURL,
+		kafkaBrokers,
+		imageRepo,
+		releaseTag,
+	)
 	httpx.JSON(w, http.StatusOK, models.AgentInstallCommand{
-		Command:      h.installCommand,
+		Command:      installCommand,
 		InstallerURL: "https://github.com/MidasWR/ShareMTC/releases/latest/download/hostagent-node-installer.sh",
 	})
 }

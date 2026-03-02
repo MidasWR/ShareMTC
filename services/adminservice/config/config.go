@@ -26,8 +26,8 @@ func Load() Config {
 		JWTSecret:       env("JWT_SECRET", "change-me-in-production"),
 		GitHubRepo:      env("GITHUB_REPO", "MidasWR/ShareMTC"),
 		ReleaseTag:      env("RELEASE_TAG", "latest"),
-		AgentResourceURL: env("AGENT_RESOURCE_API_URL", "http://167.71.47.177"),
-		AgentKafkaBrokers: env("AGENT_KAFKA_BROKERS", "167.71.47.177:9092"),
+		AgentResourceURL: env("AGENT_RESOURCE_API_URL", ""),
+		AgentKafkaBrokers: env("AGENT_KAFKA_BROKERS", ""),
 		AgentImageRepo:    env("AGENT_IMAGE_REPO", "midaswr/host-hostagent"),
 	}
 }

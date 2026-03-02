@@ -32,6 +32,9 @@ services:
   billing:
     name: billingservice
     port: 8084
+  provisioning:
+    name: provisioningservice
+    port: 8085
   frontend:
     name: frontend-service
     port: 80

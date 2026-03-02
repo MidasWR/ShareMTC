@@ -62,6 +62,14 @@ spec:
         - name: {{ .Values.services.billing.name }}
           namespace: {{ .Values.services.namespace }}
           port: {{ .Values.services.billing.port }}
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /v1/provisioning
+      backendRefs:
+        - name: {{ .Values.services.provisioning.name }}
+          namespace: {{ .Values.services.namespace }}
+          port: {{ .Values.services.provisioning.port }}
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
