@@ -91,11 +91,52 @@ func (r *ProviderRepo) Create(ctx context.Context, provider models.Provider) (mo
 }
 
 func (r *ProviderRepo) List(ctx context.Context) ([]models.Provider, error) {
-	rows, err := r.db.Query(ctx, `
-		SELECT id, display_name, provider_type, machine_id, network_mbps, online, created_at
+	hasHostResources, err := r.tableExists(ctx, "host_resources")
+	if err != nil {
+		return nil, err
+	}
+	query := `
+		SELECT id::text, display_name, provider_type, machine_id, network_mbps, online, created_at
 		FROM providers
 		ORDER BY created_at DESC
-	`)
+	`
+	if hasHostResources {
+		query = `
+			WITH known AS (
+				SELECT
+					p.id::text AS id,
+					p.display_name,
+					p.provider_type,
+					p.machine_id,
+					p.network_mbps,
+					COALESCE(hr.heartbeat_at >= NOW() - INTERVAL '60 seconds', p.online) AS online,
+					p.created_at
+				FROM providers p
+				LEFT JOIN host_resources hr ON hr.provider_id = p.id::text
+			),
+			discovered AS (
+				SELECT
+					hr.provider_id AS id,
+					'Auto-discovered ' || LEFT(hr.provider_id, 8) AS display_name,
+					'donor' AS provider_type,
+					'hostagent' AS machine_id,
+					hr.network_mbps,
+					(hr.heartbeat_at >= NOW() - INTERVAL '60 seconds') AS online,
+					hr.heartbeat_at AS created_at
+				FROM host_resources hr
+				WHERE NOT EXISTS (
+					SELECT 1 FROM providers p WHERE p.id::text = hr.provider_id
+				)
+			)
+			SELECT id, display_name, provider_type, machine_id, network_mbps, online, created_at
+			FROM known
+			UNION ALL
+			SELECT id, display_name, provider_type, machine_id, network_mbps, online, created_at
+			FROM discovered
+			ORDER BY created_at DESC
+		`
+	}
+	rows, err := r.db.Query(ctx, query)
 	if err != nil {
 		return nil, err
 	}
@@ -118,24 +159,87 @@ func (r *ProviderRepo) UpdateOnlineStatus(ctx context.Context, providerID string
 
 func (r *ProviderRepo) GetByID(ctx context.Context, providerID string) (models.Provider, error) {
 	var p models.Provider
-	err := r.db.QueryRow(ctx, `
-		SELECT id, display_name, provider_type, machine_id, network_mbps, online, created_at
+	hasHostResources, err := r.tableExists(ctx, "host_resources")
+	if err != nil {
+		return models.Provider{}, err
+	}
+	if hasHostResources {
+		err = r.db.QueryRow(ctx, `
+			SELECT
+				p.id::text,
+				p.display_name,
+				p.provider_type,
+				p.machine_id,
+				p.network_mbps,
+				COALESCE(hr.heartbeat_at >= NOW() - INTERVAL '60 seconds', p.online) AS online,
+				p.created_at
+			FROM providers p
+			LEFT JOIN host_resources hr ON hr.provider_id = p.id::text
+			WHERE p.id::text = $1
+		`, providerID).Scan(&p.ID, &p.DisplayName, &p.ProviderType, &p.MachineID, &p.NetworkMbps, &p.Online, &p.CreatedAt)
+		if err == nil {
+			return p, nil
+		}
+		if !errors.Is(err, pgx.ErrNoRows) {
+			return models.Provider{}, err
+		}
+		err = r.db.QueryRow(ctx, `
+			SELECT provider_id, 'Auto-discovered ' || LEFT(provider_id, 8), 'donor', 'hostagent', network_mbps, (heartbeat_at >= NOW() - INTERVAL '60 seconds'), heartbeat_at
+			FROM host_resources
+			WHERE provider_id = $1
+		`, providerID).Scan(&p.ID, &p.DisplayName, &p.ProviderType, &p.MachineID, &p.NetworkMbps, &p.Online, &p.CreatedAt)
+		return p, err
+	}
+	err = r.db.QueryRow(ctx, `
+		SELECT id::text, display_name, provider_type, machine_id, network_mbps, online, created_at
 		FROM providers
-		WHERE id = $1
+		WHERE id::text = $1
 	`, providerID).Scan(&p.ID, &p.DisplayName, &p.ProviderType, &p.MachineID, &p.NetworkMbps, &p.Online, &p.CreatedAt)
 	return p, err
 }
 
 func (r *ProviderRepo) Stats(ctx context.Context) (models.AdminStats, error) {
 	var stats models.AdminStats
-	err := r.db.QueryRow(ctx, `
+	hasHostResources, err := r.tableExists(ctx, "host_resources")
+	if err != nil {
+		return models.AdminStats{}, err
+	}
+	query := `
 		SELECT
 			COUNT(*) AS total_providers,
 			COUNT(*) FILTER (WHERE online) AS online_providers,
 			COUNT(*) FILTER (WHERE provider_type = 'internal') AS internal_providers,
 			COUNT(*) FILTER (WHERE provider_type = 'donor') AS donor_providers
 		FROM providers
-	`).Scan(&stats.TotalProviders, &stats.OnlineProviders, &stats.InternalCount, &stats.DonorCount)
+	`
+	if hasHostResources {
+		query = `
+			WITH all_providers AS (
+				SELECT
+					p.id::text AS id,
+					p.provider_type,
+					COALESCE(hr.heartbeat_at >= NOW() - INTERVAL '60 seconds', p.online) AS online
+				FROM providers p
+				LEFT JOIN host_resources hr ON hr.provider_id = p.id::text
+				UNION ALL
+				SELECT
+					hr.provider_id AS id,
+					'donor' AS provider_type,
+					(hr.heartbeat_at >= NOW() - INTERVAL '60 seconds') AS online
+				FROM host_resources hr
+				WHERE NOT EXISTS (
+					SELECT 1 FROM providers p WHERE p.id::text = hr.provider_id
+				)
+			)
+			SELECT
+				COUNT(*) AS total_providers,
+				COUNT(*) FILTER (WHERE online) AS online_providers,
+				COUNT(*) FILTER (WHERE provider_type = 'internal') AS internal_providers,
+				COUNT(*) FILTER (WHERE provider_type = 'donor') AS donor_providers
+			FROM all_providers
+		`
+	}
+	err = r.db.QueryRow(ctx, query).Scan(&stats.TotalProviders, &stats.OnlineProviders, &stats.InternalCount, &stats.DonorCount)
 	return stats, err
 }
 
