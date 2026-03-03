@@ -914,8 +914,8 @@ func (r *Repo) ListMetricPoints(ctx context.Context, resourceType string, resour
 		WHERE ($1 = '' OR resource_type = $1)
 		  AND ($2 = '' OR resource_id = $2)
 		  AND ($3 = '' OR metric_type = $3)
-		  AND ($4 IS NULL OR captured_at >= $4)
-		  AND ($5 IS NULL OR captured_at <= $5)
+		  AND ($4::timestamptz IS NULL OR captured_at >= $4::timestamptz)
+		  AND ($5::timestamptz IS NULL OR captured_at <= $5::timestamptz)
 		ORDER BY captured_at DESC
 		LIMIT $6
 	`, resourceType, resourceID, metricType, nullableTime(from), nullableTime(to), limit)
