@@ -57,3 +57,6 @@ spec:
           envFrom:
             - configMapRef:
                 name: host-services-config
+
+            - secretRef:
+                name: {{.Values.security.serviceSecretName}}
