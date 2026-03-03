@@ -57,4 +57,12 @@ describe("resources API query composition", () => {
     expect(logs.toString()).toContain("level=warning");
     expect(logs.toString()).toContain("limit=200");
   });
+
+  it("creates query string for agent command history", () => {
+    const commands = new URLSearchParams();
+    commands.set("provider_id", "provider-1");
+    commands.set("limit", "50");
+    expect(commands.toString()).toContain("provider_id=provider-1");
+    expect(commands.toString()).toContain("limit=50");
+  });
 });

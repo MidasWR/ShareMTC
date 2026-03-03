@@ -337,6 +337,21 @@ type rootInputLogRequest struct {
 	ExecutedAt string `json:"executed_at"`
 }
 
+type agentCommandRequest struct {
+	ProviderID string `json:"provider_id"`
+	Command    string `json:"command"`
+}
+
+type agentCommandPollRequest struct {
+	ProviderID string `json:"provider_id"`
+}
+
+type agentCommandCompleteRequest struct {
+	ProviderID    string `json:"provider_id"`
+	Status        string `json:"status"`
+	ResultMessage string `json:"result_message"`
+}
+
 func (h *Handler) ShareVM(w http.ResponseWriter, r *http.Request) {
 	claims := sdkauth.ClaimsFromContext(r.Context())
 	if claims == nil {
@@ -589,6 +604,93 @@ func (h *Handler) ListAgentLogs(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusOK, items)
 }
 
+func (h *Handler) QueueAgentCommand(w http.ResponseWriter, r *http.Request) {
+	claims := sdkauth.ClaimsFromContext(r.Context())
+	if claims == nil {
+		httpx.Error(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	var req agentCommandRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid json")
+		return
+	}
+	item, err := h.svc.QueueAgentCommand(r.Context(), models.AgentCommand{
+		ProviderID:  strings.TrimSpace(req.ProviderID),
+		Command:     models.AgentCommandAction(strings.TrimSpace(req.Command)),
+		RequestedBy: claims.UserID,
+	})
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	httpx.JSON(w, http.StatusCreated, item)
+}
+
+func (h *Handler) ListAgentCommands(w http.ResponseWriter, r *http.Request) {
+	providerID := strings.TrimSpace(r.URL.Query().Get("provider_id"))
+	limit := intQuery(r, "limit", 100)
+	items, err := h.svc.ListAgentCommands(r.Context(), providerID, limit)
+	if err != nil {
+		httpx.Error(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	httpx.JSON(w, http.StatusOK, items)
+}
+
+func (h *Handler) PollAgentCommand(w http.ResponseWriter, r *http.Request) {
+	claims := sdkauth.ClaimsFromContext(r.Context())
+	if claims == nil {
+		httpx.Error(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	var req agentCommandPollRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid json")
+		return
+	}
+	if err := validateAgentIdentity(claims, req.ProviderID); err != nil {
+		httpx.Error(w, http.StatusForbidden, err.Error())
+		return
+	}
+	item, err := h.svc.ClaimNextAgentCommand(r.Context(), strings.TrimSpace(req.ProviderID))
+	if err != nil {
+		httpx.Error(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	httpx.JSON(w, http.StatusOK, item)
+}
+
+func (h *Handler) CompleteAgentCommand(w http.ResponseWriter, r *http.Request) {
+	claims := sdkauth.ClaimsFromContext(r.Context())
+	if claims == nil {
+		httpx.Error(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	commandID := chi.URLParam(r, "commandID")
+	var req agentCommandCompleteRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid json")
+		return
+	}
+	if err := validateAgentIdentity(claims, req.ProviderID); err != nil {
+		httpx.Error(w, http.StatusForbidden, err.Error())
+		return
+	}
+	item, err := h.svc.CompleteAgentCommand(
+		r.Context(),
+		commandID,
+		strings.TrimSpace(req.ProviderID),
+		models.AgentCommandState(strings.TrimSpace(req.Status)),
+		strings.TrimSpace(req.ResultMessage),
+	)
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	httpx.JSON(w, http.StatusOK, item)
+}
+
 func (h *Handler) RecordRootInputLog(w http.ResponseWriter, r *http.Request) {
 	claims := sdkauth.ClaimsFromContext(r.Context())
 	if claims == nil {
@@ -739,4 +841,3 @@ func validateAgentIdentity(claims *sdkauth.Claims, providerID string) error {
 		return errors.New("insufficient role for agent telemetry")
 	}
 }
-

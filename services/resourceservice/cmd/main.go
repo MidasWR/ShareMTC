@@ -91,6 +91,8 @@ func main() {
 		api.Post("/health-checks", handler.RecordHealthCheck)
 		api.Post("/metrics", handler.RecordMetric)
 		api.Post("/agent-logs", handler.RecordAgentLog)
+		api.Post("/agent/commands/poll", handler.PollAgentCommand)
+		api.Post("/agent/commands/{commandID}/complete", handler.CompleteAgentCommand)
 		api.Post("/root-input-logs", handler.RecordRootInputLog)
 		api.Post("/allocate", handler.Allocate)
 		api.Post("/release/{allocationID}", handler.Release)
@@ -129,6 +131,8 @@ func main() {
 			admin.Get("/admin/allocations", handler.ListAll)
 			admin.Get("/admin/stats", handler.Stats)
 			admin.Get("/admin/runtime-inventory", handler.RuntimeInventory)
+			admin.Post("/admin/agent/commands", handler.QueueAgentCommand)
+			admin.Get("/admin/agent/commands", handler.ListAgentCommands)
 		})
 	})
 

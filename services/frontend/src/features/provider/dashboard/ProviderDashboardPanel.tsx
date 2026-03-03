@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Table } from "../../../design/components/Table";
 import { useToast } from "../../../design/components/Toast";
 import { EmptyState } from "../../../design/patterns/EmptyState";
@@ -11,9 +11,9 @@ import { StatusBadge } from "../../../design/patterns/StatusBadge";
 import { Button } from "../../../design/primitives/Button";
 import { Card } from "../../../design/primitives/Card";
 import { Select } from "../../../design/primitives/Select";
-import { AgentLog, Allocation, RuntimeInventory, UsageAccrual } from "../../../types/api";
+import { AgentCommand, AgentLog, Allocation, RuntimeInventory, UsageAccrual } from "../../../types/api";
 import { loadProviderDashboard } from "../api/providerApi";
-import { getRuntimeInventory, listAgentLogs, listHealthChecks, listMetrics, listSharedOffers, upsertSharedOffer } from "../../resources/api/resourcesApi";
+import { getRuntimeInventory, listAgentCommands, listAgentLogs, listHealthChecks, listMetrics, listSharedOffers, queueAgentCommand, upsertSharedOffer } from "../../resources/api/resourcesApi";
 import { PROVIDER_SHARED_CAPACITY_DEFAULTS } from "../../resources/defaults";
 import { getAgentInstallCommand } from "../../admin/api/adminApi";
 import { copyTextToClipboard } from "../../../lib/clipboard";
@@ -21,6 +21,7 @@ import { formatOperationMessage } from "../../../design/utils/operationFeedback"
 import { useProviderOptions } from "../../providers/useProviderOptions";
 import { readUser } from "../../../lib/auth";
 import { buildInstallCommand } from "../../agent/installCommand";
+import { useAutoRefresh } from "../../../design/hooks/useAutoRefresh";
 
 
 export function ProviderDashboardPanel() {
@@ -35,6 +36,7 @@ export function ProviderDashboardPanel() {
   const [metricCount, setMetricCount] = useState(0);
   const [agentLogsCount, setAgentLogsCount] = useState(0);
   const [recentLogs, setRecentLogs] = useState<AgentLog[]>([]);
+  const [agentCommands, setAgentCommands] = useState<AgentCommand[]>([]);
   const [sharedOfferQty, setSharedOfferQty] = useState(0);
   const [runtimeInventory, setRuntimeInventory] = useState<RuntimeInventory | null>(null);
   const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
@@ -57,9 +59,11 @@ export function ProviderDashboardPanel() {
   const runningCount = useMemo(() => allocations.filter((item) => !item.released_at).length, [allocations]);
   const totalRevenue = useMemo(() => accruals.reduce((sum, item) => sum + item.total_usd, 0), [accruals]);
 
-  async function refresh() {
+  const refresh = useCallback(async (silent = false) => {
     if (!providerState.providerID.trim()) {
-      push("error", "Provider is required", "Provider dashboard");
+      if (!silent) {
+        push("error", "Provider is required", "Provider dashboard");
+      }
       return;
     }
     setLoading(true);
@@ -83,20 +87,36 @@ export function ProviderDashboardPanel() {
       setRecentLogs(agentLogs.slice(0, 8));
       setSharedOfferQty(sharedOffers.reduce((sum, item) => sum + (item.available_qty || 0), 0));
       try {
+        const commands = await listAgentCommands({ provider_id: providerState.providerID.trim(), limit: 50 });
+        setAgentCommands(commands);
+      } catch {
+        setAgentCommands([]);
+      }
+      try {
         const inventory = await getRuntimeInventory();
         setRuntimeInventory(inventory);
       } catch {
         setRuntimeInventory(null);
       }
       setLastUpdatedAt(new Date());
-      push("info", formatOperationMessage({ action: "Refresh", entityType: "Provider dashboard", entityName: providerState.providerID.trim(), result: "updated" }), "Provider");
+      if (!silent) {
+        push("info", formatOperationMessage({ action: "Refresh", entityType: "Provider dashboard", entityName: providerState.providerID.trim(), result: "updated" }), "Provider");
+      }
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Failed to refresh provider dashboard");
-      push("error", requestError instanceof Error ? requestError.message : "Failed to refresh provider dashboard", "Provider");
+      if (!silent) {
+        push("error", requestError instanceof Error ? requestError.message : "Failed to refresh provider dashboard", "Provider");
+      }
     } finally {
       setLoading(false);
     }
-  }
+  }, [providerState.providerID, push]);
+
+  useAutoRefresh({
+    enabled: Boolean(providerState.providerID.trim()),
+    refresh: () => refresh(true),
+    intervalMs: 15000
+  });
 
   async function copyInstallerCommand() {
     if (!installerCommand) {
@@ -132,9 +152,33 @@ export function ProviderDashboardPanel() {
         status: "active"
       });
       push("success", formatOperationMessage({ action: "Publish", entityType: "Shared capacity", entityName: providerState.providerID.trim(), result: "success" }), "Provider");
-      await refresh();
+      await refresh(true);
     } catch (error) {
       push("error", error instanceof Error ? error.message : "Failed to publish shared capacity", "Provider");
+    }
+  }
+
+  function openRentView() {
+    const url = new URL(window.location.href);
+    url.searchParams.set("section", "myCompute");
+    window.history.pushState({}, "", url);
+    window.dispatchEvent(new PopStateEvent("popstate"));
+  }
+
+  async function sendAgentCommand(command: "status" | "start" | "stop" | "restart") {
+    if (!providerState.providerID.trim()) {
+      push("error", "Provider is required", "Agent control");
+      return;
+    }
+    try {
+      await queueAgentCommand({
+        provider_id: providerState.providerID.trim(),
+        command
+      });
+      push("success", `Agent command queued: ${command}`, "Agent control");
+      await refresh(true);
+    } catch (error) {
+      push("error", error instanceof Error ? error.message : "Failed to queue agent command", "Agent control");
     }
   }
 
@@ -160,7 +204,7 @@ export function ProviderDashboardPanel() {
           />
           <div className="flex items-end gap-2">
             <DataFreshnessBadge ts={lastUpdatedAt} label="Provider data" />
-            <Button onClick={refresh} loading={loading}>
+            <Button onClick={() => void refresh(false)} loading={loading}>
               Load dashboard
             </Button>
           </div>
@@ -176,11 +220,17 @@ export function ProviderDashboardPanel() {
           <MetricTile label="Agent logs" value={`${agentLogsCount}`} />
           <MetricTile label="Shared offer qty" value={`${sharedOfferQty}`} />
         </div>
-        <div className="mt-3">
+        <div className="mt-3 space-y-2">
           <p className="mb-2 text-xs text-textMuted">
             Publish source: <span className="font-medium text-textPrimary">Provider preset offer</span>
           </p>
-          <Button variant="secondary" onClick={publishSharedCapacity}>Publish shared capacity</Button>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="secondary" onClick={publishSharedCapacity}>Publish shared capacity</Button>
+            <Button variant="ghost" onClick={openRentView}>Open rent view</Button>
+          </div>
+          <p className="text-xs text-textMuted">
+            Publish offer to expose your resources, then open rent view to verify buyer-side reservation flow.
+          </p>
         </div>
       </Card>
 
@@ -193,6 +243,32 @@ export function ProviderDashboardPanel() {
         <div className="mt-3">
           <Button variant="secondary" onClick={copyInstallerCommand} disabled={!installerCommand}>Copy curl command</Button>
         </div>
+      </Card>
+
+      <Card title="Agent Control" description="Queue runtime collector commands and track command history.">
+        <div className="mb-3 flex flex-wrap gap-2">
+          <Button variant="secondary" onClick={() => void sendAgentCommand("status")}>Status</Button>
+          <Button variant="secondary" onClick={() => void sendAgentCommand("start")}>Start</Button>
+          <Button variant="secondary" onClick={() => void sendAgentCommand("stop")}>Stop</Button>
+          <Button variant="secondary" onClick={() => void sendAgentCommand("restart")}>Restart</Button>
+        </div>
+        <p className="mb-3 text-xs text-textMuted">
+          Connect to provider host via SSH from your terminal:
+          <span className="ml-1 font-mono text-textPrimary">ssh root@{providerState.providerID || "provider-host"}</span>
+        </p>
+        <Table
+          dense
+          ariaLabel="Provider agent commands table"
+          rowKey={(row) => row.id}
+          items={agentCommands}
+          emptyState={<EmptyState title="No commands yet" description="Queue a command to control hostagent runtime collector." />}
+          columns={[
+            { key: "command", header: "Command", render: (row) => row.command },
+            { key: "status", header: "Status", render: (row) => <StatusBadge status={row.status === "succeeded" ? "running" : row.status === "failed" ? "error" : "queued"} /> },
+            { key: "result", header: "Result", render: (row) => row.result_message || "-" },
+            { key: "updated", header: "Updated", render: (row) => row.updated_at ? new Date(row.updated_at).toLocaleString() : "-" }
+          ]}
+        />
       </Card>
 
       <Card title="Hoster Runtime Inventory" description="Real-time aggregated provider/runtime state from backend APIs, including RunPod pods.">

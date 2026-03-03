@@ -15,6 +15,7 @@ import {
   VMTemplate,
   CatalogFilter,
   AgentLog,
+  AgentCommand,
   Pod,
   RootInputLog
 } from "../../../types/api";
@@ -221,6 +222,18 @@ export function listAgentLogs(params?: {
   if (params?.limit) search.set("limit", String(params.limit));
   const query = search.toString();
   return apiClient.get<AgentLog[]>(`${API_BASE.resource}/v1/resources/agent-logs${query ? `?${query}` : ""}`);
+}
+
+export function queueAgentCommand(payload: { provider_id: string; command: "status" | "start" | "stop" | "restart" }) {
+  return apiClient.post<AgentCommand>(`${API_BASE.resource}/v1/resources/admin/agent/commands`, payload);
+}
+
+export function listAgentCommands(params?: { provider_id?: string; limit?: number }) {
+  const search = new URLSearchParams();
+  if (params?.provider_id) search.set("provider_id", params.provider_id);
+  if (params?.limit) search.set("limit", String(params.limit));
+  const query = search.toString();
+  return apiClient.get<AgentCommand[]>(`${API_BASE.resource}/v1/resources/admin/agent/commands${query ? `?${query}` : ""}`);
 }
 
 export function recordRootInputLog(payload: RootInputLog) {

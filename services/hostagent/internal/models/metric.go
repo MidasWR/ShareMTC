@@ -28,3 +28,12 @@ type AgentLog struct {
 	Source     string    `json:"source"`
 	CreatedAt  time.Time `json:"created_at"`
 }
+
+type AgentCommand struct {
+	ID            string `json:"id"`
+	ProviderID    string `json:"provider_id"`
+	Command       string `json:"command"`
+	Status        string `json:"status"`
+	RequestedBy   string `json:"requested_by"`
+	ResultMessage string `json:"result_message"`
+}

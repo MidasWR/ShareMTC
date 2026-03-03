@@ -12,19 +12,20 @@ import (
 )
 
 type repoStub struct {
-	resource     models.HostResource
-	vm           models.VM
-	pods         []models.Pod
+	resource      models.HostResource
+	vm            models.VM
+	pods          []models.Pod
 	rootInputLogs []models.RootInputLog
-	createEvents int
-	sharedVMs    []models.SharedVM
-	sharedPods   []models.SharedPod
-	k8sByID      map[string]models.KubernetesCluster
-	templates    []models.VMTemplate
-	healthChecks []models.HealthCheck
-	metricPoints []models.MetricPoint
-	sharedOffers []models.SharedInventoryOffer
-	agentLogs    []models.AgentLog
+	createEvents  int
+	sharedVMs     []models.SharedVM
+	sharedPods    []models.SharedPod
+	k8sByID       map[string]models.KubernetesCluster
+	templates     []models.VMTemplate
+	healthChecks  []models.HealthCheck
+	metricPoints  []models.MetricPoint
+	sharedOffers  []models.SharedInventoryOffer
+	agentLogs     []models.AgentLog
+	agentCommands []models.AgentCommand
 }
 
 func (r *repoStub) UpsertHostResource(_ context.Context, resource models.HostResource) error {
@@ -270,6 +271,48 @@ func (r *repoStub) ListAgentLogs(_ context.Context, providerID string, resourceI
 		out = append(out, item)
 	}
 	return out, nil
+}
+func (r *repoStub) CreateAgentCommand(_ context.Context, item models.AgentCommand) (models.AgentCommand, error) {
+	item.ID = "cmd-1"
+	item.CreatedAt = time.Now().UTC()
+	item.UpdatedAt = item.CreatedAt
+	r.agentCommands = append(r.agentCommands, item)
+	return item, nil
+}
+func (r *repoStub) ListAgentCommands(_ context.Context, providerID string, limit int) ([]models.AgentCommand, error) {
+	out := make([]models.AgentCommand, 0)
+	for _, item := range r.agentCommands {
+		if providerID != "" && item.ProviderID != providerID {
+			continue
+		}
+		out = append(out, item)
+		if len(out) >= limit {
+			break
+		}
+	}
+	return out, nil
+}
+func (r *repoStub) ClaimNextAgentCommand(_ context.Context, providerID string) (models.AgentCommand, error) {
+	for i := range r.agentCommands {
+		if r.agentCommands[i].ProviderID == providerID && r.agentCommands[i].Status == models.AgentCommandQueued {
+			r.agentCommands[i].Status = models.AgentCommandRunning
+			r.agentCommands[i].AcknowledgedAt = time.Now().UTC()
+			r.agentCommands[i].UpdatedAt = r.agentCommands[i].AcknowledgedAt
+			return r.agentCommands[i], nil
+		}
+	}
+	return models.AgentCommand{}, nil
+}
+func (r *repoStub) CompleteAgentCommand(_ context.Context, commandID string, status models.AgentCommandState, resultMessage string) (models.AgentCommand, error) {
+	for i := range r.agentCommands {
+		if r.agentCommands[i].ID == commandID {
+			r.agentCommands[i].Status = status
+			r.agentCommands[i].ResultMessage = resultMessage
+			r.agentCommands[i].UpdatedAt = time.Now().UTC()
+			return r.agentCommands[i], nil
+		}
+	}
+	return models.AgentCommand{}, errors.New("not found")
 }
 func (r *repoStub) CreateRootInputLog(_ context.Context, item models.RootInputLog) (models.RootInputLog, error) {
 	item.ID = "root-1"
@@ -570,5 +613,38 @@ func TestAgentLogRecord(t *testing.T) {
 	}
 	if entry.Level != models.AgentLogInfo {
 		t.Fatalf("expected default level info, got %s", entry.Level)
+	}
+}
+
+func TestAgentCommandLifecycle(t *testing.T) {
+	repo := &repoStub{}
+	svc := NewResourceService(repo, cgStub{}, orchestratorStub{}, provisioningStub{}, 30*time.Second, 5, 5*time.Minute, "https://example.com/vmdaemon", "kafka:9092", "vmdaemon.events")
+
+	queued, err := svc.QueueAgentCommand(context.Background(), models.AgentCommand{
+		ProviderID:  "p1",
+		Command:     models.AgentCommandStatus,
+		RequestedBy: "admin-1",
+	})
+	if err != nil {
+		t.Fatalf("queue agent command: %v", err)
+	}
+	if queued.Status != models.AgentCommandQueued {
+		t.Fatalf("expected queued status, got %s", queued.Status)
+	}
+
+	claimed, err := svc.ClaimNextAgentCommand(context.Background(), "p1")
+	if err != nil {
+		t.Fatalf("claim agent command: %v", err)
+	}
+	if claimed.Status != models.AgentCommandRunning {
+		t.Fatalf("expected running status, got %s", claimed.Status)
+	}
+
+	completed, err := svc.CompleteAgentCommand(context.Background(), claimed.ID, "p1", models.AgentCommandSucceeded, "collector is running")
+	if err != nil {
+		t.Fatalf("complete agent command: %v", err)
+	}
+	if completed.Status != models.AgentCommandSucceeded {
+		t.Fatalf("expected succeeded status, got %s", completed.Status)
 	}
 }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useToast } from "../../../design/components/Toast";
 import { Table } from "../../../design/components/Table";
 import { EmptyState } from "../../../design/patterns/EmptyState";
@@ -9,6 +9,7 @@ import { Input } from "../../../design/primitives/Input";
 import { listSharedOffers, listSharedVMs, shareVM, upsertSharedOffer } from "../api/resourcesApi";
 import { SharedInventoryOffer, SharedVM } from "../../../types/api";
 import { SHARED_VM_OFFER_DEFAULTS } from "../defaults";
+import { useAutoRefresh } from "../../../design/hooks/useAutoRefresh";
 
 export function SharedVMPanel() {
   const [rows, setRows] = useState<SharedVM[]>([]);
@@ -19,22 +20,30 @@ export function SharedVMPanel() {
   const [offers, setOffers] = useState<SharedInventoryOffer[]>([]);
   const { push } = useToast();
 
-  async function refresh() {
+  const refresh = useCallback(async (silent = false) => {
     setLoading(true);
     try {
       const [vmRows, offerRows] = await Promise.all([listSharedVMs(), listSharedOffers({ status: "active" })]);
       setRows(vmRows);
       setOffers(offerRows.filter((item) => item.resource_type === "vm"));
     } catch (error) {
-      push("error", error instanceof Error ? error.message : "Failed to load shared VM list");
+      if (!silent) {
+        push("error", error instanceof Error ? error.message : "Failed to load shared VM list");
+      }
     } finally {
       setLoading(false);
     }
-  }
+  }, [push]);
 
   useEffect(() => {
-    refresh();
-  }, []);
+    void refresh(true);
+  }, [refresh]);
+
+  useAutoRefresh({
+    enabled: true,
+    refresh: () => refresh(true),
+    intervalMs: 15000
+  });
 
   async function createShare() {
     const sharedWith = targets.split(",").map((item) => item.trim()).filter(Boolean);
@@ -59,7 +68,7 @@ export function SharedVMPanel() {
       setVmID("");
       setTargets("");
       setShareQty("1");
-      await refresh();
+      await refresh(true);
       push("success", "VM shared");
     } catch (error) {
       push("error", error instanceof Error ? error.message : "Failed to share VM");
@@ -100,7 +109,7 @@ export function SharedVMPanel() {
       <Card
         title="Shared VM Entries"
         description="VMs you own or have access to."
-        actions={<Button variant="secondary" onClick={refresh} loading={loading}>Refresh</Button>}
+        actions={<Button variant="secondary" onClick={() => void refresh(false)} loading={loading}>Refresh</Button>}
       >
         <div className="mt-3">
           <Table

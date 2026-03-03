@@ -1,4 +1,4 @@
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useCallback, useMemo, useState } from "react";
 import { useToast } from "../../../design/components/Toast";
 import { Allocation } from "../../../types/api";
 import {
@@ -8,6 +8,7 @@ import {
   sendHeartbeat
 } from "../api/resourcesApi";
 import { useProviderOptions } from "../../providers/useProviderOptions";
+import { useAutoRefresh } from "../../../design/hooks/useAutoRefresh";
 
 export function useAllocations() {
   const [cpuCores, setCpuCores] = useState("2");
@@ -42,24 +43,36 @@ export function useAllocations() {
     });
   }, [allocations, search, statusFilter, sortBy]);
 
-  async function load() {
+  const load = useCallback(async (silent = false) => {
     if (!providerState.providerID.trim()) {
-      setStatusText("Provider is required to load allocations");
+      if (!silent) {
+        setStatusText("Provider is required to load allocations");
+      }
       return;
     }
     setLoading(true);
     try {
       const list = await listAllocations(providerState.providerID.trim());
       setAllocations(list);
-      setStatusText(`Loaded ${list.length} allocations`);
+      if (!silent) {
+        setStatusText(`Loaded ${list.length} allocations`);
+      }
     } catch (requestError) {
       const message = requestError instanceof Error ? requestError.message : "Allocation load failed";
       setStatusText(message);
-      push("error", message);
+      if (!silent) {
+        push("error", message);
+      }
     } finally {
       setLoading(false);
     }
-  }
+  }, [providerState.providerID, push]);
+
+  useAutoRefresh({
+    enabled: Boolean(providerState.providerID.trim()),
+    refresh: () => load(true),
+    intervalMs: 15000
+  });
 
   async function create(event: FormEvent) {
     event.preventDefault();
@@ -78,7 +91,7 @@ export function useAllocations() {
       setStatusText(`Allocation created: ${created.id}`);
       push("success", "Allocation created");
       setShowCreateModal(false);
-      await load();
+      await load(true);
     } catch (requestError) {
       const message = requestError instanceof Error ? requestError.message : "Allocation create failed";
       setStatusText(message);
@@ -95,7 +108,7 @@ export function useAllocations() {
       setStatusText(`Released allocation ${allocationID}`);
       push("success", "Allocation released");
       setReleaseTarget(null);
-      await load();
+      await load(true);
     } catch (requestError) {
       const message = requestError instanceof Error ? requestError.message : "Release failed";
       setStatusText(message);

@@ -316,6 +316,18 @@ export type AgentLog = {
   created_at?: string;
 };
 
+export type AgentCommand = {
+  id: string;
+  provider_id: string;
+  command: "status" | "start" | "stop" | "restart";
+  status: "queued" | "running" | "succeeded" | "failed";
+  requested_by: string;
+  result_message: string;
+  acknowledged_at?: string;
+  created_at?: string;
+  updated_at?: string;
+};
+
 export type RootInputLog = {
   id?: string;
   provider_id: string;

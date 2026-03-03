@@ -43,7 +43,7 @@ export function HostPanel() {
                 : [{ value: "", label: state.providerLoading ? "Loading providers..." : "No providers available" }]
             }
           />
-          <Button variant="secondary" className="md:mt-7" onClick={state.load} loading={state.loading}>
+          <Button variant="secondary" className="md:mt-7" onClick={() => void state.load(false)} loading={state.loading}>
             Load allocations
           </Button>
           <Button variant="secondary" className="md:mt-7" onClick={state.heartbeat} loading={state.loading}>

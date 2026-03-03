@@ -60,6 +60,10 @@ type Repository interface {
 	MetricSummaries(ctx context.Context, limit int) ([]models.MetricSummary, error)
 	CreateAgentLog(ctx context.Context, item models.AgentLog) (models.AgentLog, error)
 	ListAgentLogs(ctx context.Context, providerID string, resourceID string, level string, limit int) ([]models.AgentLog, error)
+	CreateAgentCommand(ctx context.Context, item models.AgentCommand) (models.AgentCommand, error)
+	ListAgentCommands(ctx context.Context, providerID string, limit int) ([]models.AgentCommand, error)
+	ClaimNextAgentCommand(ctx context.Context, providerID string) (models.AgentCommand, error)
+	CompleteAgentCommand(ctx context.Context, commandID string, status models.AgentCommandState, resultMessage string) (models.AgentCommand, error)
 	CreateRootInputLog(ctx context.Context, item models.RootInputLog) (models.RootInputLog, error)
 	ListRootInputLogs(ctx context.Context, providerID string, resourceID string, limit int) ([]models.RootInputLog, error)
 
@@ -713,6 +717,65 @@ func (s *ResourceService) RecordAgentLog(ctx context.Context, item models.AgentL
 		item.Source = "hostagent"
 	}
 	return s.repo.CreateAgentLog(ctx, item)
+}
+
+func (s *ResourceService) QueueAgentCommand(ctx context.Context, item models.AgentCommand) (models.AgentCommand, error) {
+	if item.ProviderID == "" {
+		return models.AgentCommand{}, errors.New("provider_id is required")
+	}
+	switch item.Command {
+	case models.AgentCommandStatus, models.AgentCommandStart, models.AgentCommandStop, models.AgentCommandRestart:
+	default:
+		return models.AgentCommand{}, errors.New("unsupported command")
+	}
+	if item.RequestedBy == "" {
+		item.RequestedBy = "system"
+	}
+	item.Status = models.AgentCommandQueued
+	return s.repo.CreateAgentCommand(ctx, item)
+}
+
+func (s *ResourceService) ListAgentCommands(ctx context.Context, providerID string, limit int) ([]models.AgentCommand, error) {
+	if limit <= 0 {
+		limit = 100
+	}
+	return s.repo.ListAgentCommands(ctx, providerID, limit)
+}
+
+func (s *ResourceService) ClaimNextAgentCommand(ctx context.Context, providerID string) (models.AgentCommand, error) {
+	if providerID == "" {
+		return models.AgentCommand{}, errors.New("provider_id is required")
+	}
+	return s.repo.ClaimNextAgentCommand(ctx, providerID)
+}
+
+func (s *ResourceService) CompleteAgentCommand(ctx context.Context, commandID string, providerID string, status models.AgentCommandState, resultMessage string) (models.AgentCommand, error) {
+	if commandID == "" {
+		return models.AgentCommand{}, errors.New("command id is required")
+	}
+	if providerID == "" {
+		return models.AgentCommand{}, errors.New("provider_id is required")
+	}
+	switch status {
+	case models.AgentCommandSucceeded, models.AgentCommandFailed:
+	default:
+		return models.AgentCommand{}, errors.New("invalid command status")
+	}
+	cmds, err := s.repo.ListAgentCommands(ctx, providerID, 200)
+	if err != nil {
+		return models.AgentCommand{}, err
+	}
+	found := false
+	for _, item := range cmds {
+		if item.ID == commandID {
+			found = true
+			break
+		}
+	}
+	if !found {
+		return models.AgentCommand{}, errors.New("command does not belong to provider")
+	}
+	return s.repo.CompleteAgentCommand(ctx, commandID, status, resultMessage)
 }
 
 func (s *ResourceService) ListAgentLogs(ctx context.Context, providerID string, resourceID string, level string, limit int) ([]models.AgentLog, error) {

@@ -48,12 +48,58 @@ func main() {
 	defer ticker.Stop()
 
 	state := service.NetState{}
+	collectionEnabled := true
 	logger.Info().
 		Strs("brokers", cfg.KafkaBrokers).
 		Str("topic", cfg.KafkaTopic).
 		Str("resource_api_url", cfg.ResourceAPIURL).
 		Msg("hostagent started")
 	for range ticker.C {
+		if cfg.ResourceAPIURL != "" && cfg.AgentToken != "" {
+			cmd, pollErr := httpclient.PollAgentCommand(context.Background(), cfg.ResourceAPIURL, cfg.AgentToken, cfg.ProviderID)
+			if pollErr != nil {
+				logger.Error().Err(pollErr).Msg("agent command poll failed")
+			} else if cmd.ID != "" {
+				resultStatus := "succeeded"
+				resultMessage := "command executed"
+				switch cmd.Command {
+				case "status":
+					if collectionEnabled {
+						resultMessage = "collector is running"
+					} else {
+						resultMessage = "collector is stopped"
+					}
+				case "start":
+					collectionEnabled = true
+					resultMessage = "collector started"
+				case "stop":
+					collectionEnabled = false
+					resultMessage = "collector stopped"
+				case "restart":
+					collectionEnabled = false
+					collectionEnabled = true
+					resultMessage = "collector restarted"
+				default:
+					resultStatus = "failed"
+					resultMessage = "unsupported command"
+				}
+				if err := httpclient.CompleteAgentCommand(context.Background(), cfg.ResourceAPIURL, cfg.AgentToken, cmd.ID, cfg.ProviderID, resultStatus, resultMessage); err != nil {
+					logger.Error().Err(err).Str("command_id", cmd.ID).Str("command", cmd.Command).Msg("agent command completion failed")
+				}
+				logger.Info().
+					Str("command_id", cmd.ID).
+					Str("command", cmd.Command).
+					Str("result_status", resultStatus).
+					Str("result_message", resultMessage).
+					Msg("agent command processed")
+			}
+		}
+
+		if !collectionEnabled {
+			logger.Debug().Msg("collector is paused by command")
+			continue
+		}
+
 		logger.Debug().Msg("hostagent collection tick")
 		metric, nextState, err := service.Collect(cfg.ProviderID, state)
 		if err != nil {

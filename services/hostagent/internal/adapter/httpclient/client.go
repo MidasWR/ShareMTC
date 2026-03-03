@@ -60,6 +60,66 @@ func SendAgentLog(ctx context.Context, baseURL string, token string, log models.
 	return nil
 }
 
+func PollAgentCommand(ctx context.Context, baseURL string, token string, providerID string) (models.AgentCommand, error) {
+	url := strings.TrimRight(baseURL, "/") + "/v1/resources/agent/commands/poll"
+	payload, err := json.Marshal(map[string]string{
+		"provider_id": providerID,
+	})
+	if err != nil {
+		return models.AgentCommand{}, err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(payload))
+	if err != nil {
+		return models.AgentCommand{}, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return models.AgentCommand{}, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return models.AgentCommand{}, &httpStatusError{Code: resp.StatusCode}
+	}
+	var out models.AgentCommand
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		return models.AgentCommand{}, err
+	}
+	return out, nil
+}
+
+func CompleteAgentCommand(ctx context.Context, baseURL string, token string, commandID string, providerID string, status string, resultMessage string) error {
+	url := strings.TrimRight(baseURL, "/") + "/v1/resources/agent/commands/" + commandID + "/complete"
+	payload, err := json.Marshal(map[string]string{
+		"provider_id":    providerID,
+		"status":         status,
+		"result_message": resultMessage,
+	})
+	if err != nil {
+		return err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(payload))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return &httpStatusError{Code: resp.StatusCode}
+	}
+	return nil
+}
+
 type httpStatusError struct {
 	Code int
 }

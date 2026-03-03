@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { LuExternalLink, LuFileText, LuPlay, LuPower, LuRefreshCw, LuTrash2 } from "react-icons/lu";
 import { useSettings } from "../../app/providers/SettingsProvider";
+import { Table } from "../../design/components/Table";
 import { EmptyState } from "../../design/patterns/EmptyState";
 import { InlineAlert } from "../../design/patterns/InlineAlert";
 import { PageSectionHeader } from "../../design/patterns/PageSectionHeader";
@@ -14,9 +15,10 @@ import { Select } from "../../design/primitives/Select";
 import { useToast } from "../../design/components/Toast";
 import { Modal } from "../../design/components/Modal";
 import { formatOperationMessage } from "../../design/utils/operationFeedback";
-import { getVM, listPods, listVMs, rebootVM, startVM, stopVM, terminatePod, terminateVM } from "../resources/api/resourcesApi";
+import { getVM, listPods, listSharedOffers, listVMs, rebootVM, reserveSharedOffer, startVM, stopVM, terminatePod, terminateVM } from "../resources/api/resourcesApi";
 import { formatDateTime } from "../hifi/formatters";
-import { Pod, VM } from "../../types/api";
+import { Pod, SharedInventoryOffer, VM } from "../../types/api";
+import { useAutoRefresh } from "../../design/hooks/useAutoRefresh";
 
 type RuntimeRow = {
   id: string;
@@ -52,14 +54,18 @@ export function ServerRentalPanel() {
   const [rows, setRows] = useState<RuntimeRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [offersError, setOffersError] = useState("");
   const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
   const [terminateTarget, setTerminateTarget] = useState<RuntimeRow | null>(null);
+  const [offers, setOffers] = useState<SharedInventoryOffer[]>([]);
+  const [reserveQty, setReserveQty] = useState<Record<string, string>>({});
 
-  async function refreshRows() {
+  const refreshRows = useCallback(async (silent = false) => {
     setLoading(true);
     setError("");
+    setOffersError("");
     try {
-      const [vms, pods] = await Promise.all([listVMs(), listPods()]);
+      const [vms, pods, sharedOffers] = await Promise.all([listVMs(), listPods(), listSharedOffers({ status: "active" })]);
       const vmRows: RuntimeRow[] = vms.map((item: VM) => ({
         id: item.id || "",
         kind: "vm",
@@ -84,19 +90,36 @@ export function ServerRentalPanel() {
         createdAt: item.created_at
       }));
       setRows([...vmRows, ...podRows]);
+      const rentableOffers = sharedOffers.filter((item) => item.available_qty > 0);
+      setOffers(rentableOffers);
+      setReserveQty((prev) => {
+        const next: Record<string, string> = {};
+        for (const offer of rentableOffers) {
+          next[offer.id || offer.title] = prev[offer.id || offer.title] || "1";
+        }
+        return next;
+      });
       setLastUpdatedAt(new Date());
     } catch (requestError) {
       const message = requestError instanceof Error ? requestError.message : "Failed to load resources";
       setError(message);
-      push("error", message, "My Instances");
+      if (!silent) {
+        push("error", message, "My Instances");
+      }
     } finally {
       setLoading(false);
     }
-  }
+  }, [push]);
 
   useEffect(() => {
-    void refreshRows();
-  }, []);
+    void refreshRows(true);
+  }, [refreshRows]);
+
+  useAutoRefresh({
+    enabled: true,
+    refresh: () => refreshRows(true),
+    intervalMs: 15000
+  });
 
   async function runAction(row: RuntimeRow, action: "start" | "stop" | "reboot" | "terminate") {
     if (!row.id) {
@@ -120,7 +143,7 @@ export function ServerRentalPanel() {
         formatOperationMessage({ action: action[0].toUpperCase() + action.slice(1), entityType: row.kind.toUpperCase(), entityName: row.name, entityId: row.id, result: "success" }),
         "My Instances"
       );
-      await refreshRows();
+      await refreshRows(true);
     } catch (requestError) {
       push("error", requestError instanceof Error ? requestError.message : "Action failed", "My Instances");
     }
@@ -149,9 +172,80 @@ export function ServerRentalPanel() {
     });
   }, [rows, search, statusFilter]);
 
+  async function reserveOffer(offer: SharedInventoryOffer) {
+    if (!offer.id) {
+      push("error", "Offer ID is missing", "Shared marketplace");
+      return;
+    }
+    const qty = Math.max(1, Number(reserveQty[offer.id] || "1") || 1);
+    try {
+      await reserveSharedOffer({ offer_id: offer.id, quantity: qty });
+      push(
+        "success",
+        formatOperationMessage({
+          action: "Reserve",
+          entityType: "Shared offer",
+          entityName: offer.title,
+          entityId: offer.id,
+          result: "success"
+        }),
+        "Shared marketplace"
+      );
+      await refreshRows();
+    } catch (requestError) {
+      const message = requestError instanceof Error ? requestError.message : "Reserve failed";
+      setOffersError(message);
+      push("error", message, "Shared marketplace");
+    }
+  }
+
   return (
     <section className="section-stack">
       <PageSectionHeader title={locale === "ru" ? "My Instances" : "My Instances"} description={locale === "ru" ? "Операционный список с быстрыми действиями и раскрытием деталей." : "Operational list with quick actions and expandable details."} />
+
+      <Card
+        title={locale === "ru" ? "Rent shared capacity" : "Rent shared capacity"}
+        description={locale === "ru" ? "Арендуйте опубликованные shared offers и обновляйте инстансы после резерва." : "Reserve published shared offers and refresh instances after reservation."}
+      >
+        {offersError ? <InlineAlert kind="error">{offersError}</InlineAlert> : null}
+        <Table
+          dense
+          ariaLabel="Shared offers rental table"
+          rowKey={(row) => row.id || `${row.provider_id}-${row.title}`}
+          items={offers}
+          emptyState={<EmptyState title="No active offers" description="Ask provider to publish shared capacity offers." />}
+          columns={[
+            { key: "title", header: "Title", render: (row) => row.title },
+            { key: "provider", header: "Provider", render: (row) => row.provider_id },
+            { key: "capacity", header: "Capacity", render: (row) => `${row.cpu_cores} CPU / ${Math.round(row.ram_mb / 1024)} GB / ${row.gpu_units} GPU` },
+            { key: "available", header: "Available", render: (row) => `${row.available_qty}/${row.quantity}` },
+            { key: "price", header: "$/hr", render: (row) => row.price_hourly_usd.toFixed(2) },
+            {
+              key: "reserve",
+              header: "Reserve",
+              render: (row) => (
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    min={1}
+                    max={Math.max(1, row.available_qty)}
+                    value={reserveQty[row.id || row.title] || "1"}
+                    onChange={(event) =>
+                      setReserveQty((prev) => ({
+                        ...prev,
+                        [row.id || row.title]: event.target.value
+                      }))
+                    }
+                  />
+                  <Button size="sm" onClick={() => reserveOffer(row)} disabled={loading || row.available_qty <= 0}>
+                    Reserve
+                  </Button>
+                </div>
+              )
+            }
+          ]}
+        />
+      </Card>
 
       <Card
         title={locale === "ru" ? "Instances list" : "Instances list"}
@@ -159,7 +253,7 @@ export function ServerRentalPanel() {
         actions={(
           <div className="flex items-center gap-2">
             <DataFreshnessBadge ts={lastUpdatedAt} label="Instances" />
-            <Button variant="secondary" onClick={refreshRows} loading={loading}>Refresh</Button>
+            <Button variant="secondary" onClick={() => void refreshRows(false)} loading={loading}>Refresh</Button>
           </div>
         )}
       >

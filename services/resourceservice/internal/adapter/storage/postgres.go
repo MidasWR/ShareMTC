@@ -8,6 +8,7 @@ import (
 
 	"github.com/MidasWR/ShareMTC/services/resourceservice/internal/models"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -179,6 +180,19 @@ func (r *Repo) Migrate(ctx context.Context) error {
 		);
 		CREATE INDEX IF NOT EXISTS idx_agent_logs_provider ON agent_logs(provider_id, created_at DESC);
 		CREATE INDEX IF NOT EXISTS idx_agent_logs_level ON agent_logs(level, created_at DESC);
+		CREATE TABLE IF NOT EXISTS agent_commands (
+			id TEXT PRIMARY KEY,
+			provider_id TEXT NOT NULL,
+			command TEXT NOT NULL,
+			status TEXT NOT NULL DEFAULT 'queued',
+			requested_by TEXT NOT NULL,
+			result_message TEXT NOT NULL DEFAULT '',
+			acknowledged_at TIMESTAMPTZ,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+			updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+		);
+		CREATE INDEX IF NOT EXISTS idx_agent_commands_provider ON agent_commands(provider_id, created_at DESC);
+		CREATE INDEX IF NOT EXISTS idx_agent_commands_queue ON agent_commands(provider_id, status, created_at ASC);
 		CREATE TABLE IF NOT EXISTS root_input_logs (
 			id TEXT PRIMARY KEY,
 			provider_id TEXT NOT NULL,
@@ -1075,6 +1089,79 @@ func (r *Repo) ListAgentLogs(ctx context.Context, providerID string, resourceID 
 		out = append(out, item)
 	}
 	return out, nil
+}
+
+func (r *Repo) CreateAgentCommand(ctx context.Context, item models.AgentCommand) (models.AgentCommand, error) {
+	if item.ID == "" {
+		item.ID = uuid.NewString()
+	}
+	err := r.db.QueryRow(ctx, `
+		INSERT INTO agent_commands (id, provider_id, command, status, requested_by, result_message)
+		VALUES ($1, $2, $3, $4, $5, $6)
+		RETURNING acknowledged_at, created_at, updated_at
+	`, item.ID, item.ProviderID, item.Command, item.Status, item.RequestedBy, item.ResultMessage).Scan(&item.AcknowledgedAt, &item.CreatedAt, &item.UpdatedAt)
+	return item, err
+}
+
+func (r *Repo) ListAgentCommands(ctx context.Context, providerID string, limit int) ([]models.AgentCommand, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT id, provider_id, command, status, requested_by, result_message, acknowledged_at, created_at, updated_at
+		FROM agent_commands
+		WHERE ($1 = '' OR provider_id = $1)
+		ORDER BY created_at DESC
+		LIMIT $2
+	`, providerID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make([]models.AgentCommand, 0)
+	for rows.Next() {
+		var item models.AgentCommand
+		if err := rows.Scan(&item.ID, &item.ProviderID, &item.Command, &item.Status, &item.RequestedBy, &item.ResultMessage, &item.AcknowledgedAt, &item.CreatedAt, &item.UpdatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, item)
+	}
+	return out, nil
+}
+
+func (r *Repo) ClaimNextAgentCommand(ctx context.Context, providerID string) (models.AgentCommand, error) {
+	var item models.AgentCommand
+	err := r.db.QueryRow(ctx, `
+		WITH next AS (
+			SELECT id
+			FROM agent_commands
+			WHERE provider_id = $1
+			  AND status = 'queued'
+			ORDER BY created_at ASC
+			LIMIT 1
+		)
+		UPDATE agent_commands AS ac
+		SET status = 'running',
+		    acknowledged_at = NOW(),
+		    updated_at = NOW()
+		FROM next
+		WHERE ac.id = next.id
+		RETURNING ac.id, ac.provider_id, ac.command, ac.status, ac.requested_by, ac.result_message, ac.acknowledged_at, ac.created_at, ac.updated_at
+	`, providerID).Scan(&item.ID, &item.ProviderID, &item.Command, &item.Status, &item.RequestedBy, &item.ResultMessage, &item.AcknowledgedAt, &item.CreatedAt, &item.UpdatedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return models.AgentCommand{}, nil
+	}
+	return item, err
+}
+
+func (r *Repo) CompleteAgentCommand(ctx context.Context, commandID string, status models.AgentCommandState, resultMessage string) (models.AgentCommand, error) {
+	var item models.AgentCommand
+	err := r.db.QueryRow(ctx, `
+		UPDATE agent_commands
+		SET status = $2,
+		    result_message = $3,
+		    updated_at = NOW()
+		WHERE id = $1
+		RETURNING id, provider_id, command, status, requested_by, result_message, acknowledged_at, created_at, updated_at
+	`, commandID, status, resultMessage).Scan(&item.ID, &item.ProviderID, &item.Command, &item.Status, &item.RequestedBy, &item.ResultMessage, &item.AcknowledgedAt, &item.CreatedAt, &item.UpdatedAt)
+	return item, err
 }
 
 func (r *Repo) CreateRootInputLog(ctx context.Context, item models.RootInputLog) (models.RootInputLog, error) {

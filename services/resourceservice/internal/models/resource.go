@@ -35,24 +35,24 @@ type ResourceStats struct {
 }
 
 type RuntimeProviderStat struct {
-	ProviderID         string `json:"provider_id"`
-	VMTotal            int    `json:"vm_total"`
-	VMRunning          int    `json:"vm_running"`
-	PodTotal           int    `json:"pod_total"`
-	PodRunning         int    `json:"pod_running"`
-	SharedOfferTotal   int    `json:"shared_offer_total"`
-	SharedOfferActive  int    `json:"shared_offer_active"`
+	ProviderID        string `json:"provider_id"`
+	VMTotal           int    `json:"vm_total"`
+	VMRunning         int    `json:"vm_running"`
+	PodTotal          int    `json:"pod_total"`
+	PodRunning        int    `json:"pod_running"`
+	SharedOfferTotal  int    `json:"shared_offer_total"`
+	SharedOfferActive int    `json:"shared_offer_active"`
 }
 
 type RuntimeInventory struct {
-	GeneratedAt     time.Time            `json:"generated_at"`
-	ProviderStats   []RuntimeProviderStat `json:"provider_stats"`
-	RunPodPods      []Pod                `json:"runpod_pods"`
-	VMTotal         int                  `json:"vm_total"`
-	VMRunning       int                  `json:"vm_running"`
-	PodTotal        int                  `json:"pod_total"`
-	PodRunning      int                  `json:"pod_running"`
-	SharedOfferTotal int                 `json:"shared_offer_total"`
+	GeneratedAt      time.Time             `json:"generated_at"`
+	ProviderStats    []RuntimeProviderStat `json:"provider_stats"`
+	RunPodPods       []Pod                 `json:"runpod_pods"`
+	VMTotal          int                   `json:"vm_total"`
+	VMRunning        int                   `json:"vm_running"`
+	PodTotal         int                   `json:"pod_total"`
+	PodRunning       int                   `json:"pod_running"`
+	SharedOfferTotal int                   `json:"shared_offer_total"`
 }
 
 type VMStatus string
@@ -219,6 +219,36 @@ type AgentLog struct {
 	Message    string        `json:"message"`
 	Source     string        `json:"source"`
 	CreatedAt  time.Time     `json:"created_at"`
+}
+
+type AgentCommandAction string
+
+const (
+	AgentCommandStatus  AgentCommandAction = "status"
+	AgentCommandStart   AgentCommandAction = "start"
+	AgentCommandStop    AgentCommandAction = "stop"
+	AgentCommandRestart AgentCommandAction = "restart"
+)
+
+type AgentCommandState string
+
+const (
+	AgentCommandQueued    AgentCommandState = "queued"
+	AgentCommandRunning   AgentCommandState = "running"
+	AgentCommandSucceeded AgentCommandState = "succeeded"
+	AgentCommandFailed    AgentCommandState = "failed"
+)
+
+type AgentCommand struct {
+	ID             string             `json:"id"`
+	ProviderID     string             `json:"provider_id"`
+	Command        AgentCommandAction `json:"command"`
+	Status         AgentCommandState  `json:"status"`
+	RequestedBy    string             `json:"requested_by"`
+	ResultMessage  string             `json:"result_message"`
+	CreatedAt      time.Time          `json:"created_at"`
+	UpdatedAt      time.Time          `json:"updated_at"`
+	AcknowledgedAt time.Time          `json:"acknowledged_at"`
 }
 
 type RootInputLog struct {

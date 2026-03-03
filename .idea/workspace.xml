@@ -6,6 +6,8 @@
   <component name="ChangeListManager">
     <list default="true" id="093339f5-8e40-4fff-8dda-262df5227056" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/charts/ChartsInfra/templates/kafka/controllers.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/charts/ChartsInfra/templates/kafka/controllers.yaml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/charts/ChartsInfra/values.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/charts/ChartsInfra/values.yaml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/installer/host-installer.sh" beforeDir="false" afterPath="$PROJECT_DIR$/installer/host-installer.sh" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />

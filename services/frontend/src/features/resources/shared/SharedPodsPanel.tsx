@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useToast } from "../../../design/components/Toast";
 import { Table } from "../../../design/components/Table";
 import { DataFreshnessBadge } from "../../../design/patterns/DataFreshnessBadge";
@@ -12,6 +12,7 @@ import { formatOperationMessage } from "../../../design/utils/operationFeedback"
 import { listSharedOffers, listSharedPods, sharePod, upsertSharedOffer } from "../api/resourcesApi";
 import { SharedInventoryOffer, SharedPod } from "../../../types/api";
 import { useProviderOptions } from "../../providers/useProviderOptions";
+import { useAutoRefresh } from "../../../design/hooks/useAutoRefresh";
 
 export function SharedPodsPanel() {
   const [rows, setRows] = useState<SharedPod[]>([]);
@@ -30,7 +31,7 @@ export function SharedPodsPanel() {
   const { push } = useToast();
   const providerState = useProviderOptions();
 
-  async function refresh() {
+  const refresh = useCallback(async (silent = false) => {
     setLoading(true);
     try {
       const [podRows, offerRows] = await Promise.all([listSharedPods(), listSharedOffers({ status: "active" })]);
@@ -38,15 +39,23 @@ export function SharedPodsPanel() {
       setOffers(offerRows.filter((item) => item.resource_type === "pod"));
       setLastUpdatedAt(new Date());
     } catch (error) {
-      push("error", error instanceof Error ? error.message : "Failed to load shared POD list", "Shared PODs");
+      if (!silent) {
+        push("error", error instanceof Error ? error.message : "Failed to load shared POD list", "Shared PODs");
+      }
     } finally {
       setLoading(false);
     }
-  }
+  }, [push]);
 
   useEffect(() => {
-    refresh();
-  }, []);
+    void refresh(true);
+  }, [refresh]);
+
+  useAutoRefresh({
+    enabled: true,
+    refresh: () => refresh(true),
+    intervalMs: 15000
+  });
 
   async function createShare() {
     const nextErrors: Record<string, string> = {};
@@ -92,7 +101,7 @@ export function SharedPodsPanel() {
       setTargets("");
       setShareQty("1");
       setPriceHourlyUSD("0.59");
-      await refresh();
+      await refresh(true);
       push(
         "success",
         formatOperationMessage({ action: "Share", entityType: "POD", entityName: podCode.trim(), result: "success" }),
@@ -153,7 +162,7 @@ export function SharedPodsPanel() {
         actions={(
           <div className="flex items-center gap-2">
             <DataFreshnessBadge ts={lastUpdatedAt} label="Shared PODs" />
-            <Button variant="secondary" onClick={refresh} loading={loading}>Refresh</Button>
+            <Button variant="secondary" onClick={() => void refresh(false)} loading={loading}>Refresh</Button>
           </div>
         )}
       >
