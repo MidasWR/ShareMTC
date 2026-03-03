@@ -16,7 +16,7 @@ type Config struct {
 
 func New(cfg Config) (zerolog.Logger, error) {
 	if cfg.WriterAddr == "" {
-		logger := zerolog.New(os.Stdout).With().Timestamp().Str("service", cfg.ServiceName).Logger()
+		logger := zerolog.New(zerolog.ConsoleWriter{Out: os.Stdout}).With().Timestamp().Str("service", cfg.ServiceName).Logger()
 		return logger, nil
 	}
 
