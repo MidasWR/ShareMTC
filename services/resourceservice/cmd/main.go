@@ -73,17 +73,11 @@ func main() {
 	if len(cfg.KafkaBrokers) > 0 {
 		consumer := kafkaadapter.NewConsumer(cfg.KafkaBrokers, cfg.VMDaemonKafkaTopic, cfg.VMDaemonKafkaGroup, kafkaIngestHandler(svc))
 		go func() {
-			logger.Info().Strs("brokers", cfg.KafkaBrokers).Str("topic", cfg.VMDaemonKafkaTopic).Str("group", cfg.VMDaemonKafkaGroup).Msg("vmdaemon kafka consumer started")
-			if err := consumer.Run(context.Background()); err != nil {
-				logger.Error().Err(err).Msg("vmdaemon kafka consumer stopped")
-			}
+			runConsumerWithRetry(context.Background(), logger, "vmdaemon", consumer, cfg.KafkaBrokers, cfg.VMDaemonKafkaTopic, cfg.VMDaemonKafkaGroup)
 		}()
 		hostMetricConsumer := kafkaadapter.NewConsumer(cfg.KafkaBrokers, cfg.HostAgentKafkaTopic, cfg.HostAgentKafkaGroup, kafkaIngestHandler(svc))
 		go func() {
-			logger.Info().Strs("brokers", cfg.KafkaBrokers).Str("topic", cfg.HostAgentKafkaTopic).Str("group", cfg.HostAgentKafkaGroup).Msg("hostagent kafka consumer started")
-			if err := hostMetricConsumer.Run(context.Background()); err != nil {
-				logger.Error().Err(err).Msg("hostagent kafka consumer stopped")
-			}
+			runConsumerWithRetry(context.Background(), logger, "hostagent", hostMetricConsumer, cfg.KafkaBrokers, cfg.HostAgentKafkaTopic, cfg.HostAgentKafkaGroup)
 		}()
 	}
 	handler := httpadapter.NewHandler(svc)
@@ -158,6 +152,39 @@ func runExpiryWorker(logger zerolog.Logger, svc *service.ResourceService) {
 			logger.Error().Err(err).Msg("resource expiry pass failed")
 		}
 		<-ticker.C
+	}
+}
+
+func runConsumerWithRetry(ctx context.Context, logger zerolog.Logger, name string, consumer *kafkaadapter.Consumer, brokers []string, topic string, group string) {
+	backoff := 2 * time.Second
+	const maxBackoff = 30 * time.Second
+	for {
+		logger.Info().
+			Str("consumer", name).
+			Strs("brokers", brokers).
+			Str("topic", topic).
+			Str("group", group).
+			Msg("kafka consumer run started")
+		err := consumer.Run(ctx)
+		if err == nil {
+			backoff = 2 * time.Second
+			continue
+		}
+		logger.Error().
+			Err(err).
+			Str("consumer", name).
+			Dur("retry_in", backoff).
+			Msg("kafka consumer stopped; retry scheduled")
+		select {
+		case <-time.After(backoff):
+		case <-ctx.Done():
+			logger.Info().Str("consumer", name).Msg("kafka consumer context cancelled")
+			return
+		}
+		backoff *= 2
+		if backoff > maxBackoff {
+			backoff = maxBackoff
+		}
 	}
 }
 
