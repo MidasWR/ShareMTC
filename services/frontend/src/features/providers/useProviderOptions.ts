@@ -20,6 +20,22 @@ export function useProviderOptions(params?: Params) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  function withSessionFallback(rows: Provider[]): Provider[] {
+    if (!sessionUserID) return rows;
+    if (rows.some((item) => item.id === sessionUserID)) return rows;
+    return [
+      {
+        id: sessionUserID,
+        display_name: "Current user provider",
+        provider_type: "donor",
+        machine_id: "jwt-subject",
+        network_mbps: 0,
+        online: true
+      },
+      ...rows
+    ];
+  }
+
   const options = useMemo<ProviderOption[]>(
     () =>
       providers.map((provider) => ({
@@ -34,7 +50,7 @@ export function useProviderOptions(params?: Params) {
     setError("");
     try {
       const rows = await listProviders();
-      setProviders(rows);
+      setProviders(withSessionFallback(rows));
     } catch (requestError) {
       try {
         const [vmsResult, podsResult, offersResult, clustersResult] = await Promise.allSettled([
@@ -65,11 +81,11 @@ export function useProviderOptions(params?: Params) {
           setError(requestError instanceof Error ? requestError.message : "Failed to load providers");
           setProviders([]);
         } else {
-          setProviders(discoveredProviders);
+          setProviders(withSessionFallback(discoveredProviders));
         }
       } catch {
         setError(requestError instanceof Error ? requestError.message : "Failed to load providers");
-        setProviders([]);
+        setProviders(withSessionFallback([]));
       }
     } finally {
       setLoading(false);

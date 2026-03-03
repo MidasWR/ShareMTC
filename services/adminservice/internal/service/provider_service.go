@@ -5,11 +5,13 @@ import (
 	"strings"
 
 	"github.com/MidasWR/ShareMTC/services/adminservice/internal/models"
+	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
 )
 
 type ProviderRepository interface {
 	Create(context.Context, models.Provider) (models.Provider, error)
+	EnsureProvider(ctx context.Context, providerID string, displayName string) error
 	List(context.Context) ([]models.Provider, error)
 	UpdateOnlineStatus(ctx context.Context, providerID string, online bool) error
 	GetByID(ctx context.Context, providerID string) (models.Provider, error)
@@ -35,6 +37,16 @@ func NewProviderService(repo ProviderRepository) *ProviderService {
 func (s *ProviderService) Create(ctx context.Context, provider models.Provider) (models.Provider, error) {
 	log.Info().Str("provider_type", string(provider.ProviderType)).Str("machine_id", provider.MachineID).Msg("creating provider")
 	return s.repo.Create(ctx, provider)
+}
+
+func (s *ProviderService) EnsureProvider(ctx context.Context, providerID string) error {
+	if strings.TrimSpace(providerID) == "" {
+		return nil
+	}
+	if _, err := uuid.Parse(providerID); err != nil {
+		return nil
+	}
+	return s.repo.EnsureProvider(ctx, providerID, "Auto-registered provider")
 }
 
 func (s *ProviderService) List(ctx context.Context) ([]models.Provider, error) {

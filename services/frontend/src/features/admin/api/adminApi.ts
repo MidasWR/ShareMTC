@@ -3,7 +3,56 @@ import { apiClient } from "../../../lib/http";
 import { AdminStats, PodCatalogItem, PodTemplate, Provider, ProviderMetrics } from "../../../types/api";
 
 export function listProviders() {
-  return apiClient.get<Provider[]>(`${API_BASE.admin}/v1/admin/providers/`, { preserveSessionOnAuthError: true });
+  return apiClient.get<unknown>(`${API_BASE.admin}/v1/admin/providers/`, { preserveSessionOnAuthError: true }).then(normalizeProvidersResponse);
+}
+
+function normalizeProvidersResponse(payload: unknown): Provider[] {
+  const raw = Array.isArray(payload)
+    ? payload
+    : isRecord(payload) && Array.isArray(payload.providers)
+      ? payload.providers
+      : isRecord(payload) && Array.isArray(payload.items)
+        ? payload.items
+        : isRecord(payload) && Array.isArray(payload.data)
+          ? payload.data
+          : [];
+  return raw
+    .map(normalizeProvider)
+    .filter((item): item is Provider => item !== null);
+}
+
+function normalizeProvider(input: unknown): Provider | null {
+  if (!isRecord(input)) return null;
+  const id = toString(input.id);
+  if (!id) return null;
+  return {
+    id,
+    display_name: toString(input.display_name) || toString(input.name) || `Provider ${id}`,
+    provider_type: toString(input.provider_type) || "donor",
+    machine_id: toString(input.machine_id) || "unknown",
+    network_mbps: toNumber(input.network_mbps),
+    online: Boolean(input.online),
+    created_at: toString(input.created_at) || undefined
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, any> {
+  return Boolean(value) && typeof value === "object";
+}
+
+function toString(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (typeof value === "number") return String(value);
+  return "";
+}
+
+function toNumber(value: unknown): number {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return 0;
 }
 
 export function createProvider(payload: {

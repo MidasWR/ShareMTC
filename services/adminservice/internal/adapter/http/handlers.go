@@ -249,6 +249,9 @@ func (h *Handler) AgentInstallCommand(w http.ResponseWriter, r *http.Request) {
 	if providerID == "" {
 		providerID = "local-host"
 	}
+	if userID != "" {
+		_ = h.svc.EnsureProvider(r.Context(), userID)
+	}
 	installCommand := fmt.Sprintf(
 		"curl -fsSL %s | sudo RESOURCE_API_URL=%s KAFKA_BROKERS=%s IMAGE_REPO=%s IMAGE_TAG=%s PROVIDER_ID=%s bash",
 		shellQuote(installerURL),

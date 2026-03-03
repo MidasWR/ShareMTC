@@ -90,6 +90,18 @@ func (r *ProviderRepo) Create(ctx context.Context, provider models.Provider) (mo
 	return provider, err
 }
 
+func (r *ProviderRepo) EnsureProvider(ctx context.Context, providerID string, displayName string) error {
+	if displayName == "" {
+		displayName = "Auto-registered provider"
+	}
+	_, err := r.db.Exec(ctx, `
+		INSERT INTO providers (id, display_name, provider_type, machine_id, network_mbps, online)
+		VALUES ($1, $2, 'donor', 'hostagent', 0, false)
+		ON CONFLICT (id) DO NOTHING
+	`, providerID, displayName)
+	return err
+}
+
 func (r *ProviderRepo) List(ctx context.Context) ([]models.Provider, error) {
 	hasHostResources, err := r.tableExists(ctx, "host_resources")
 	if err != nil {
