@@ -43,9 +43,8 @@ EOF
 cat >/etc/systemd/system/sharemct-hostagent.service <<EOF
 [Unit]
 Description=ShareMTC Host Agent
-After=network-online.target docker.service
+After=network-online.target
 Wants=network-online.target
-Requires=docker.service
 
 [Service]
 Restart=always
@@ -62,5 +61,12 @@ EOF
 systemctl daemon-reload
 systemctl enable --now sharemct-hostagent
 
-echo "ShareMTC hostagent installed and started."
+if systemctl is-active --quiet sharemct-hostagent; then
+  echo "ShareMTC hostagent installed and started."
+else
+  echo "ShareMTC hostagent installed, but service is not active yet."
+  echo "Check logs: journalctl -u sharemct-hostagent -n 100 --no-pager"
+  exit 1
+fi
+
 echo "Check status: systemctl status sharemct-hostagent"
