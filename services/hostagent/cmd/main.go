@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/MidasWR/ShareMTC/services/hostagent/config"
@@ -51,6 +52,14 @@ func main() {
 
 	state := service.NetState{}
 	collectionEnabled := true
+	terminalManager := service.NewTerminalManager(func(sessionID string, payload string) {
+		if cfg.ResourceAPIURL == "" || cfg.AgentToken == "" || strings.TrimSpace(payload) == "" {
+			return
+		}
+		if err := httpclient.ReportTerminalOutput(context.Background(), cfg.ResourceAPIURL, cfg.AgentToken, sessionID, cfg.ProviderID, payload); err != nil {
+			logger.Error().Err(err).Str("session_id", sessionID).Msg("terminal output report failed")
+		}
+	})
 	logger.Info().
 		Strs("brokers", cfg.KafkaBrokers).
 		Str("topic", cfg.KafkaTopic).
@@ -81,6 +90,34 @@ func main() {
 					collectionEnabled = false
 					collectionEnabled = true
 					resultMessage = "collector restarted"
+				case "terminal_open":
+					if err := terminalManager.Open(cmd.SessionID, cmd.Rows, cmd.Cols); err != nil {
+						resultStatus = "failed"
+						resultMessage = err.Error()
+					} else {
+						resultMessage = "terminal opened"
+					}
+				case "terminal_data":
+					if err := terminalManager.Write(cmd.SessionID, cmd.Payload); err != nil {
+						resultStatus = "failed"
+						resultMessage = err.Error()
+					} else {
+						resultMessage = "terminal input delivered"
+					}
+				case "terminal_resize":
+					if err := terminalManager.Resize(cmd.SessionID, cmd.Rows, cmd.Cols); err != nil {
+						resultStatus = "failed"
+						resultMessage = err.Error()
+					} else {
+						resultMessage = "terminal resized"
+					}
+				case "terminal_close":
+					if err := terminalManager.Close(cmd.SessionID); err != nil {
+						resultStatus = "failed"
+						resultMessage = err.Error()
+					} else {
+						resultMessage = "terminal closed"
+					}
 				default:
 					resultStatus = "failed"
 					resultMessage = "unsupported command"

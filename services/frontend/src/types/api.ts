@@ -319,13 +319,45 @@ export type AgentLog = {
 export type AgentCommand = {
   id: string;
   provider_id: string;
-  command: "status" | "start" | "stop" | "restart";
+  resource_id: string;
+  session_id: string;
+  command: "status" | "start" | "stop" | "restart" | "terminal_open" | "terminal_data" | "terminal_resize" | "terminal_close";
+  payload: string;
+  rows: number;
+  cols: number;
   status: "queued" | "running" | "succeeded" | "failed";
   requested_by: string;
   result_message: string;
   acknowledged_at?: string;
   created_at?: string;
   updated_at?: string;
+};
+
+export type TerminalSession = {
+  id: string;
+  provider_id: string;
+  resource_id: string;
+  renter_user_id: string;
+  status: "queued" | "open" | "closed" | "expired";
+  rows: number;
+  cols: number;
+  last_input_seq: number;
+  last_output_seq: number;
+  last_active_at: string;
+  closed_at?: string;
+  exit_code: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type TerminalChunk = {
+  id: string;
+  session_id: string;
+  provider_id: string;
+  direction: "input" | "output";
+  seq: number;
+  data: string;
+  created_at: string;
 };
 
 export type RootInputLog = {

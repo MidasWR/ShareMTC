@@ -171,6 +171,7 @@ Detailed audit findings and Wave 1/2/3 implementation plan are tracked in:
 - This MVP does **not** claim hardened sandbox execution for untrusted workloads yet.
 - Next stage for untrusted execution is explicit isolation (sandbox VM/TEE runtime).
 - Provisioning operations are now rate-limited (`5 RPM` per user for VM/Pod create) and ephemeral by default (`5 min TTL` auto-cleanup).
+- Interactive terminal sessions are supported for renter-owned resources through control-plane relay (`resourceservice <-> hostagent`) with session audit and idle expiration.
 
 ### Provider node platform support
 
@@ -237,6 +238,13 @@ Detailed audit findings and Wave 1/2/3 implementation plan are tracked in:
 - `GET /v1/resources/agent-logs?provider_id=&resource_id=&level=&limit=`
 - `POST /v1/resources/root-input-logs`
 - `GET /v1/resources/root-input-logs?provider_id=&resource_id=&limit=`
+- `POST /v1/resources/terminal/sessions`
+- `GET /v1/resources/terminal/sessions/{sessionID}`
+- `POST /v1/resources/terminal/sessions/{sessionID}/input`
+- `GET /v1/resources/terminal/sessions/{sessionID}/output?after_seq=&limit=`
+- `POST /v1/resources/terminal/sessions/{sessionID}/resize`
+- `POST /v1/resources/terminal/sessions/{sessionID}/close`
+- `POST /v1/resources/agent/terminal/sessions/{sessionID}/output`
 - `POST /v1/resources/k8s/clusters`
 - `GET /v1/resources/k8s/clusters`
 - `POST /v1/resources/k8s/clusters/{clusterID}/refresh`
@@ -272,6 +280,7 @@ cd services/billingservice && go run ./cmd
 - `VMDAEMON_KAFKA_TOPIC` - Kafka topic for daemon events consumed by resourceservice.
 - `VMDAEMON_KAFKA_GROUP` - Kafka consumer group for resourceservice daemon ingest.
 - VM daemon receives `RESOURCE_PROVIDER_ID`/`RESOURCE_ID` at install time and publishes events to Kafka; resourceservice persists them by ID linkage.
+- Hostagent terminal relay uses existing `RESOURCE_API_URL` + `AGENT_TOKEN` to poll terminal commands and post terminal output chunks.
 
 ### Run frontend
 

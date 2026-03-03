@@ -32,7 +32,12 @@ type AgentLog struct {
 type AgentCommand struct {
 	ID            string `json:"id"`
 	ProviderID    string `json:"provider_id"`
+	ResourceID    string `json:"resource_id"`
+	SessionID     string `json:"session_id"`
 	Command       string `json:"command"`
+	Payload       string `json:"payload"`
+	Rows          int    `json:"rows"`
+	Cols          int    `json:"cols"`
 	Status        string `json:"status"`
 	RequestedBy   string `json:"requested_by"`
 	ResultMessage string `json:"result_message"`

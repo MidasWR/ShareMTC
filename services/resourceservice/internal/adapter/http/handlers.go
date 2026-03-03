@@ -352,6 +352,26 @@ type agentCommandCompleteRequest struct {
 	ResultMessage string `json:"result_message"`
 }
 
+type createTerminalSessionRequest struct {
+	ResourceID string `json:"resource_id"`
+	Rows       int    `json:"rows"`
+	Cols       int    `json:"cols"`
+}
+
+type terminalInputRequest struct {
+	Data string `json:"data"`
+}
+
+type terminalResizeRequest struct {
+	Rows int `json:"rows"`
+	Cols int `json:"cols"`
+}
+
+type terminalOutputReportRequest struct {
+	ProviderID string `json:"provider_id"`
+	Data       string `json:"data"`
+}
+
 func (h *Handler) ShareVM(w http.ResponseWriter, r *http.Request) {
 	claims := sdkauth.ClaimsFromContext(r.Context())
 	if claims == nil {
@@ -689,6 +709,136 @@ func (h *Handler) CompleteAgentCommand(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.JSON(w, http.StatusOK, item)
+}
+
+func (h *Handler) CreateTerminalSession(w http.ResponseWriter, r *http.Request) {
+	claims := sdkauth.ClaimsFromContext(r.Context())
+	if claims == nil {
+		httpx.Error(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	var req createTerminalSessionRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid json")
+		return
+	}
+	item, err := h.svc.CreateTerminalSession(r.Context(), claims.UserID, strings.TrimSpace(req.ResourceID), req.Rows, req.Cols)
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	httpx.JSON(w, http.StatusCreated, item)
+}
+
+func (h *Handler) GetTerminalSession(w http.ResponseWriter, r *http.Request) {
+	claims := sdkauth.ClaimsFromContext(r.Context())
+	if claims == nil {
+		httpx.Error(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	sessionID := chi.URLParam(r, "sessionID")
+	item, err := h.svc.GetTerminalSession(r.Context(), claims.UserID, sessionID)
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	httpx.JSON(w, http.StatusOK, item)
+}
+
+func (h *Handler) WriteTerminalInput(w http.ResponseWriter, r *http.Request) {
+	claims := sdkauth.ClaimsFromContext(r.Context())
+	if claims == nil {
+		httpx.Error(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	sessionID := chi.URLParam(r, "sessionID")
+	var req terminalInputRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid json")
+		return
+	}
+	item, err := h.svc.WriteTerminalInput(r.Context(), claims.UserID, sessionID, req.Data)
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	httpx.JSON(w, http.StatusCreated, item)
+}
+
+func (h *Handler) ListTerminalOutput(w http.ResponseWriter, r *http.Request) {
+	claims := sdkauth.ClaimsFromContext(r.Context())
+	if claims == nil {
+		httpx.Error(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	sessionID := chi.URLParam(r, "sessionID")
+	afterSeq := int64(intQuery(r, "after_seq", 0))
+	limit := intQuery(r, "limit", 200)
+	items, err := h.svc.ListTerminalOutput(r.Context(), claims.UserID, sessionID, afterSeq, limit)
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	httpx.JSON(w, http.StatusOK, items)
+}
+
+func (h *Handler) ResizeTerminalSession(w http.ResponseWriter, r *http.Request) {
+	claims := sdkauth.ClaimsFromContext(r.Context())
+	if claims == nil {
+		httpx.Error(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	sessionID := chi.URLParam(r, "sessionID")
+	var req terminalResizeRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid json")
+		return
+	}
+	item, err := h.svc.ResizeTerminalSession(r.Context(), claims.UserID, sessionID, req.Rows, req.Cols)
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	httpx.JSON(w, http.StatusOK, item)
+}
+
+func (h *Handler) CloseTerminalSession(w http.ResponseWriter, r *http.Request) {
+	claims := sdkauth.ClaimsFromContext(r.Context())
+	if claims == nil {
+		httpx.Error(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	sessionID := chi.URLParam(r, "sessionID")
+	item, err := h.svc.CloseTerminalSession(r.Context(), claims.UserID, sessionID)
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	httpx.JSON(w, http.StatusOK, item)
+}
+
+func (h *Handler) ReportTerminalOutput(w http.ResponseWriter, r *http.Request) {
+	claims := sdkauth.ClaimsFromContext(r.Context())
+	if claims == nil {
+		httpx.Error(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	sessionID := chi.URLParam(r, "sessionID")
+	var req terminalOutputReportRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid json")
+		return
+	}
+	if err := validateAgentIdentity(claims, req.ProviderID); err != nil {
+		httpx.Error(w, http.StatusForbidden, err.Error())
+		return
+	}
+	item, err := h.svc.RecordTerminalOutput(r.Context(), strings.TrimSpace(req.ProviderID), sessionID, req.Data)
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	httpx.JSON(w, http.StatusCreated, item)
 }
 
 func (h *Handler) RecordRootInputLog(w http.ResponseWriter, r *http.Request) {

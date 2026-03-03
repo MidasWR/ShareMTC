@@ -53,7 +53,7 @@ security:
 secrets:
   create: true
   provisioningServiceToken: "scr-891001"
-  digitalOceanToken: "dop_v1_0fe407b5f2e0dbcc00c7161ca48af91549e7f27a90ab3f2cabfb9b25d6c39a18"
+  digitalOceanToken: "dop_v1_e979f0beb13af8742c04081a2fb93e7dee3eee4ce7afe6550e78224f4987c5c6"
   runpodApiKey: "rpa_EPT39EAAG1BPYS9UG996FWSSA9D1K3XC3DB2XB081bvo1p"
 
 billing:

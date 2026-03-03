@@ -120,6 +120,34 @@ func CompleteAgentCommand(ctx context.Context, baseURL string, token string, com
 	return nil
 }
 
+func ReportTerminalOutput(ctx context.Context, baseURL string, token string, sessionID string, providerID string, data string) error {
+	url := strings.TrimRight(baseURL, "/") + "/v1/resources/agent/terminal/sessions/" + sessionID + "/output"
+	payload, err := json.Marshal(map[string]string{
+		"provider_id": providerID,
+		"data":        data,
+	})
+	if err != nil {
+		return err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(payload))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return &httpStatusError{Code: resp.StatusCode}
+	}
+	return nil
+}
+
 type httpStatusError struct {
 	Code int
 }

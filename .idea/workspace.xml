@@ -6,25 +6,7 @@
   <component name="ChangeListManager">
     <list default="true" id="093339f5-8e40-4fff-8dda-262df5227056" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/frontend/src/features/provider/dashboard/ProviderDashboardPanel.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/services/frontend/src/features/provider/dashboard/ProviderDashboardPanel.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/frontend/src/features/rental/ServerRentalPanel.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/services/frontend/src/features/rental/ServerRentalPanel.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/frontend/src/features/resources/api/resourcesApi.test.ts" beforeDir="false" afterPath="$PROJECT_DIR$/services/frontend/src/features/resources/api/resourcesApi.test.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/frontend/src/features/resources/api/resourcesApi.ts" beforeDir="false" afterPath="$PROJECT_DIR$/services/frontend/src/features/resources/api/resourcesApi.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/frontend/src/features/resources/hooks/useAllocations.ts" beforeDir="false" afterPath="$PROJECT_DIR$/services/frontend/src/features/resources/hooks/useAllocations.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/frontend/src/features/resources/shared/SharedPodsPanel.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/services/frontend/src/features/resources/shared/SharedPodsPanel.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/frontend/src/features/resources/shared/SharedVMPanel.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/services/frontend/src/features/resources/shared/SharedVMPanel.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/frontend/src/types/api.ts" beforeDir="false" afterPath="$PROJECT_DIR$/services/frontend/src/types/api.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/frontend/src/ui/HostPanel.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/services/frontend/src/ui/HostPanel.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/frontend/tsconfig.tsbuildinfo" beforeDir="false" afterPath="$PROJECT_DIR$/services/frontend/tsconfig.tsbuildinfo" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/hostagent/cmd/main.go" beforeDir="false" afterPath="$PROJECT_DIR$/services/hostagent/cmd/main.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/hostagent/internal/adapter/httpclient/client.go" beforeDir="false" afterPath="$PROJECT_DIR$/services/hostagent/internal/adapter/httpclient/client.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/hostagent/internal/models/metric.go" beforeDir="false" afterPath="$PROJECT_DIR$/services/hostagent/internal/models/metric.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/resourceservice/cmd/main.go" beforeDir="false" afterPath="$PROJECT_DIR$/services/resourceservice/cmd/main.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/resourceservice/internal/adapter/http/handlers.go" beforeDir="false" afterPath="$PROJECT_DIR$/services/resourceservice/internal/adapter/http/handlers.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/resourceservice/internal/adapter/storage/postgres.go" beforeDir="false" afterPath="$PROJECT_DIR$/services/resourceservice/internal/adapter/storage/postgres.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/resourceservice/internal/models/resource.go" beforeDir="false" afterPath="$PROJECT_DIR$/services/resourceservice/internal/models/resource.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/resourceservice/internal/service/resource_service.go" beforeDir="false" afterPath="$PROJECT_DIR$/services/resourceservice/internal/service/resource_service.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/resourceservice/internal/service/resource_service_test.go" beforeDir="false" afterPath="$PROJECT_DIR$/services/resourceservice/internal/service/resource_service_test.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/charts/ChartsServices/values.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/charts/ChartsServices/values.yaml" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />

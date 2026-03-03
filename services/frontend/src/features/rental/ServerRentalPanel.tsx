@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LuExternalLink, LuFileText, LuPlay, LuPower, LuRefreshCw, LuTrash2 } from "react-icons/lu";
 import { useSettings } from "../../app/providers/SettingsProvider";
 import { Table } from "../../design/components/Table";
@@ -15,7 +15,22 @@ import { Select } from "../../design/primitives/Select";
 import { useToast } from "../../design/components/Toast";
 import { Modal } from "../../design/components/Modal";
 import { formatOperationMessage } from "../../design/utils/operationFeedback";
-import { getVM, listPods, listSharedOffers, listVMs, rebootVM, reserveSharedOffer, startVM, stopVM, terminatePod, terminateVM } from "../resources/api/resourcesApi";
+import {
+  closeTerminalSession,
+  createTerminalSession,
+  getVM,
+  listPods,
+  listSharedOffers,
+  listTerminalOutput,
+  listVMs,
+  rebootVM,
+  reserveSharedOffer,
+  startVM,
+  stopVM,
+  terminatePod,
+  terminateVM,
+  writeTerminalInput
+} from "../resources/api/resourcesApi";
 import { formatDateTime } from "../hifi/formatters";
 import { Pod, SharedInventoryOffer, VM } from "../../types/api";
 import { useAutoRefresh } from "../../design/hooks/useAutoRefresh";
@@ -59,6 +74,14 @@ export function ServerRentalPanel() {
   const [terminateTarget, setTerminateTarget] = useState<RuntimeRow | null>(null);
   const [offers, setOffers] = useState<SharedInventoryOffer[]>([]);
   const [reserveQty, setReserveQty] = useState<Record<string, string>>({});
+  const [activeTerminalSessionID, setActiveTerminalSessionID] = useState("");
+  const [activeTerminalResourceID, setActiveTerminalResourceID] = useState("");
+  const [terminalOutput, setTerminalOutput] = useState("");
+  const [terminalInput, setTerminalInput] = useState("");
+  const [terminalSeq, setTerminalSeq] = useState(0);
+  const [terminalBusy, setTerminalBusy] = useState(false);
+  const [terminalError, setTerminalError] = useState("");
+  const terminalOutputRef = useRef<HTMLPreElement | null>(null);
 
   const refreshRows = useCallback(async (silent = false) => {
     setLoading(true);
@@ -199,6 +222,104 @@ export function ServerRentalPanel() {
     }
   }
 
+  useEffect(() => {
+    if (!activeTerminalSessionID) {
+      return;
+    }
+    let cancelled = false;
+    const poll = async () => {
+      try {
+        const chunks = await listTerminalOutput(activeTerminalSessionID, { after_seq: terminalSeq, limit: 300 });
+        if (cancelled || chunks.length === 0) {
+          return;
+        }
+        const merged = chunks.map((item) => item.data).join("");
+        const nextSeq = chunks[chunks.length - 1]?.seq ?? terminalSeq;
+        setTerminalSeq(nextSeq);
+        setTerminalOutput((prev) => prev + merged);
+      } catch (error) {
+        if (!cancelled) {
+          const message = error instanceof Error ? error.message : "Failed to fetch terminal output";
+          setTerminalError(message);
+        }
+      }
+    };
+    void poll();
+    const timer = window.setInterval(() => {
+      void poll();
+    }, 1000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [activeTerminalSessionID, terminalSeq]);
+
+  useEffect(() => {
+    const node = terminalOutputRef.current;
+    if (!node) {
+      return;
+    }
+    node.scrollTop = node.scrollHeight;
+  }, [terminalOutput]);
+
+  async function openTerminal(row: RuntimeRow) {
+    if (!row.id) {
+      push("error", "Resource ID is missing", "Terminal");
+      return;
+    }
+    setTerminalBusy(true);
+    setTerminalError("");
+    try {
+      const session = await createTerminalSession({
+        resource_id: row.id,
+        rows: 30,
+        cols: 120
+      });
+      setActiveTerminalSessionID(session.id);
+      setActiveTerminalResourceID(row.id);
+      setTerminalOutput("");
+      setTerminalInput("");
+      setTerminalSeq(0);
+      push("success", "Terminal session opened", row.name);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to open terminal";
+      setTerminalError(message);
+      push("error", message, "Terminal");
+    } finally {
+      setTerminalBusy(false);
+    }
+  }
+
+  async function sendTerminalInput() {
+    if (!activeTerminalSessionID || !terminalInput.trim()) {
+      return;
+    }
+    const payload = terminalInput.endsWith("\n") ? terminalInput : `${terminalInput}\n`;
+    try {
+      await writeTerminalInput(activeTerminalSessionID, { data: payload });
+      setTerminalInput("");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to send terminal input";
+      setTerminalError(message);
+      push("error", message, "Terminal");
+    }
+  }
+
+  async function closeActiveTerminal() {
+    if (!activeTerminalSessionID) {
+      return;
+    }
+    try {
+      await closeTerminalSession(activeTerminalSessionID);
+    } catch {
+      // Session may already be closed/expired.
+    }
+    setActiveTerminalSessionID("");
+    setActiveTerminalResourceID("");
+    setTerminalSeq(0);
+    setTerminalInput("");
+  }
+
   return (
     <section className="section-stack">
       <PageSectionHeader title={locale === "ru" ? "My Instances" : "My Instances"} description={locale === "ru" ? "Операционный список с быстрыми действиями и раскрытием деталей." : "Operational list with quick actions and expandable details."} />
@@ -317,6 +438,7 @@ export function ServerRentalPanel() {
                           Connect
                         </Button>
                         <Button size="sm" variant="ghost" leftIcon={<Icon glyph={LuFileText} size={16} />} onClick={() => openLogs(row)}>Logs</Button>
+                        <Button size="sm" variant="ghost" onClick={() => openTerminal(row)} disabled={terminalBusy}>Terminal</Button>
                       </div>
                     </td>
                   </tr>
@@ -325,6 +447,39 @@ export function ServerRentalPanel() {
             </tbody>
           </table>
         </div>
+      </Card>
+      <Card
+        title={locale === "ru" ? "Remote terminal" : "Remote terminal"}
+        description={locale === "ru" ? "Interactive shell для активной аренды." : "Interactive shell for active rental resources."}
+      >
+        {terminalError ? <InlineAlert kind="error">{terminalError}</InlineAlert> : null}
+        {!activeTerminalSessionID ? (
+          <EmptyState title="Terminal is not opened" description="Select an instance row and press Terminal." />
+        ) : (
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center gap-2 text-xs text-textSecondary">
+              <span className="font-mono">session: {activeTerminalSessionID}</span>
+              <span className="font-mono">resource: {activeTerminalResourceID}</span>
+              <Button size="sm" variant="secondary" onClick={closeActiveTerminal}>
+                Close session
+              </Button>
+            </div>
+            <pre ref={terminalOutputRef} className="max-h-80 overflow-auto rounded-md border border-border bg-canvas p-3 font-mono text-xs text-textPrimary">
+              {terminalOutput || "$ "}
+            </pre>
+            <div className="flex items-center gap-2">
+              <Input
+                label="Command"
+                value={terminalInput}
+                onChange={(event) => setTerminalInput(event.target.value)}
+                placeholder="Enter command..."
+              />
+              <Button onClick={sendTerminalInput} disabled={!terminalInput.trim()}>
+                Send
+              </Button>
+            </div>
+          </div>
+        )}
       </Card>
       <Modal
         open={Boolean(terminateTarget)}

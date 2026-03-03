@@ -224,10 +224,14 @@ type AgentLog struct {
 type AgentCommandAction string
 
 const (
-	AgentCommandStatus  AgentCommandAction = "status"
-	AgentCommandStart   AgentCommandAction = "start"
-	AgentCommandStop    AgentCommandAction = "stop"
-	AgentCommandRestart AgentCommandAction = "restart"
+	AgentCommandStatus         AgentCommandAction = "status"
+	AgentCommandStart          AgentCommandAction = "start"
+	AgentCommandStop           AgentCommandAction = "stop"
+	AgentCommandRestart        AgentCommandAction = "restart"
+	AgentCommandTerminalOpen   AgentCommandAction = "terminal_open"
+	AgentCommandTerminalData   AgentCommandAction = "terminal_data"
+	AgentCommandTerminalResize AgentCommandAction = "terminal_resize"
+	AgentCommandTerminalClose  AgentCommandAction = "terminal_close"
 )
 
 type AgentCommandState string
@@ -242,13 +246,71 @@ const (
 type AgentCommand struct {
 	ID             string             `json:"id"`
 	ProviderID     string             `json:"provider_id"`
+	ResourceID     string             `json:"resource_id"`
+	SessionID      string             `json:"session_id"`
 	Command        AgentCommandAction `json:"command"`
+	Payload        string             `json:"payload"`
+	Rows           int                `json:"rows"`
+	Cols           int                `json:"cols"`
 	Status         AgentCommandState  `json:"status"`
 	RequestedBy    string             `json:"requested_by"`
 	ResultMessage  string             `json:"result_message"`
 	CreatedAt      time.Time          `json:"created_at"`
 	UpdatedAt      time.Time          `json:"updated_at"`
 	AcknowledgedAt time.Time          `json:"acknowledged_at"`
+}
+
+type TerminalSessionState string
+
+const (
+	TerminalSessionQueued  TerminalSessionState = "queued"
+	TerminalSessionOpen    TerminalSessionState = "open"
+	TerminalSessionClosed  TerminalSessionState = "closed"
+	TerminalSessionExpired TerminalSessionState = "expired"
+)
+
+type TerminalSession struct {
+	ID            string               `json:"id"`
+	ProviderID    string               `json:"provider_id"`
+	ResourceID    string               `json:"resource_id"`
+	RenterUserID  string               `json:"renter_user_id"`
+	Status        TerminalSessionState `json:"status"`
+	Rows          int                  `json:"rows"`
+	Cols          int                  `json:"cols"`
+	LastInputSeq  int64                `json:"last_input_seq"`
+	LastOutputSeq int64                `json:"last_output_seq"`
+	LastActiveAt  time.Time            `json:"last_active_at"`
+	ClosedAt      time.Time            `json:"closed_at"`
+	ExitCode      int                  `json:"exit_code"`
+	CreatedAt     time.Time            `json:"created_at"`
+	UpdatedAt     time.Time            `json:"updated_at"`
+}
+
+type TerminalChunkDirection string
+
+const (
+	TerminalChunkInput  TerminalChunkDirection = "input"
+	TerminalChunkOutput TerminalChunkDirection = "output"
+)
+
+type TerminalChunk struct {
+	ID         string                 `json:"id"`
+	SessionID  string                 `json:"session_id"`
+	ProviderID string                 `json:"provider_id"`
+	Direction  TerminalChunkDirection `json:"direction"`
+	Seq        int64                  `json:"seq"`
+	Data       string                 `json:"data"`
+	CreatedAt  time.Time              `json:"created_at"`
+}
+
+type TerminalAuditEvent struct {
+	ID         string    `json:"id"`
+	SessionID  string    `json:"session_id"`
+	ProviderID string    `json:"provider_id"`
+	UserID     string    `json:"user_id"`
+	EventType  string    `json:"event_type"`
+	Details    string    `json:"details"`
+	CreatedAt  time.Time `json:"created_at"`
 }
 
 type RootInputLog struct {

@@ -64,6 +64,15 @@ type Repository interface {
 	ListAgentCommands(ctx context.Context, providerID string, limit int) ([]models.AgentCommand, error)
 	ClaimNextAgentCommand(ctx context.Context, providerID string) (models.AgentCommand, error)
 	CompleteAgentCommand(ctx context.Context, commandID string, status models.AgentCommandState, resultMessage string) (models.AgentCommand, error)
+	CreateTerminalSession(ctx context.Context, item models.TerminalSession) (models.TerminalSession, error)
+	GetTerminalSession(ctx context.Context, sessionID string) (models.TerminalSession, error)
+	UpdateTerminalSessionStatus(ctx context.Context, sessionID string, status models.TerminalSessionState, exitCode int) (models.TerminalSession, error)
+	UpdateTerminalSessionSize(ctx context.Context, sessionID string, rows int, cols int) (models.TerminalSession, error)
+	AppendTerminalChunk(ctx context.Context, chunk models.TerminalChunk) (models.TerminalChunk, error)
+	ListTerminalChunks(ctx context.Context, sessionID string, direction models.TerminalChunkDirection, afterSeq int64, limit int) ([]models.TerminalChunk, error)
+	CreateTerminalAuditEvent(ctx context.Context, event models.TerminalAuditEvent) (models.TerminalAuditEvent, error)
+	ExpireIdleTerminalSessions(ctx context.Context, idleBefore time.Time, limit int) ([]models.TerminalSession, error)
+	CountActiveTerminalSessions(ctx context.Context, renterUserID string) (int, error)
 	CreateRootInputLog(ctx context.Context, item models.RootInputLog) (models.RootInputLog, error)
 	ListRootInputLogs(ctx context.Context, providerID string, resourceID string, limit int) ([]models.RootInputLog, error)
 
@@ -92,6 +101,8 @@ type ResourceService struct {
 	vmDaemonDownloadURL  string
 	vmDaemonKafkaBrokers string
 	vmDaemonKafkaTopic   string
+	terminalIdleTimeout  time.Duration
+	terminalMaxSessions  int
 }
 
 type ProvisioningClient interface {
@@ -113,13 +124,15 @@ func NewResourceService(repo Repository, cgroups CGroupApplier, runtime orchestr
 	if vmTTL <= 0 {
 		vmTTL = 5 * time.Minute
 	}
+	terminalIdleTimeout := 10 * time.Minute
+	terminalMaxSessions := 2
 	log.Info().
 		Dur("heartbeat_max_age", heartbeatMaxAge).
 		Int("create_rate_limit_rpm", createRateLimitRPM).
 		Dur("vm_ttl", vmTTL).
 		Msg("resource service initialized")
 	return &ResourceService{
-		repo: repo, cgroups: cgroups, orchestrator: runtime, provisioning: provisioningClient, heartbeatMaxAge: heartbeatMaxAge, createRateLimitRPM: createRateLimitRPM, vmTTL: vmTTL, vmDaemonDownloadURL: vmDaemonDownloadURL, vmDaemonKafkaBrokers: vmDaemonKafkaBrokers, vmDaemonKafkaTopic: vmDaemonKafkaTopic,
+		repo: repo, cgroups: cgroups, orchestrator: runtime, provisioning: provisioningClient, heartbeatMaxAge: heartbeatMaxAge, createRateLimitRPM: createRateLimitRPM, vmTTL: vmTTL, vmDaemonDownloadURL: vmDaemonDownloadURL, vmDaemonKafkaBrokers: vmDaemonKafkaBrokers, vmDaemonKafkaTopic: vmDaemonKafkaTopic, terminalIdleTimeout: terminalIdleTimeout, terminalMaxSessions: terminalMaxSessions,
 	}
 }
 
@@ -775,7 +788,39 @@ func (s *ResourceService) CompleteAgentCommand(ctx context.Context, commandID st
 	if !found {
 		return models.AgentCommand{}, errors.New("command does not belong to provider")
 	}
-	return s.repo.CompleteAgentCommand(ctx, commandID, status, resultMessage)
+	updated, err := s.repo.CompleteAgentCommand(ctx, commandID, status, resultMessage)
+	if err != nil {
+		return models.AgentCommand{}, err
+	}
+	if updated.SessionID != "" {
+		switch updated.Command {
+		case models.AgentCommandTerminalOpen:
+			if status == models.AgentCommandSucceeded {
+				_, _ = s.repo.UpdateTerminalSessionStatus(ctx, updated.SessionID, models.TerminalSessionOpen, 0)
+				_, _ = s.repo.CreateTerminalAuditEvent(ctx, models.TerminalAuditEvent{
+					SessionID:  updated.SessionID,
+					ProviderID: updated.ProviderID,
+					UserID:     updated.RequestedBy,
+					EventType:  "terminal_opened",
+					Details:    "agent confirmed terminal open",
+				})
+			}
+		case models.AgentCommandTerminalClose:
+			finalExitCode := 0
+			if status == models.AgentCommandFailed {
+				finalExitCode = 1
+			}
+			_, _ = s.repo.UpdateTerminalSessionStatus(ctx, updated.SessionID, models.TerminalSessionClosed, finalExitCode)
+			_, _ = s.repo.CreateTerminalAuditEvent(ctx, models.TerminalAuditEvent{
+				SessionID:  updated.SessionID,
+				ProviderID: updated.ProviderID,
+				UserID:     updated.RequestedBy,
+				EventType:  "terminal_closed",
+				Details:    strings.TrimSpace(resultMessage),
+			})
+		}
+	}
+	return updated, nil
 }
 
 func (s *ResourceService) ListAgentLogs(ctx context.Context, providerID string, resourceID string, level string, limit int) ([]models.AgentLog, error) {
@@ -783,6 +828,248 @@ func (s *ResourceService) ListAgentLogs(ctx context.Context, providerID string, 
 		limit = 200
 	}
 	return s.repo.ListAgentLogs(ctx, providerID, resourceID, level, limit)
+}
+
+func (s *ResourceService) CreateTerminalSession(ctx context.Context, userID string, resourceID string, rows int, cols int) (models.TerminalSession, error) {
+	if strings.TrimSpace(userID) == "" || strings.TrimSpace(resourceID) == "" {
+		return models.TerminalSession{}, errors.New("user_id and resource_id are required")
+	}
+	if rows <= 0 {
+		rows = 24
+	}
+	if cols <= 0 {
+		cols = 80
+	}
+	activeCount, err := s.repo.CountActiveTerminalSessions(ctx, userID)
+	if err != nil {
+		return models.TerminalSession{}, err
+	}
+	if activeCount >= s.terminalMaxSessions {
+		return models.TerminalSession{}, errors.New("too many active terminal sessions")
+	}
+	providerID, err := s.authorizeTerminalResource(ctx, userID, resourceID)
+	if err != nil {
+		return models.TerminalSession{}, err
+	}
+	session, err := s.repo.CreateTerminalSession(ctx, models.TerminalSession{
+		ProviderID:   providerID,
+		ResourceID:   resourceID,
+		RenterUserID: userID,
+		Status:       models.TerminalSessionQueued,
+		Rows:         rows,
+		Cols:         cols,
+	})
+	if err != nil {
+		return models.TerminalSession{}, err
+	}
+	_, _ = s.repo.CreateTerminalAuditEvent(ctx, models.TerminalAuditEvent{
+		SessionID:  session.ID,
+		ProviderID: providerID,
+		UserID:     userID,
+		EventType:  "terminal_create",
+		Details:    "terminal session requested",
+	})
+	_, err = s.repo.CreateAgentCommand(ctx, models.AgentCommand{
+		ProviderID:  providerID,
+		ResourceID:  resourceID,
+		SessionID:   session.ID,
+		Command:     models.AgentCommandTerminalOpen,
+		Rows:        rows,
+		Cols:        cols,
+		Status:      models.AgentCommandQueued,
+		RequestedBy: userID,
+	})
+	if err != nil {
+		return models.TerminalSession{}, err
+	}
+	return session, nil
+}
+
+func (s *ResourceService) GetTerminalSession(ctx context.Context, userID string, sessionID string) (models.TerminalSession, error) {
+	session, err := s.repo.GetTerminalSession(ctx, sessionID)
+	if err != nil {
+		return models.TerminalSession{}, err
+	}
+	if session.RenterUserID != userID {
+		return models.TerminalSession{}, errors.New("forbidden session access")
+	}
+	return session, nil
+}
+
+func (s *ResourceService) WriteTerminalInput(ctx context.Context, userID string, sessionID string, data string) (models.TerminalChunk, error) {
+	session, err := s.GetTerminalSession(ctx, userID, sessionID)
+	if err != nil {
+		return models.TerminalChunk{}, err
+	}
+	if session.Status == models.TerminalSessionClosed || session.Status == models.TerminalSessionExpired {
+		return models.TerminalChunk{}, errors.New("terminal session is closed")
+	}
+	if strings.TrimSpace(data) == "" {
+		return models.TerminalChunk{}, errors.New("input payload is empty")
+	}
+	chunk, err := s.repo.AppendTerminalChunk(ctx, models.TerminalChunk{
+		SessionID:  session.ID,
+		ProviderID: session.ProviderID,
+		Direction:  models.TerminalChunkInput,
+		Data:       data,
+	})
+	if err != nil {
+		return models.TerminalChunk{}, err
+	}
+	_, err = s.repo.CreateAgentCommand(ctx, models.AgentCommand{
+		ProviderID:  session.ProviderID,
+		ResourceID:  session.ResourceID,
+		SessionID:   session.ID,
+		Command:     models.AgentCommandTerminalData,
+		Payload:     data,
+		Status:      models.AgentCommandQueued,
+		RequestedBy: userID,
+	})
+	if err != nil {
+		return models.TerminalChunk{}, err
+	}
+	return chunk, nil
+}
+
+func (s *ResourceService) ListTerminalOutput(ctx context.Context, userID string, sessionID string, afterSeq int64, limit int) ([]models.TerminalChunk, error) {
+	if limit <= 0 {
+		limit = 200
+	}
+	if limit > 1000 {
+		limit = 1000
+	}
+	if _, err := s.GetTerminalSession(ctx, userID, sessionID); err != nil {
+		return nil, err
+	}
+	return s.repo.ListTerminalChunks(ctx, sessionID, models.TerminalChunkOutput, afterSeq, limit)
+}
+
+func (s *ResourceService) RecordTerminalOutput(ctx context.Context, providerID string, sessionID string, data string) (models.TerminalChunk, error) {
+	session, err := s.repo.GetTerminalSession(ctx, sessionID)
+	if err != nil {
+		return models.TerminalChunk{}, err
+	}
+	if session.ProviderID != providerID {
+		return models.TerminalChunk{}, errors.New("provider mismatch for terminal output")
+	}
+	chunk, err := s.repo.AppendTerminalChunk(ctx, models.TerminalChunk{
+		SessionID:  session.ID,
+		ProviderID: providerID,
+		Direction:  models.TerminalChunkOutput,
+		Data:       data,
+	})
+	if err != nil {
+		return models.TerminalChunk{}, err
+	}
+	return chunk, nil
+}
+
+func (s *ResourceService) ResizeTerminalSession(ctx context.Context, userID string, sessionID string, rows int, cols int) (models.TerminalSession, error) {
+	if rows <= 0 || cols <= 0 {
+		return models.TerminalSession{}, errors.New("rows and cols must be positive")
+	}
+	session, err := s.GetTerminalSession(ctx, userID, sessionID)
+	if err != nil {
+		return models.TerminalSession{}, err
+	}
+	updated, err := s.repo.UpdateTerminalSessionSize(ctx, sessionID, rows, cols)
+	if err != nil {
+		return models.TerminalSession{}, err
+	}
+	_, err = s.repo.CreateAgentCommand(ctx, models.AgentCommand{
+		ProviderID:  session.ProviderID,
+		ResourceID:  session.ResourceID,
+		SessionID:   session.ID,
+		Command:     models.AgentCommandTerminalResize,
+		Rows:        rows,
+		Cols:        cols,
+		Status:      models.AgentCommandQueued,
+		RequestedBy: userID,
+	})
+	if err != nil {
+		return models.TerminalSession{}, err
+	}
+	return updated, nil
+}
+
+func (s *ResourceService) CloseTerminalSession(ctx context.Context, userID string, sessionID string) (models.TerminalSession, error) {
+	session, err := s.GetTerminalSession(ctx, userID, sessionID)
+	if err != nil {
+		return models.TerminalSession{}, err
+	}
+	updated, err := s.repo.UpdateTerminalSessionStatus(ctx, sessionID, models.TerminalSessionClosed, 0)
+	if err != nil {
+		return models.TerminalSession{}, err
+	}
+	_, _ = s.repo.CreateTerminalAuditEvent(ctx, models.TerminalAuditEvent{
+		SessionID:  sessionID,
+		ProviderID: session.ProviderID,
+		UserID:     userID,
+		EventType:  "terminal_close_request",
+		Details:    "close requested by renter",
+	})
+	_, err = s.repo.CreateAgentCommand(ctx, models.AgentCommand{
+		ProviderID:  session.ProviderID,
+		ResourceID:  session.ResourceID,
+		SessionID:   session.ID,
+		Command:     models.AgentCommandTerminalClose,
+		Status:      models.AgentCommandQueued,
+		RequestedBy: userID,
+	})
+	if err != nil {
+		return models.TerminalSession{}, err
+	}
+	return updated, nil
+}
+
+func (s *ResourceService) ExpireTerminalSessions(ctx context.Context, now time.Time) error {
+	idleBefore := now.Add(-s.terminalIdleTimeout)
+	expired, err := s.repo.ExpireIdleTerminalSessions(ctx, idleBefore, 100)
+	if err != nil {
+		return err
+	}
+	for _, item := range expired {
+		_, _ = s.repo.CreateTerminalAuditEvent(ctx, models.TerminalAuditEvent{
+			SessionID:  item.ID,
+			ProviderID: item.ProviderID,
+			UserID:     item.RenterUserID,
+			EventType:  "terminal_expired",
+			Details:    "idle timeout reached",
+		})
+		_, _ = s.repo.CreateAgentCommand(ctx, models.AgentCommand{
+			ProviderID:  item.ProviderID,
+			ResourceID:  item.ResourceID,
+			SessionID:   item.ID,
+			Command:     models.AgentCommandTerminalClose,
+			Status:      models.AgentCommandQueued,
+			RequestedBy: "system",
+		})
+	}
+	return nil
+}
+
+func (s *ResourceService) authorizeTerminalResource(ctx context.Context, userID string, resourceID string) (string, error) {
+	vm, err := s.repo.GetVM(ctx, resourceID)
+	if err == nil {
+		if vm.UserID != userID {
+			return "", errors.New("forbidden: user does not own vm")
+		}
+		return vm.ProviderID, nil
+	}
+	pod, podErr := s.repo.GetPod(ctx, resourceID)
+	if podErr == nil {
+		if pod.UserID != userID {
+			return "", errors.New("forbidden: user does not own pod")
+		}
+		return pod.ProviderID, nil
+	}
+	if errors.Is(err, pgx.ErrNoRows) || errors.Is(podErr, pgx.ErrNoRows) {
+		return "", errors.New("resource not found for terminal access")
+	}
+	if podErr != nil {
+		return "", podErr
+	}
+	return "", err
 }
 
 func (s *ResourceService) RecordRootInputLog(ctx context.Context, item models.RootInputLog) (models.RootInputLog, error) {
@@ -876,6 +1163,9 @@ func (s *ResourceService) ExpireResources(ctx context.Context, now time.Time) er
 		}
 		_ = s.repo.MarkPodExpired(ctx, pod.ID)
 		log.Info().Str("pod_id", pod.ID).Msg("expired pod marked")
+	}
+	if err := s.ExpireTerminalSessions(ctx, now); err != nil {
+		log.Warn().Err(err).Msg("terminal session expiry pass failed")
 	}
 	log.Debug().Msg("resource expiry pass completed")
 	return nil

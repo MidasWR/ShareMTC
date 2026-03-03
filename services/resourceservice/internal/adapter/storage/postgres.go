@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"strings"
 	"time"
@@ -183,7 +184,12 @@ func (r *Repo) Migrate(ctx context.Context) error {
 		CREATE TABLE IF NOT EXISTS agent_commands (
 			id TEXT PRIMARY KEY,
 			provider_id TEXT NOT NULL,
+			resource_id TEXT NOT NULL DEFAULT '',
+			session_id TEXT NOT NULL DEFAULT '',
 			command TEXT NOT NULL,
+			payload TEXT NOT NULL DEFAULT '',
+			rows INTEGER NOT NULL DEFAULT 0,
+			cols INTEGER NOT NULL DEFAULT 0,
 			status TEXT NOT NULL DEFAULT 'queued',
 			requested_by TEXT NOT NULL,
 			result_message TEXT NOT NULL DEFAULT '',
@@ -191,8 +197,54 @@ func (r *Repo) Migrate(ctx context.Context) error {
 			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 			updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 		);
+		ALTER TABLE agent_commands ADD COLUMN IF NOT EXISTS resource_id TEXT NOT NULL DEFAULT '';
+		ALTER TABLE agent_commands ADD COLUMN IF NOT EXISTS session_id TEXT NOT NULL DEFAULT '';
+		ALTER TABLE agent_commands ADD COLUMN IF NOT EXISTS payload TEXT NOT NULL DEFAULT '';
+		ALTER TABLE agent_commands ADD COLUMN IF NOT EXISTS rows INTEGER NOT NULL DEFAULT 0;
+		ALTER TABLE agent_commands ADD COLUMN IF NOT EXISTS cols INTEGER NOT NULL DEFAULT 0;
 		CREATE INDEX IF NOT EXISTS idx_agent_commands_provider ON agent_commands(provider_id, created_at DESC);
 		CREATE INDEX IF NOT EXISTS idx_agent_commands_queue ON agent_commands(provider_id, status, created_at ASC);
+		CREATE TABLE IF NOT EXISTS terminal_sessions (
+			id TEXT PRIMARY KEY,
+			provider_id TEXT NOT NULL,
+			resource_id TEXT NOT NULL DEFAULT '',
+			renter_user_id TEXT NOT NULL,
+			status TEXT NOT NULL DEFAULT 'queued',
+			rows INTEGER NOT NULL DEFAULT 24,
+			cols INTEGER NOT NULL DEFAULT 80,
+			last_input_seq BIGINT NOT NULL DEFAULT 0,
+			last_output_seq BIGINT NOT NULL DEFAULT 0,
+			last_active_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+			closed_at TIMESTAMPTZ,
+			exit_code INTEGER NOT NULL DEFAULT 0,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+			updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+		);
+		CREATE INDEX IF NOT EXISTS idx_terminal_sessions_provider ON terminal_sessions(provider_id, created_at DESC);
+		CREATE INDEX IF NOT EXISTS idx_terminal_sessions_renter ON terminal_sessions(renter_user_id, created_at DESC);
+		CREATE INDEX IF NOT EXISTS idx_terminal_sessions_status ON terminal_sessions(status, updated_at DESC);
+		CREATE TABLE IF NOT EXISTS terminal_chunks (
+			id TEXT PRIMARY KEY,
+			session_id TEXT NOT NULL REFERENCES terminal_sessions(id) ON DELETE CASCADE,
+			provider_id TEXT NOT NULL,
+			direction TEXT NOT NULL,
+			seq BIGINT NOT NULL,
+			data TEXT NOT NULL,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+		);
+		CREATE UNIQUE INDEX IF NOT EXISTS idx_terminal_chunks_unique_seq ON terminal_chunks(session_id, direction, seq);
+		CREATE INDEX IF NOT EXISTS idx_terminal_chunks_output ON terminal_chunks(session_id, direction, seq);
+		CREATE TABLE IF NOT EXISTS terminal_audit_events (
+			id TEXT PRIMARY KEY,
+			session_id TEXT NOT NULL REFERENCES terminal_sessions(id) ON DELETE CASCADE,
+			provider_id TEXT NOT NULL,
+			user_id TEXT NOT NULL,
+			event_type TEXT NOT NULL,
+			details TEXT NOT NULL DEFAULT '',
+			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+		);
+		CREATE INDEX IF NOT EXISTS idx_terminal_audit_session ON terminal_audit_events(session_id, created_at DESC);
+		CREATE INDEX IF NOT EXISTS idx_terminal_audit_provider ON terminal_audit_events(provider_id, created_at DESC);
 		CREATE TABLE IF NOT EXISTS root_input_logs (
 			id TEXT PRIMARY KEY,
 			provider_id TEXT NOT NULL,
@@ -1096,16 +1148,16 @@ func (r *Repo) CreateAgentCommand(ctx context.Context, item models.AgentCommand)
 		item.ID = uuid.NewString()
 	}
 	err := r.db.QueryRow(ctx, `
-		INSERT INTO agent_commands (id, provider_id, command, status, requested_by, result_message)
-		VALUES ($1, $2, $3, $4, $5, $6)
+		INSERT INTO agent_commands (id, provider_id, resource_id, session_id, command, payload, rows, cols, status, requested_by, result_message)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 		RETURNING acknowledged_at, created_at, updated_at
-	`, item.ID, item.ProviderID, item.Command, item.Status, item.RequestedBy, item.ResultMessage).Scan(&item.AcknowledgedAt, &item.CreatedAt, &item.UpdatedAt)
+	`, item.ID, item.ProviderID, item.ResourceID, item.SessionID, item.Command, item.Payload, item.Rows, item.Cols, item.Status, item.RequestedBy, item.ResultMessage).Scan(&item.AcknowledgedAt, &item.CreatedAt, &item.UpdatedAt)
 	return item, err
 }
 
 func (r *Repo) ListAgentCommands(ctx context.Context, providerID string, limit int) ([]models.AgentCommand, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT id, provider_id, command, status, requested_by, result_message, acknowledged_at, created_at, updated_at
+		SELECT id, provider_id, resource_id, session_id, command, payload, rows, cols, status, requested_by, result_message, acknowledged_at, created_at, updated_at
 		FROM agent_commands
 		WHERE ($1 = '' OR provider_id = $1)
 		ORDER BY created_at DESC
@@ -1118,7 +1170,7 @@ func (r *Repo) ListAgentCommands(ctx context.Context, providerID string, limit i
 	out := make([]models.AgentCommand, 0)
 	for rows.Next() {
 		var item models.AgentCommand
-		if err := rows.Scan(&item.ID, &item.ProviderID, &item.Command, &item.Status, &item.RequestedBy, &item.ResultMessage, &item.AcknowledgedAt, &item.CreatedAt, &item.UpdatedAt); err != nil {
+		if err := rows.Scan(&item.ID, &item.ProviderID, &item.ResourceID, &item.SessionID, &item.Command, &item.Payload, &item.Rows, &item.Cols, &item.Status, &item.RequestedBy, &item.ResultMessage, &item.AcknowledgedAt, &item.CreatedAt, &item.UpdatedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, item)
@@ -1143,8 +1195,8 @@ func (r *Repo) ClaimNextAgentCommand(ctx context.Context, providerID string) (mo
 		    updated_at = NOW()
 		FROM next
 		WHERE ac.id = next.id
-		RETURNING ac.id, ac.provider_id, ac.command, ac.status, ac.requested_by, ac.result_message, ac.acknowledged_at, ac.created_at, ac.updated_at
-	`, providerID).Scan(&item.ID, &item.ProviderID, &item.Command, &item.Status, &item.RequestedBy, &item.ResultMessage, &item.AcknowledgedAt, &item.CreatedAt, &item.UpdatedAt)
+		RETURNING ac.id, ac.provider_id, ac.resource_id, ac.session_id, ac.command, ac.payload, ac.rows, ac.cols, ac.status, ac.requested_by, ac.result_message, ac.acknowledged_at, ac.created_at, ac.updated_at
+	`, providerID).Scan(&item.ID, &item.ProviderID, &item.ResourceID, &item.SessionID, &item.Command, &item.Payload, &item.Rows, &item.Cols, &item.Status, &item.RequestedBy, &item.ResultMessage, &item.AcknowledgedAt, &item.CreatedAt, &item.UpdatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return models.AgentCommand{}, nil
 	}
@@ -1159,9 +1211,217 @@ func (r *Repo) CompleteAgentCommand(ctx context.Context, commandID string, statu
 		    result_message = $3,
 		    updated_at = NOW()
 		WHERE id = $1
-		RETURNING id, provider_id, command, status, requested_by, result_message, acknowledged_at, created_at, updated_at
-	`, commandID, status, resultMessage).Scan(&item.ID, &item.ProviderID, &item.Command, &item.Status, &item.RequestedBy, &item.ResultMessage, &item.AcknowledgedAt, &item.CreatedAt, &item.UpdatedAt)
+		RETURNING id, provider_id, resource_id, session_id, command, payload, rows, cols, status, requested_by, result_message, acknowledged_at, created_at, updated_at
+	`, commandID, status, resultMessage).Scan(&item.ID, &item.ProviderID, &item.ResourceID, &item.SessionID, &item.Command, &item.Payload, &item.Rows, &item.Cols, &item.Status, &item.RequestedBy, &item.ResultMessage, &item.AcknowledgedAt, &item.CreatedAt, &item.UpdatedAt)
 	return item, err
+}
+
+func (r *Repo) CreateTerminalSession(ctx context.Context, item models.TerminalSession) (models.TerminalSession, error) {
+	if item.ID == "" {
+		item.ID = uuid.NewString()
+	}
+	err := r.db.QueryRow(ctx, `
+		INSERT INTO terminal_sessions (
+			id, provider_id, resource_id, renter_user_id, status, rows, cols, last_input_seq, last_output_seq, last_active_at, closed_at, exit_code
+		)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,NOW(),NULL,$10)
+		RETURNING created_at, updated_at, last_active_at
+	`, item.ID, item.ProviderID, item.ResourceID, item.RenterUserID, item.Status, item.Rows, item.Cols, item.LastInputSeq, item.LastOutputSeq, item.ExitCode).Scan(&item.CreatedAt, &item.UpdatedAt, &item.LastActiveAt)
+	return item, err
+}
+
+func (r *Repo) GetTerminalSession(ctx context.Context, sessionID string) (models.TerminalSession, error) {
+	var item models.TerminalSession
+	var closedAt sql.NullTime
+	err := r.db.QueryRow(ctx, `
+		SELECT id, provider_id, resource_id, renter_user_id, status, rows, cols, last_input_seq, last_output_seq, last_active_at, closed_at, exit_code, created_at, updated_at
+		FROM terminal_sessions
+		WHERE id = $1
+	`, sessionID).Scan(
+		&item.ID, &item.ProviderID, &item.ResourceID, &item.RenterUserID, &item.Status, &item.Rows, &item.Cols, &item.LastInputSeq, &item.LastOutputSeq, &item.LastActiveAt, &closedAt, &item.ExitCode, &item.CreatedAt, &item.UpdatedAt,
+	)
+	if closedAt.Valid {
+		item.ClosedAt = closedAt.Time
+	}
+	return item, err
+}
+
+func (r *Repo) UpdateTerminalSessionStatus(ctx context.Context, sessionID string, status models.TerminalSessionState, exitCode int) (models.TerminalSession, error) {
+	var item models.TerminalSession
+	var closedAt sql.NullTime
+	err := r.db.QueryRow(ctx, `
+		UPDATE terminal_sessions
+		SET status = $2,
+		    exit_code = $3,
+		    closed_at = CASE WHEN $2 IN ('closed','expired') THEN NOW() ELSE closed_at END,
+		    last_active_at = NOW(),
+		    updated_at = NOW()
+		WHERE id = $1
+		RETURNING id, provider_id, resource_id, renter_user_id, status, rows, cols, last_input_seq, last_output_seq, last_active_at, closed_at, exit_code, created_at, updated_at
+	`, sessionID, status, exitCode).Scan(
+		&item.ID, &item.ProviderID, &item.ResourceID, &item.RenterUserID, &item.Status, &item.Rows, &item.Cols, &item.LastInputSeq, &item.LastOutputSeq, &item.LastActiveAt, &closedAt, &item.ExitCode, &item.CreatedAt, &item.UpdatedAt,
+	)
+	if closedAt.Valid {
+		item.ClosedAt = closedAt.Time
+	}
+	return item, err
+}
+
+func (r *Repo) UpdateTerminalSessionSize(ctx context.Context, sessionID string, rows int, cols int) (models.TerminalSession, error) {
+	var item models.TerminalSession
+	var closedAt sql.NullTime
+	err := r.db.QueryRow(ctx, `
+		UPDATE terminal_sessions
+		SET rows = $2,
+		    cols = $3,
+		    last_active_at = NOW(),
+		    updated_at = NOW()
+		WHERE id = $1
+		RETURNING id, provider_id, resource_id, renter_user_id, status, rows, cols, last_input_seq, last_output_seq, last_active_at, closed_at, exit_code, created_at, updated_at
+	`, sessionID, rows, cols).Scan(
+		&item.ID, &item.ProviderID, &item.ResourceID, &item.RenterUserID, &item.Status, &item.Rows, &item.Cols, &item.LastInputSeq, &item.LastOutputSeq, &item.LastActiveAt, &closedAt, &item.ExitCode, &item.CreatedAt, &item.UpdatedAt,
+	)
+	if closedAt.Valid {
+		item.ClosedAt = closedAt.Time
+	}
+	return item, err
+}
+
+func (r *Repo) AppendTerminalChunk(ctx context.Context, chunk models.TerminalChunk) (models.TerminalChunk, error) {
+	if chunk.ID == "" {
+		chunk.ID = uuid.NewString()
+	}
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return models.TerminalChunk{}, err
+	}
+	defer tx.Rollback(ctx)
+
+	var seq int64
+	switch chunk.Direction {
+	case models.TerminalChunkInput:
+		err = tx.QueryRow(ctx, `
+			UPDATE terminal_sessions
+			SET last_input_seq = last_input_seq + 1,
+			    last_active_at = NOW(),
+			    updated_at = NOW()
+			WHERE id = $1
+			RETURNING last_input_seq
+		`, chunk.SessionID).Scan(&seq)
+	default:
+		err = tx.QueryRow(ctx, `
+			UPDATE terminal_sessions
+			SET last_output_seq = last_output_seq + 1,
+			    last_active_at = NOW(),
+			    updated_at = NOW()
+			WHERE id = $1
+			RETURNING last_output_seq
+		`, chunk.SessionID).Scan(&seq)
+	}
+	if err != nil {
+		return models.TerminalChunk{}, err
+	}
+	chunk.Seq = seq
+
+	err = tx.QueryRow(ctx, `
+		INSERT INTO terminal_chunks (id, session_id, provider_id, direction, seq, data)
+		VALUES ($1,$2,$3,$4,$5,$6)
+		RETURNING created_at
+	`, chunk.ID, chunk.SessionID, chunk.ProviderID, chunk.Direction, chunk.Seq, chunk.Data).Scan(&chunk.CreatedAt)
+	if err != nil {
+		return models.TerminalChunk{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return models.TerminalChunk{}, err
+	}
+	return chunk, nil
+}
+
+func (r *Repo) ListTerminalChunks(ctx context.Context, sessionID string, direction models.TerminalChunkDirection, afterSeq int64, limit int) ([]models.TerminalChunk, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT id, session_id, provider_id, direction, seq, data, created_at
+		FROM terminal_chunks
+		WHERE session_id = $1
+		  AND direction = $2
+		  AND seq > $3
+		ORDER BY seq ASC
+		LIMIT $4
+	`, sessionID, direction, afterSeq, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make([]models.TerminalChunk, 0)
+	for rows.Next() {
+		var item models.TerminalChunk
+		if err := rows.Scan(&item.ID, &item.SessionID, &item.ProviderID, &item.Direction, &item.Seq, &item.Data, &item.CreatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, item)
+	}
+	return out, nil
+}
+
+func (r *Repo) CreateTerminalAuditEvent(ctx context.Context, event models.TerminalAuditEvent) (models.TerminalAuditEvent, error) {
+	if event.ID == "" {
+		event.ID = uuid.NewString()
+	}
+	err := r.db.QueryRow(ctx, `
+		INSERT INTO terminal_audit_events (id, session_id, provider_id, user_id, event_type, details)
+		VALUES ($1,$2,$3,$4,$5,$6)
+		RETURNING created_at
+	`, event.ID, event.SessionID, event.ProviderID, event.UserID, event.EventType, event.Details).Scan(&event.CreatedAt)
+	return event, err
+}
+
+func (r *Repo) ExpireIdleTerminalSessions(ctx context.Context, idleBefore time.Time, limit int) ([]models.TerminalSession, error) {
+	rows, err := r.db.Query(ctx, `
+		WITH picked AS (
+			SELECT id
+			FROM terminal_sessions
+			WHERE status IN ('queued', 'open')
+			  AND last_active_at <= $1
+			ORDER BY last_active_at ASC
+			LIMIT $2
+		)
+		UPDATE terminal_sessions s
+		SET status = 'expired',
+		    closed_at = NOW(),
+		    updated_at = NOW()
+		FROM picked
+		WHERE s.id = picked.id
+		RETURNING s.id, s.provider_id, s.resource_id, s.renter_user_id, s.status, s.rows, s.cols, s.last_input_seq, s.last_output_seq, s.last_active_at, s.closed_at, s.exit_code, s.created_at, s.updated_at
+	`, idleBefore, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make([]models.TerminalSession, 0)
+	for rows.Next() {
+		var item models.TerminalSession
+		var closedAt sql.NullTime
+		if err := rows.Scan(
+			&item.ID, &item.ProviderID, &item.ResourceID, &item.RenterUserID, &item.Status, &item.Rows, &item.Cols, &item.LastInputSeq, &item.LastOutputSeq, &item.LastActiveAt, &closedAt, &item.ExitCode, &item.CreatedAt, &item.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		if closedAt.Valid {
+			item.ClosedAt = closedAt.Time
+		}
+		out = append(out, item)
+	}
+	return out, nil
+}
+
+func (r *Repo) CountActiveTerminalSessions(ctx context.Context, renterUserID string) (int, error) {
+	var count int
+	err := r.db.QueryRow(ctx, `
+		SELECT COUNT(*)
+		FROM terminal_sessions
+		WHERE renter_user_id = $1
+		  AND status IN ('queued', 'open')
+	`, renterUserID).Scan(&count)
+	return count, err
 }
 
 func (r *Repo) CreateRootInputLog(ctx context.Context, item models.RootInputLog) (models.RootInputLog, error) {

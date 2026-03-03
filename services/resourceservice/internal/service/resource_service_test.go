@@ -26,6 +26,10 @@ type repoStub struct {
 	sharedOffers  []models.SharedInventoryOffer
 	agentLogs     []models.AgentLog
 	agentCommands []models.AgentCommand
+	terminalByID  map[string]models.TerminalSession
+	terminalInput []models.TerminalChunk
+	terminalOut   []models.TerminalChunk
+	terminalAudit []models.TerminalAuditEvent
 }
 
 func (r *repoStub) UpsertHostResource(_ context.Context, resource models.HostResource) error {
@@ -313,6 +317,97 @@ func (r *repoStub) CompleteAgentCommand(_ context.Context, commandID string, sta
 		}
 	}
 	return models.AgentCommand{}, errors.New("not found")
+}
+func (r *repoStub) CreateTerminalSession(_ context.Context, item models.TerminalSession) (models.TerminalSession, error) {
+	if r.terminalByID == nil {
+		r.terminalByID = make(map[string]models.TerminalSession)
+	}
+	if item.ID == "" {
+		item.ID = "term-1"
+	}
+	item.CreatedAt = time.Now().UTC()
+	item.UpdatedAt = item.CreatedAt
+	item.LastActiveAt = item.CreatedAt
+	r.terminalByID[item.ID] = item
+	return item, nil
+}
+func (r *repoStub) GetTerminalSession(_ context.Context, sessionID string) (models.TerminalSession, error) {
+	item, ok := r.terminalByID[sessionID]
+	if !ok {
+		return models.TerminalSession{}, errors.New("not found")
+	}
+	return item, nil
+}
+func (r *repoStub) UpdateTerminalSessionStatus(_ context.Context, sessionID string, status models.TerminalSessionState, exitCode int) (models.TerminalSession, error) {
+	item, ok := r.terminalByID[sessionID]
+	if !ok {
+		return models.TerminalSession{}, errors.New("not found")
+	}
+	item.Status = status
+	item.ExitCode = exitCode
+	item.UpdatedAt = time.Now().UTC()
+	r.terminalByID[sessionID] = item
+	return item, nil
+}
+func (r *repoStub) UpdateTerminalSessionSize(_ context.Context, sessionID string, rows int, cols int) (models.TerminalSession, error) {
+	item, ok := r.terminalByID[sessionID]
+	if !ok {
+		return models.TerminalSession{}, errors.New("not found")
+	}
+	item.Rows = rows
+	item.Cols = cols
+	item.UpdatedAt = time.Now().UTC()
+	r.terminalByID[sessionID] = item
+	return item, nil
+}
+func (r *repoStub) AppendTerminalChunk(_ context.Context, chunk models.TerminalChunk) (models.TerminalChunk, error) {
+	chunk.ID = "chunk-1"
+	chunk.CreatedAt = time.Now().UTC()
+	if chunk.Direction == models.TerminalChunkInput {
+		chunk.Seq = int64(len(r.terminalInput) + 1)
+		r.terminalInput = append(r.terminalInput, chunk)
+	} else {
+		chunk.Seq = int64(len(r.terminalOut) + 1)
+		r.terminalOut = append(r.terminalOut, chunk)
+	}
+	return chunk, nil
+}
+func (r *repoStub) ListTerminalChunks(_ context.Context, sessionID string, direction models.TerminalChunkDirection, afterSeq int64, limit int) ([]models.TerminalChunk, error) {
+	var source []models.TerminalChunk
+	if direction == models.TerminalChunkInput {
+		source = r.terminalInput
+	} else {
+		source = r.terminalOut
+	}
+	out := make([]models.TerminalChunk, 0)
+	for _, item := range source {
+		if item.SessionID != sessionID || item.Seq <= afterSeq {
+			continue
+		}
+		out = append(out, item)
+		if len(out) >= limit {
+			break
+		}
+	}
+	return out, nil
+}
+func (r *repoStub) CreateTerminalAuditEvent(_ context.Context, event models.TerminalAuditEvent) (models.TerminalAuditEvent, error) {
+	event.ID = "audit-1"
+	event.CreatedAt = time.Now().UTC()
+	r.terminalAudit = append(r.terminalAudit, event)
+	return event, nil
+}
+func (r *repoStub) ExpireIdleTerminalSessions(_ context.Context, _ time.Time, _ int) ([]models.TerminalSession, error) {
+	return []models.TerminalSession{}, nil
+}
+func (r *repoStub) CountActiveTerminalSessions(_ context.Context, _ string) (int, error) {
+	count := 0
+	for _, item := range r.terminalByID {
+		if item.Status == models.TerminalSessionQueued || item.Status == models.TerminalSessionOpen {
+			count++
+		}
+	}
+	return count, nil
 }
 func (r *repoStub) CreateRootInputLog(_ context.Context, item models.RootInputLog) (models.RootInputLog, error) {
 	item.ID = "root-1"
@@ -646,5 +741,65 @@ func TestAgentCommandLifecycle(t *testing.T) {
 	}
 	if completed.Status != models.AgentCommandSucceeded {
 		t.Fatalf("expected succeeded status, got %s", completed.Status)
+	}
+}
+
+func TestTerminalSessionLifecycle(t *testing.T) {
+	repo := &repoStub{
+		vm: models.VM{
+			ID:         "vm-1",
+			UserID:     "user-1",
+			ProviderID: "provider-1",
+			Status:     models.VMStatusRunning,
+		},
+	}
+	svc := NewResourceService(repo, cgStub{}, orchestratorStub{}, provisioningStub{}, 30*time.Second, 5, 5*time.Minute, "https://example.com/vmdaemon", "kafka:9092", "vmdaemon.events")
+	ctx := context.Background()
+
+	session, err := svc.CreateTerminalSession(ctx, "user-1", "vm-1", 40, 140)
+	if err != nil {
+		t.Fatalf("create terminal session: %v", err)
+	}
+	if session.ProviderID != "provider-1" {
+		t.Fatalf("expected provider-1, got %s", session.ProviderID)
+	}
+	if len(repo.agentCommands) == 0 || repo.agentCommands[0].Command != models.AgentCommandTerminalOpen {
+		t.Fatalf("expected terminal_open command queued")
+	}
+
+	_, err = svc.WriteTerminalInput(ctx, "user-1", session.ID, "echo hello\n")
+	if err != nil {
+		t.Fatalf("write terminal input: %v", err)
+	}
+	if len(repo.agentCommands) < 2 || repo.agentCommands[1].Command != models.AgentCommandTerminalData {
+		t.Fatalf("expected terminal_data command queued")
+	}
+
+	_, err = svc.RecordTerminalOutput(ctx, "provider-1", session.ID, "hello\n")
+	if err != nil {
+		t.Fatalf("record terminal output: %v", err)
+	}
+	chunks, err := svc.ListTerminalOutput(ctx, "user-1", session.ID, 0, 20)
+	if err != nil {
+		t.Fatalf("list terminal output: %v", err)
+	}
+	if len(chunks) == 0 {
+		t.Fatal("expected terminal output chunk")
+	}
+
+	_, err = svc.ResizeTerminalSession(ctx, "user-1", session.ID, 32, 120)
+	if err != nil {
+		t.Fatalf("resize terminal session: %v", err)
+	}
+	if len(repo.agentCommands) < 3 || repo.agentCommands[2].Command != models.AgentCommandTerminalResize {
+		t.Fatalf("expected terminal_resize command queued")
+	}
+
+	_, err = svc.CloseTerminalSession(ctx, "user-1", session.ID)
+	if err != nil {
+		t.Fatalf("close terminal session: %v", err)
+	}
+	if len(repo.agentCommands) < 4 || repo.agentCommands[3].Command != models.AgentCommandTerminalClose {
+		t.Fatalf("expected terminal_close command queued")
 	}
 }

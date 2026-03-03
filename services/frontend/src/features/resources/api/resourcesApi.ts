@@ -16,6 +16,8 @@ import {
   CatalogFilter,
   AgentLog,
   AgentCommand,
+  TerminalSession,
+  TerminalChunk,
   Pod,
   RootInputLog
 } from "../../../types/api";
@@ -267,4 +269,32 @@ export function refreshK8sCluster(clusterID: string) {
 
 export function deleteK8sCluster(clusterID: string) {
   return apiClient.del<{ status: string }>(`${API_BASE.resource}/v1/resources/k8s/clusters/${encodeURIComponent(clusterID)}`);
+}
+
+export function createTerminalSession(payload: { resource_id: string; rows?: number; cols?: number }) {
+  return apiClient.post<TerminalSession>(`${API_BASE.resource}/v1/resources/terminal/sessions`, payload);
+}
+
+export function getTerminalSession(sessionID: string) {
+  return apiClient.get<TerminalSession>(`${API_BASE.resource}/v1/resources/terminal/sessions/${encodeURIComponent(sessionID)}`);
+}
+
+export function writeTerminalInput(sessionID: string, payload: { data: string }) {
+  return apiClient.post<TerminalChunk>(`${API_BASE.resource}/v1/resources/terminal/sessions/${encodeURIComponent(sessionID)}/input`, payload);
+}
+
+export function listTerminalOutput(sessionID: string, params?: { after_seq?: number; limit?: number }) {
+  const search = new URLSearchParams();
+  if (typeof params?.after_seq === "number") search.set("after_seq", String(params.after_seq));
+  if (typeof params?.limit === "number") search.set("limit", String(params.limit));
+  const query = search.toString();
+  return apiClient.get<TerminalChunk[]>(`${API_BASE.resource}/v1/resources/terminal/sessions/${encodeURIComponent(sessionID)}/output${query ? `?${query}` : ""}`);
+}
+
+export function resizeTerminalSession(sessionID: string, payload: { rows: number; cols: number }) {
+  return apiClient.post<TerminalSession>(`${API_BASE.resource}/v1/resources/terminal/sessions/${encodeURIComponent(sessionID)}/resize`, payload);
+}
+
+export function closeTerminalSession(sessionID: string) {
+  return apiClient.post<TerminalSession>(`${API_BASE.resource}/v1/resources/terminal/sessions/${encodeURIComponent(sessionID)}/close`);
 }
