@@ -10,7 +10,7 @@ import { SkeletonBlock } from "../../../design/patterns/SkeletonBlock";
 import { StatusBadge } from "../../../design/patterns/StatusBadge";
 import { Button } from "../../../design/primitives/Button";
 import { Card } from "../../../design/primitives/Card";
-import { Input } from "../../../design/primitives/Input";
+import { Select } from "../../../design/primitives/Select";
 import { AgentLog, Allocation, RuntimeInventory, UsageAccrual } from "../../../types/api";
 import { loadProviderDashboard } from "../api/providerApi";
 import { getRuntimeInventory, listAgentLogs, listHealthChecks, listMetrics, listSharedOffers, upsertSharedOffer } from "../../resources/api/resourcesApi";
@@ -18,10 +18,14 @@ import { PROVIDER_SHARED_CAPACITY_DEFAULTS } from "../../resources/defaults";
 import { getAgentInstallCommand } from "../../admin/api/adminApi";
 import { copyTextToClipboard } from "../../../lib/clipboard";
 import { formatOperationMessage } from "../../../design/utils/operationFeedback";
+import { useProviderOptions } from "../../providers/useProviderOptions";
+import { readUser } from "../../../lib/auth";
+import { buildInstallCommand } from "../../agent/installCommand";
 
 
 export function ProviderDashboardPanel() {
-  const [providerID, setProviderID] = useState("");
+  const currentUser = readUser();
+  const providerState = useProviderOptions();
   const [allocations, setAllocations] = useState<Allocation[]>([]);
   const [accruals, setAccruals] = useState<UsageAccrual[]>([]);
   const [loading, setLoading] = useState(false);
@@ -35,14 +39,15 @@ export function ProviderDashboardPanel() {
   const [runtimeInventory, setRuntimeInventory] = useState<RuntimeInventory | null>(null);
   const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
   const { push } = useToast();
-  const [installerCommand, setInstallerCommand] = useState("");
+  const [installerCommand, setInstallerCommand] = useState(() => buildInstallCommand("", "", currentUser?.id).command);
   useEffect(() => {
     async function loadInstallerCommand() {
       try {
-        const payload = await getAgentInstallCommand();
-        setInstallerCommand(payload.command);
+        const payload = await getAgentInstallCommand({ user_id: currentUser?.id });
+        const resolved = buildInstallCommand(payload.command, payload.installer_url, currentUser?.id);
+        setInstallerCommand(resolved.command);
       } catch {
-        setInstallerCommand("");
+        setInstallerCommand(buildInstallCommand("", "", currentUser?.id).command);
       }
     }
     void loadInstallerCommand();
@@ -53,14 +58,14 @@ export function ProviderDashboardPanel() {
   const totalRevenue = useMemo(() => accruals.reduce((sum, item) => sum + item.total_usd, 0), [accruals]);
 
   async function refresh() {
-    if (!providerID.trim()) {
-      push("error", "Provider ID is required", "Provider dashboard");
+    if (!providerState.providerID.trim()) {
+      push("error", "Provider is required", "Provider dashboard");
       return;
     }
     setLoading(true);
     setError("");
     try {
-      const data = await loadProviderDashboard(providerID.trim());
+      const data = await loadProviderDashboard(providerState.providerID.trim());
       setAllocations(data.allocations);
       setAccruals(data.accruals);
       setMetrics(data.metrics);
@@ -71,8 +76,8 @@ export function ProviderDashboardPanel() {
       setHealthCount(healthRows.length);
       setMetricCount(metricRows.length);
       const [agentLogs, sharedOffers] = await Promise.all([
-        listAgentLogs({ provider_id: providerID.trim(), limit: 200 }),
-        listSharedOffers({ provider_id: providerID.trim() })
+        listAgentLogs({ provider_id: providerState.providerID.trim(), limit: 200 }),
+        listSharedOffers({ provider_id: providerState.providerID.trim() })
       ]);
       setAgentLogsCount(agentLogs.length);
       setRecentLogs(agentLogs.slice(0, 8));
@@ -84,7 +89,7 @@ export function ProviderDashboardPanel() {
         setRuntimeInventory(null);
       }
       setLastUpdatedAt(new Date());
-      push("info", formatOperationMessage({ action: "Refresh", entityType: "Provider dashboard", entityName: providerID.trim(), result: "updated" }), "Provider");
+      push("info", formatOperationMessage({ action: "Refresh", entityType: "Provider dashboard", entityName: providerState.providerID.trim(), result: "updated" }), "Provider");
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Failed to refresh provider dashboard");
       push("error", requestError instanceof Error ? requestError.message : "Failed to refresh provider dashboard", "Provider");
@@ -107,13 +112,13 @@ export function ProviderDashboardPanel() {
   }
 
   async function publishSharedCapacity() {
-    if (!providerID.trim()) {
-      push("error", "Provider ID is required", "Publish shared capacity");
+    if (!providerState.providerID.trim()) {
+      push("error", "Provider is required", "Publish shared capacity");
       return;
     }
     try {
       await upsertSharedOffer({
-        provider_id: providerID.trim(),
+        provider_id: providerState.providerID.trim(),
         resource_type: "gpu",
         title: "Provider Shared GPU Pool",
         description: "Shared GPU capacity for marketplace users",
@@ -126,7 +131,7 @@ export function ProviderDashboardPanel() {
         price_hourly_usd: PROVIDER_SHARED_CAPACITY_DEFAULTS.priceHourlyUSD,
         status: "active"
       });
-      push("success", formatOperationMessage({ action: "Publish", entityType: "Shared capacity", entityName: providerID.trim(), result: "success" }), "Provider");
+      push("success", formatOperationMessage({ action: "Publish", entityType: "Shared capacity", entityName: providerState.providerID.trim(), result: "success" }), "Provider");
       await refresh();
     } catch (error) {
       push("error", error instanceof Error ? error.message : "Failed to publish shared capacity", "Provider");
@@ -142,7 +147,17 @@ export function ProviderDashboardPanel() {
 
       <Card title="Provider Selector" description="Load dashboard data by provider ID.">
         <div className="grid gap-3 md:grid-cols-[2fr_auto]">
-          <Input label="Provider ID" value={providerID} onChange={(event) => setProviderID(event.target.value)} placeholder="Provider UUID" />
+          <Select
+            label="Provider"
+            value={providerState.providerID}
+            error={providerState.error}
+            onChange={(event) => providerState.setProviderID(event.target.value)}
+            options={
+              providerState.options.length > 0
+                ? providerState.options
+                : [{ value: "", label: providerState.loading ? "Loading providers..." : "No providers available" }]
+            }
+          />
           <div className="flex items-end gap-2">
             <DataFreshnessBadge ts={lastUpdatedAt} label="Provider data" />
             <Button onClick={refresh} loading={loading}>

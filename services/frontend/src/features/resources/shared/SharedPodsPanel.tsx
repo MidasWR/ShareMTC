@@ -7,14 +7,15 @@ import { PageSectionHeader } from "../../../design/patterns/PageSectionHeader";
 import { Button } from "../../../design/primitives/Button";
 import { Card } from "../../../design/primitives/Card";
 import { Input } from "../../../design/primitives/Input";
+import { Select } from "../../../design/primitives/Select";
 import { formatOperationMessage } from "../../../design/utils/operationFeedback";
 import { listSharedOffers, listSharedPods, sharePod, upsertSharedOffer } from "../api/resourcesApi";
 import { SharedInventoryOffer, SharedPod } from "../../../types/api";
+import { useProviderOptions } from "../../providers/useProviderOptions";
 
 export function SharedPodsPanel() {
   const [rows, setRows] = useState<SharedPod[]>([]);
   const [podCode, setPodCode] = useState("");
-  const [providerID, setProviderID] = useState("provider-default");
   const [targets, setTargets] = useState("");
   const [loading, setLoading] = useState(false);
   const [shareQty, setShareQty] = useState("1");
@@ -27,6 +28,7 @@ export function SharedPodsPanel() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
   const { push } = useToast();
+  const providerState = useProviderOptions();
 
   async function refresh() {
     setLoading(true);
@@ -56,7 +58,7 @@ export function SharedPodsPanel() {
     const network = Number(networkMbps) || 0;
     const price = Number(priceHourlyUSD) || 0;
     if (!podCode.trim()) nextErrors.podCode = "POD code is required";
-    if (!providerID.trim()) nextErrors.providerID = "Provider ID is required";
+    if (!providerState.providerID.trim()) nextErrors.providerID = "Provider is required";
     if (sharedWith.length === 0) nextErrors.targets = "Provide at least one target user";
     if (cpu <= 0) nextErrors.cpuCores = "CPU must be greater than 0";
     if (ram <= 0) nextErrors.ramMb = "RAM must be greater than 0";
@@ -73,7 +75,7 @@ export function SharedPodsPanel() {
     try {
       await sharePod({ pod_code: podCode.trim(), shared_with: sharedWith, access_level: "read" });
       await upsertSharedOffer({
-        provider_id: providerID.trim(),
+        provider_id: providerState.providerID.trim(),
         resource_type: "pod",
         title: `Shared POD ${podCode.trim()}`,
         description: "Shared POD capacity published from owner",
@@ -109,7 +111,17 @@ export function SharedPodsPanel() {
       <Card title="Quick Share POD" description="Publish share access and explicit marketplace capacity parameters.">
         <div className="grid items-end gap-3 md:grid-cols-2 xl:grid-cols-4">
           <Input label="POD Code" error={errors.podCode} value={podCode} onChange={(event) => setPodCode(event.target.value)} />
-          <Input label="Provider ID" error={errors.providerID} value={providerID} onChange={(event) => setProviderID(event.target.value)} />
+          <Select
+            label="Provider"
+            error={errors.providerID || providerState.error}
+            value={providerState.providerID}
+            onChange={(event) => providerState.setProviderID(event.target.value)}
+            options={
+              providerState.options.length > 0
+                ? providerState.options
+                : [{ value: "", label: providerState.loading ? "Loading providers..." : "No providers available" }]
+            }
+          />
           <Input label="Share with" error={errors.targets} value={targets} onChange={(event) => setTargets(event.target.value)} placeholder="user1,user2" />
           <Input type="number" min={1} step={1} label="Qty" value={shareQty} onChange={(event) => setShareQty(event.target.value)} />
           <Input type="number" min={1} step={1} label="CPU Cores" error={errors.cpuCores} value={cpuCores} onChange={(event) => setCpuCores(event.target.value)} />

@@ -13,9 +13,10 @@ import { Select } from "../../design/primitives/Select";
 import { useSettings } from "../../app/providers/SettingsProvider";
 import { useToast } from "../../design/components/Toast";
 import { formatOperationMessage } from "../../design/utils/operationFeedback";
-import { flagFromCountry, formatUSD } from "../hifi/formatters";
-import { listVMTemplates } from "../resources/api/resourcesApi";
+import { flagFromCountry, formatUSD, formatDateTime } from "../hifi/formatters";
+import { createPod, listVMTemplates } from "../resources/api/resourcesApi";
 import { listPodCatalog } from "../admin/api/adminApi";
+import { useProviderOptions } from "../providers/useProviderOptions";
 
 const steps = [
   "Template",
@@ -47,6 +48,7 @@ export function MarketplacePanel() {
   const { settings } = useSettings();
   const locale = settings.language === "ru" ? "ru" : "en";
   const { push } = useToast();
+  const providerState = useProviderOptions();
   const [computeType, setComputeType] = useState<"ALL" | "GPU" | "CPU">("GPU");
   const [countries, setCountries] = useState<string[]>([]);
   const [search, setSearch] = useState("");
@@ -67,6 +69,7 @@ export function MarketplacePanel() {
   const [sshKey, setSshKey] = useState("default-ed25519");
   const [pricingModel, setPricingModel] = useState<PricingModel>("on-demand");
   const [deploySubmitted, setDeploySubmitted] = useState(false);
+  const [deployResult, setDeployResult] = useState<{ id?: string; status?: string; created_at?: string } | null>(null);
   const [instanceNameError, setInstanceNameError] = useState("");
   const [lastCatalogRefreshAt, setLastCatalogRefreshAt] = useState<Date | null>(null);
   const countryOptions = useMemo(
@@ -128,15 +131,43 @@ export function MarketplacePanel() {
     void loadCatalog();
   }, []);
 
-  function submitDeployRequest() {
+  async function submitDeployRequest() {
     if (!instanceName.trim()) {
       setInstanceNameError(locale === "ru" ? "Имя инстанса обязательно" : "Instance name is required");
       push("error", locale === "ru" ? "Укажите имя инстанса" : "Please provide instance name", "Deploy wizard");
       return;
     }
+    if (!selected) {
+      push("error", locale === "ru" ? "Выберите шаблон/под" : "Select a template/pod first", "Deploy wizard");
+      return;
+    }
+    if (!providerState.providerID.trim()) {
+      push("error", locale === "ru" ? "Выберите провайдера" : "Select provider", "Deploy wizard");
+      return;
+    }
     setInstanceNameError("");
-    setDeploySubmitted(true);
-    push("info", formatOperationMessage({ action: "Deploy request", entityType: "Instance", entityName: instanceName.trim(), result: "started" }), "Marketplace");
+    try {
+      const created = await createPod({
+        provider_id: providerState.providerID.trim(),
+        name: instanceName.trim(),
+        image_name: "pytorch/pytorch:2.4.0-cuda12.1-cudnn9-runtime",
+        gpu_type_id: selected.datacenter || selected.id,
+        gpu_count: Math.max(1, gpuCount),
+        cpu_count: Math.max(1, cpuCores),
+        memory_gb: Math.max(1, ramGb)
+      });
+      setDeployResult({ id: created.id, status: created.status, created_at: created.created_at });
+      setDeploySubmitted(true);
+      push(
+        "success",
+        formatOperationMessage({ action: "Create", entityType: "POD", entityName: created.name || instanceName.trim(), entityId: created.id, result: "success" }),
+        "Marketplace"
+      );
+    } catch (error) {
+      setDeploySubmitted(false);
+      setDeployResult(null);
+      push("error", error instanceof Error ? error.message : "Deploy failed", "Marketplace");
+    }
   }
 
   const filteredCatalog = useMemo(() => {
@@ -317,7 +348,20 @@ export function MarketplacePanel() {
 
           <div className="space-y-3">
             <Input label="1) Template / Pod Name" required error={instanceNameError} value={instanceName} onChange={(event) => setInstanceName(event.target.value)} />
-            <Input label="2) Location (country / region / datacenter)" value={selected ? `${selected.country}/${selected.region}/${selected.datacenter}` : ""} readOnly />
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Input label="2) Location (country / region / datacenter)" value={selected ? `${selected.country}/${selected.region}/${selected.datacenter}` : ""} readOnly />
+              <Select
+                label="2) Provider"
+                value={providerState.providerID}
+                error={providerState.error}
+                onChange={(event) => providerState.setProviderID(event.target.value)}
+                options={
+                  providerState.options.length > 0
+                    ? providerState.options
+                    : [{ value: "", label: providerState.loading ? "Loading providers..." : "No providers available" }]
+                }
+              />
+            </div>
             <div className="grid gap-3 sm:grid-cols-3">
               <Input type="number" min={1} label="3) GPU count" value={String(gpuCount)} onChange={(event) => setGpuCount(Number(event.target.value) || 1)} />
               <Input type="number" min={2} label="3) CPU" value={String(cpuCores)} onChange={(event) => setCpuCores(Number(event.target.value) || 2)} />
@@ -369,7 +413,10 @@ export function MarketplacePanel() {
             </div>
             {deploySubmitted ? (
               <p className="rounded-md border border-success/40 bg-success/10 p-2 text-sm text-textSecondary">
-                {locale === "ru" ? "Запрос на деплой отправлен. Статус ресурса проверьте в My Instances." : "Deploy request submitted. Check My Instances for runtime status."}
+                {locale === "ru" ? "Пода создана. Проверьте статус в My Instances." : "Pod created. Check My Instances for runtime status."}
+                {deployResult?.id ? ` ID: ${deployResult.id}.` : ""}
+                {deployResult?.status ? ` Status: ${deployResult.status}.` : ""}
+                {deployResult?.created_at ? ` ${locale === "ru" ? "Создано" : "Created"}: ${formatDateTime(deployResult.created_at, locale)}.` : ""}
               </p>
             ) : null}
           </div>

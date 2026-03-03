@@ -7,9 +7,19 @@ import { SkeletonBlock } from "../design/patterns/SkeletonBlock";
 import { Button } from "../design/primitives/Button";
 import { Card } from "../design/primitives/Card";
 import { Input } from "../design/primitives/Input";
+import { Select } from "../design/primitives/Select";
+import { useProviderOptions } from "../features/providers/useProviderOptions";
+import { useEffect } from "react";
 
 export function BillingPanel() {
   const state = useBilling();
+  const providerState = useProviderOptions();
+
+  useEffect(() => {
+    if (!state.providerID && providerState.providerID) {
+      state.setProviderID(providerState.providerID);
+    }
+  }, [providerState.providerID, state.providerID]);
 
   function toggleColumn(key: string) {
     state.setVisibleColumns((prev) => {
@@ -27,7 +37,17 @@ export function BillingPanel() {
 
       <Card title="Billing usage" description="Use existing billing contract for cost preview and accrual history.">
         <form className="grid gap-3 md:grid-cols-2 xl:grid-cols-[2fr_2fr_1fr_1fr]" onSubmit={state.previewUsage}>
-          <Input label="Provider ID" value={state.providerID} onChange={(event) => state.setProviderID(event.target.value)} />
+          <Select
+            label="Provider"
+            value={state.providerID}
+            error={providerState.error}
+            onChange={(event) => state.setProviderID(event.target.value)}
+            options={
+              providerState.options.length > 0
+                ? providerState.options
+                : [{ value: "", label: providerState.loading ? "Loading providers..." : "No providers available" }]
+            }
+          />
           <Input label="Plan ID" value={state.planID} onChange={(event) => state.setPlanID(event.target.value)} />
           <Input
             type="number"

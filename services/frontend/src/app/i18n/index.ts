@@ -18,7 +18,7 @@ export const translations = {
       myCompute: "My Compute",
       provideCompute: "Provide Compute",
       billing: "Billing",
-      admin: "Админка",
+      admin: "Admin",
       settings: "Settings",
       // Legacy labels stay for deep screens and old links.
       myTemplates: "My Templates",
@@ -81,7 +81,7 @@ export const translations = {
       myCompute: "Мои мощности",
       provideCompute: "Предоставить мощности",
       billing: "Биллинг",
-      admin: "Admin",
+      admin: "Админка",
       settings: "Настройки",
       myTemplates: "Мои шаблоны",
       vm: "GPU серверы",

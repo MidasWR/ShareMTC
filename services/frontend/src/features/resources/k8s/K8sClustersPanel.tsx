@@ -7,21 +7,23 @@ import { PageSectionHeader } from "../../../design/patterns/PageSectionHeader";
 import { Button } from "../../../design/primitives/Button";
 import { Card } from "../../../design/primitives/Card";
 import { Input } from "../../../design/primitives/Input";
+import { Select } from "../../../design/primitives/Select";
 import { formatOperationMessage } from "../../../design/utils/operationFeedback";
 import { createK8sCluster, deleteK8sCluster, listK8sClusters, refreshK8sCluster } from "../api/resourcesApi";
 import { KubernetesCluster } from "../../../types/api";
 import { StatusBadge } from "../../../design/patterns/StatusBadge";
 import { ActionDropdown } from "../../../design/components/ActionDropdown";
 import { Modal } from "../../../design/components/Modal";
+import { useProviderOptions } from "../../providers/useProviderOptions";
 
 export function K8sClustersPanel() {
   const [rows, setRows] = useState<KubernetesCluster[]>([]);
   const [name, setName] = useState("core-k8s");
-  const [providerID, setProviderID] = useState("provider-default");
   const [loading, setLoading] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<KubernetesCluster | null>(null);
   const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
   const { push } = useToast();
+  const providerState = useProviderOptions();
 
   async function refresh() {
     setLoading(true);
@@ -41,11 +43,15 @@ export function K8sClustersPanel() {
 
   async function create(event: FormEvent) {
     event.preventDefault();
+    if (!providerState.providerID.trim()) {
+      push("error", "Provider is required", "Kubernetes");
+      return;
+    }
     setLoading(true);
     try {
       const created = await createK8sCluster({
         name,
-        provider_id: providerID,
+        provider_id: providerState.providerID,
         node_count: 3,
         node_type: "shared-cpu",
         k8s_version: "1.30"
@@ -95,7 +101,17 @@ export function K8sClustersPanel() {
       <Card title="Quick Create Cluster" description="Minimal create form for internal orchestrator.">
         <form className="grid items-end gap-3 md:grid-cols-[1fr_1fr_auto]" onSubmit={create}>
           <Input label="Cluster Name" value={name} onChange={(event) => setName(event.target.value)} />
-          <Input label="Provider ID" value={providerID} onChange={(event) => setProviderID(event.target.value)} />
+          <Select
+            label="Provider"
+            value={providerState.providerID}
+            error={providerState.error}
+            onChange={(event) => providerState.setProviderID(event.target.value)}
+            options={
+              providerState.options.length > 0
+                ? providerState.options
+                : [{ value: "", label: providerState.loading ? "Loading providers..." : "No providers available" }]
+            }
+          />
           <Button loading={loading} type="submit">Create</Button>
         </form>
       </Card>

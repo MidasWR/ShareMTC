@@ -7,9 +7,9 @@ import {
   releaseAllocation as releaseAllocationRequest,
   sendHeartbeat
 } from "../api/resourcesApi";
+import { useProviderOptions } from "../../providers/useProviderOptions";
 
 export function useAllocations() {
-  const [providerID, setProviderID] = useState("");
   const [cpuCores, setCpuCores] = useState("2");
   const [ramMB, setRamMB] = useState("4096");
   const [gpuUnits, setGpuUnits] = useState("0");
@@ -24,6 +24,7 @@ export function useAllocations() {
   const [sortBy, setSortBy] = useState<"newest" | "cpu" | "ram">("newest");
   const [visibleColumns, setVisibleColumns] = useState<string[]>(["id", "cpu", "ram", "gpu", "status", "actions"]);
   const { push } = useToast();
+  const providerState = useProviderOptions();
 
   const activeAllocations = useMemo(() => allocations.filter((item) => !item.released_at).length, [allocations]);
   const filteredAllocations = useMemo(() => {
@@ -42,13 +43,13 @@ export function useAllocations() {
   }, [allocations, search, statusFilter, sortBy]);
 
   async function load() {
-    if (!providerID.trim()) {
-      setStatusText("Provider ID is required to load allocations");
+    if (!providerState.providerID.trim()) {
+      setStatusText("Provider is required to load allocations");
       return;
     }
     setLoading(true);
     try {
-      const list = await listAllocations(providerID.trim());
+      const list = await listAllocations(providerState.providerID.trim());
       setAllocations(list);
       setStatusText(`Loaded ${list.length} allocations`);
     } catch (requestError) {
@@ -62,14 +63,14 @@ export function useAllocations() {
 
   async function create(event: FormEvent) {
     event.preventDefault();
-    if (!providerID.trim()) {
-      setStatusText("Provider ID is required before create");
+    if (!providerState.providerID.trim()) {
+      setStatusText("Provider is required before create");
       return;
     }
     setLoading(true);
     try {
       const created = await createAllocation({
-        provider_id: providerID.trim(),
+        provider_id: providerState.providerID.trim(),
         cpu_cores: Number(cpuCores) || 0,
         ram_mb: Number(ramMB) || 0,
         gpu_units: Number(gpuUnits) || 0
@@ -105,14 +106,14 @@ export function useAllocations() {
   }
 
   async function heartbeat() {
-    if (!providerID.trim()) {
-      setStatusText("Provider ID is required before heartbeat");
+    if (!providerState.providerID.trim()) {
+      setStatusText("Provider is required before heartbeat");
       return;
     }
     setLoading(true);
     try {
       await sendHeartbeat({
-        provider_id: providerID.trim(),
+        provider_id: providerState.providerID.trim(),
         cpu_free_cores: 8,
         ram_free_mb: 16384,
         gpu_free_units: 1,
@@ -131,8 +132,11 @@ export function useAllocations() {
   }
 
   return {
-    providerID,
-    setProviderID,
+    providerID: providerState.providerID,
+    setProviderID: providerState.setProviderID,
+    providerOptions: providerState.options,
+    providerLoading: providerState.loading,
+    providerError: providerState.error,
     cpuCores,
     setCpuCores,
     ramMB,

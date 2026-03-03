@@ -4,6 +4,7 @@ import { PageSectionHeader } from "../design/patterns/PageSectionHeader";
 import { Button } from "../design/primitives/Button";
 import { Card } from "../design/primitives/Card";
 import { Input } from "../design/primitives/Input";
+import { Select } from "../design/primitives/Select";
 import { AllocationDetailsDrawer } from "../features/resources/components/AllocationDetailsDrawer";
 import { AllocationFilters } from "../features/resources/components/AllocationFilters";
 import { AllocationMetrics } from "../features/resources/components/AllocationMetrics";
@@ -30,12 +31,17 @@ export function HostPanel() {
 
       <Card title="Pod allocations" description="Create and monitor running allocations for provider compute capacity.">
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[2fr_1fr_1fr_1fr]">
-          <Input
-            label="Provider ID"
+          <Select
+            label="Provider"
             value={state.providerID}
             onChange={(event) => state.setProviderID(event.target.value)}
-            placeholder="Provider UUID"
+            error={state.providerError}
             helpText="Used for list/create/release API operations."
+            options={
+              state.providerOptions.length > 0
+                ? state.providerOptions
+                : [{ value: "", label: state.providerLoading ? "Loading providers..." : "No providers available" }]
+            }
           />
           <Button variant="secondary" className="md:mt-7" onClick={state.load} loading={state.loading}>
             Load allocations

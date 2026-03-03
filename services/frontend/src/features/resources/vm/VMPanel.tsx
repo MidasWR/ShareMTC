@@ -15,13 +15,13 @@ import { VM, VMTemplate } from "../../../types/api";
 import { StatusBadge } from "../../../design/patterns/StatusBadge";
 import { ActionDropdown } from "../../../design/components/ActionDropdown";
 import { VM_TEMPLATE_FALLBACK } from "../defaults";
+import { useProviderOptions } from "../../providers/useProviderOptions";
 
 export function VMPanel() {
   const [rows, setRows] = useState<VM[]>([]);
   const [templates, setTemplates] = useState<VMTemplate[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
-  const [providerID, setProviderID] = useState("provider-default");
   const [name, setName] = useState("vm-instance");
   const [template, setTemplate] = useState("fastpanel");
   const [osName, setOsName] = useState("Ubuntu 22.04");
@@ -42,6 +42,7 @@ export function VMPanel() {
   const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
   const [terminateTarget, setTerminateTarget] = useState<VM | null>(null);
   const { push } = useToast();
+  const providerState = useProviderOptions();
 
   const selectedTemplate = templates.find((item) => item.code === template);
   const configSource = manualOverride ? "Manual override" : "From Template/Offer";
@@ -83,7 +84,7 @@ export function VMPanel() {
 
   async function createNewVM() {
     const nextErrors: Record<string, string> = {};
-    if (!providerID.trim()) nextErrors.provider_id = "Provider ID is required";
+    if (!providerState.providerID.trim()) nextErrors.provider_id = "Provider is required";
     if (!name.trim()) nextErrors.name = "VM Name is required";
     if (!template.trim()) nextErrors.template = "Template is required";
     if (!osName.trim()) nextErrors.os_name = "OS Name is required";
@@ -100,7 +101,7 @@ export function VMPanel() {
     setLoading(true);
     try {
       const created = await createVM({
-        provider_id: providerID.trim(),
+        provider_id: providerState.providerID.trim(),
         name: name.trim(),
         template,
         os_name: osName,
@@ -159,7 +160,17 @@ export function VMPanel() {
           Configuration source: <span className="font-medium text-textPrimary">{configSource}</span>
         </p>
         <div className="grid items-end gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <Input label="Provider ID" value={providerID} error={errors.provider_id} onChange={(event) => setProviderID(event.target.value)} />
+          <Select
+            label="Provider"
+            value={providerState.providerID}
+            error={errors.provider_id || providerState.error}
+            onChange={(event) => providerState.setProviderID(event.target.value)}
+            options={
+              providerState.options.length > 0
+                ? providerState.options
+                : [{ value: "", label: providerState.loading ? "Loading providers..." : "No providers available" }]
+            }
+          />
           <Input label="VM Name" value={name} error={errors.name} onChange={(event) => setName(event.target.value)} />
           <Select
             label="Template"

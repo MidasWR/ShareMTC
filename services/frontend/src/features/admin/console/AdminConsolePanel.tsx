@@ -16,6 +16,8 @@ import { getAgentInstallCommand } from "../api/adminApi";
 import { AdminPodsPanel } from "../catalog/AdminPodsPanel";
 import { copyTextToClipboard } from "../../../lib/clipboard";
 import { formatOperationMessage } from "../../../design/utils/operationFeedback";
+import { readUser } from "../../../lib/auth";
+import { buildInstallCommand } from "../../agent/installCommand";
 
 type AdminTab = "overview" | "providers" | "pods" | "allocations" | "billing" | "risk";
 const adminTabs: AdminTab[] = ["overview", "providers", "pods", "allocations", "billing", "risk"];
@@ -30,13 +32,15 @@ function readTabFromURL(): AdminTab {
 }
 
 export function AdminConsolePanel() {
+  const currentUser = readUser();
+  const initialInstall = buildInstallCommand("", "", currentUser?.id);
   const [tab, setTab] = useState<AdminTab>(() => readTabFromURL());
   const [loading, setLoading] = useState(false);
   const [commandLoading, setCommandLoading] = useState(false);
   const [allocations, setAllocations] = useState<Array<{ id: string; provider_id: string; cpu_cores: number; ram_mb: number; gpu_units: number; released_at?: string | null }>>([]);
   const [accruals, setAccruals] = useState<Array<{ id: string; provider_id: string; total_usd: number; vip_bonus_usd: number; created_at: string }>>([]);
-  const [installCommand, setInstallCommand] = useState("");
-  const [installerURL, setInstallerURL] = useState("");
+  const [installCommand, setInstallCommand] = useState(initialInstall.command);
+  const [installerURL, setInstallerURL] = useState(initialInstall.installerURL);
   const [lastDataRefreshAt, setLastDataRefreshAt] = useState<Date | null>(null);
   const [lastCommandRefreshAt, setLastCommandRefreshAt] = useState<Date | null>(null);
   const { push } = useToast();
@@ -59,11 +63,15 @@ export function AdminConsolePanel() {
   async function refreshInstallCommand() {
     setCommandLoading(true);
     try {
-      const payload = await getAgentInstallCommand();
-      setInstallCommand(payload.command);
-      setInstallerURL(payload.installer_url);
+      const payload = await getAgentInstallCommand({ user_id: currentUser?.id });
+      const next = buildInstallCommand(payload.command, payload.installer_url, currentUser?.id);
+      setInstallCommand(next.command);
+      setInstallerURL(next.installerURL);
       setLastCommandRefreshAt(new Date());
     } catch (error) {
+      const fallback = buildInstallCommand("", "", currentUser?.id);
+      setInstallCommand(fallback.command);
+      setInstallerURL(fallback.installerURL);
       push("error", error instanceof Error ? error.message : "Failed to fetch install command", "Admin");
     } finally {
       setCommandLoading(false);
@@ -166,11 +174,11 @@ export function AdminConsolePanel() {
       </Card>
       <Card title="Agent Install (one-command)" description="Copy this command to install hostagent on a host machine.">
         <div className="rounded-md border border-border bg-elevated p-3 font-mono text-xs text-textSecondary">
-          {installCommand || "Press 'Refresh curl' to fetch the latest command."}
+          {installCommand}
         </div>
         <div className="mt-3 rounded-md border border-border bg-canvas p-3 text-xs text-textSecondary">
           <div className="mb-2 uppercase tracking-wide text-textMuted">Direct installer URL</div>
-          <div className="break-all font-mono">{installerURL || "Press 'Refresh curl' to fetch installer URL."}</div>
+          <div className="break-all font-mono">{installerURL}</div>
           <div className="mt-3 flex flex-wrap gap-2">
             <Button variant="secondary" onClick={copyInstallCommand} disabled={!installCommand}>
               Copy curl command

@@ -16,8 +16,8 @@ const PREFILL_ADMIN_USERNAME = import.meta.env.VITE_ADMIN_PREFILL_USERNAME ?? "a
 const PREFILL_ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PREFILL_PASSWORD ?? "admin123";
 
 export function AdminAccessPanel({ onSuccess }: Props) {
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
+  const [username, setUsername] = useState(PREFILL_ADMIN_USERNAME);
+  const [password, setPassword] = useState(PREFILL_ADMIN_PASSWORD);
   const [errors, setErrors] = useState<{ username?: string; password?: string }>({});
   const [loading, setLoading] = useState(false);
   const { push } = useToast();

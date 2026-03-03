@@ -47,6 +47,10 @@ func main() {
 		logger.Fatal().Err(err).Msg("migration failed")
 	}
 	logger.Info().Msg("auth database migrations applied")
+	if err := repo.EnsureLocalUser(ctx, "admin@local", "admin"); err != nil {
+		logger.Fatal().Err(err).Msg("failed to ensure default admin user")
+	}
+	logger.Info().Msg("default admin user ensured")
 
 	svc := service.New(repo, cfg.JWTSecret, time.Duration(cfg.TokenTTLMinutes)*time.Minute)
 	logger.Info().Msg("auth service initialized")

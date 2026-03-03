@@ -19,7 +19,9 @@ export function AppShell({ tab, enabledMenu, onNavigate, onShortcuts, onLogout, 
   const { settings } = useSettings();
   const locale = settings.language === "ru" ? "ru" : "en";
   const activeItem = enabledMenu.find((item) => item.id === tab);
-  const groupLabel = activeItem?.group === "account" ? "Account" : "Workspace";
+  const groupLabel = activeItem?.group === "account"
+    ? (locale === "ru" ? "Аккаунт" : "Account")
+    : (locale === "ru" ? "Рабочее пространство" : "Workspace");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   return (
@@ -39,7 +41,7 @@ export function AppShell({ tab, enabledMenu, onNavigate, onShortcuts, onLogout, 
           onShortcuts={onShortcuts}
         />
       </div>
-      <Drawer open={mobileNavOpen} title="Navigation" onClose={() => setMobileNavOpen(false)}>
+      <Drawer open={mobileNavOpen} title={locale === "ru" ? "Навигация" : "Navigation"} onClose={() => setMobileNavOpen(false)}>
         <SidebarNav
           tab={tab}
           enabledMenu={enabledMenu}
@@ -60,15 +62,15 @@ export function AppShell({ tab, enabledMenu, onNavigate, onShortcuts, onLogout, 
       </Drawer>
       <main id="content" className="page-container section-stack" tabIndex={-1}>
         <header className="mb-1 flex items-center justify-between lg:hidden">
-          <Button variant="secondary" onClick={() => setMobileNavOpen(true)} aria-label="Open navigation">
-            Menu
+          <Button variant="secondary" onClick={() => setMobileNavOpen(true)} aria-label={locale === "ru" ? "Открыть навигацию" : "Open navigation"}>
+            {locale === "ru" ? "Меню" : "Menu"}
           </Button>
           <img src="/logo-sharemtc.svg" alt="ShareMTC logo" className="h-6 w-6" />
         </header>
         <header className="mb-2 flex items-center justify-between gap-2 text-textSecondary">
           <div className="flex items-center gap-2">
             <BadgeLabel label={groupLabel} />
-            <span className="text-sm font-medium text-textPrimary">{activeItem?.label ?? "Marketplace"}</span>
+            <span className="text-sm font-medium text-textPrimary">{activeItem?.label ?? (locale === "ru" ? "Маркетплейс" : "Marketplace")}</span>
           </div>
           <img src="/logo-sharemtc.svg" alt="ShareMTC logo" className="h-6 w-6" />
         </header>

@@ -11,6 +11,7 @@ import (
 
 	"github.com/MidasWR/ShareMTC/services/adminservice/internal/models"
 	"github.com/MidasWR/ShareMTC/services/adminservice/internal/service"
+	sdkauth "github.com/MidasWR/ShareMTC/services/sdk/auth"
 	"github.com/MidasWR/ShareMTC/services/sdk/httpx"
 	"github.com/go-chi/chi/v5"
 )
@@ -184,6 +185,11 @@ func (h *Handler) DeletePodTemplate(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) AgentInstallCommand(w http.ResponseWriter, r *http.Request) {
+	claims := sdkauth.ClaimsFromContext(r.Context())
+	userID := strings.TrimSpace(r.URL.Query().Get("user_id"))
+	if userID == "" && claims != nil {
+		userID = strings.TrimSpace(claims.UserID)
+	}
 	resourceURL := h.agentResourceURL
 	kafkaBrokers := h.agentKafkaBrokers
 	if resourceURL == "" || kafkaBrokers == "" {
@@ -231,13 +237,26 @@ func (h *Handler) AgentInstallCommand(w http.ResponseWriter, r *http.Request) {
 		imageRepo = "midaswr/host-hostagent"
 	}
 	installerURL := buildInstallerURL(repo, releaseTag)
+	if userID != "" {
+		if parsed, err := url.Parse(installerURL); err == nil {
+			q := parsed.Query()
+			q.Set("provider_id", userID)
+			parsed.RawQuery = q.Encode()
+			installerURL = parsed.String()
+		}
+	}
+	providerID := userID
+	if providerID == "" {
+		providerID = "local-host"
+	}
 	installCommand := fmt.Sprintf(
-		"curl -fsSL %s | sudo RESOURCE_API_URL=%s KAFKA_BROKERS=%s IMAGE_REPO=%s IMAGE_TAG=%s bash",
+		"curl -fsSL %s | sudo RESOURCE_API_URL=%s KAFKA_BROKERS=%s IMAGE_REPO=%s IMAGE_TAG=%s PROVIDER_ID=%s bash",
 		shellQuote(installerURL),
 		shellQuote(resourceURL),
 		shellQuote(kafkaBrokers),
 		shellQuote(imageRepo),
 		shellQuote(releaseTag),
+		shellQuote(providerID),
 	)
 	httpx.JSON(w, http.StatusOK, models.AgentInstallCommand{
 		Command:      installCommand,

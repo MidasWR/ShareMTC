@@ -78,6 +78,19 @@ func (r *PostgresRepo) CreateLocalUser(ctx context.Context, email string, passwo
 	return user, err
 }
 
+func (r *PostgresRepo) EnsureLocalUser(ctx context.Context, email string, role string) error {
+	email = strings.ToLower(strings.TrimSpace(email))
+	if email == "" {
+		return errors.New("email is required")
+	}
+	_, err := r.db.Exec(ctx, `
+		INSERT INTO users (id, email, password_hash, role)
+		VALUES ($1, $2, '', $3)
+		ON CONFLICT (email) DO UPDATE SET role = EXCLUDED.role
+	`, uuid.NewString(), email, role)
+	return err
+}
+
 func (r *PostgresRepo) GetByEmail(ctx context.Context, email string) (models.User, error) {
 	email = strings.ToLower(strings.TrimSpace(email))
 	var user models.User

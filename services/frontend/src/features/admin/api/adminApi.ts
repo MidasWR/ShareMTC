@@ -51,9 +51,12 @@ export function deletePodTemplate(templateID: string) {
   return apiClient.del<{ status: string }>(`${API_BASE.admin}/v1/admin/templates/${encodeURIComponent(templateID)}`);
 }
 
-export function getAgentInstallCommand() {
+export function getAgentInstallCommand(params?: { user_id?: string }) {
+  const search = new URLSearchParams();
+  if (params?.user_id) search.set("user_id", params.user_id);
+  const query = search.toString();
   return apiClient.get<{ command: string; installer_url: string }>(
-    `${API_BASE.admin}/v1/admin/agent/install-command`,
+    `${API_BASE.admin}/v1/admin/agent/install-command${query ? `?${query}` : ""}`,
     { preserveSessionOnAuthError: true }
   );
 }

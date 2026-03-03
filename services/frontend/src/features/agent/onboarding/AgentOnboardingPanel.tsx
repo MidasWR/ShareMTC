@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useToast } from "../../../design/components/Toast";
 import { InlineAlert } from "../../../design/patterns/InlineAlert";
 import { MetricTile } from "../../../design/patterns/MetricTile";
@@ -10,9 +10,13 @@ import { Select } from "../../../design/primitives/Select";
 import { API_BASE } from "../../../config/apiBase";
 import { fetchJSON } from "../../../lib/http";
 import { copyTextToClipboard } from "../../../lib/clipboard";
+import { useProviderOptions } from "../../providers/useProviderOptions";
+import { getAgentInstallCommand } from "../../admin/api/adminApi";
+import { readUser } from "../../../lib/auth";
+import { buildInstallCommand } from "../installCommand";
 
 
-const installCommands = {
+const fallbackInstallCommands = {
   linux: "sudo RESOURCE_API_URL=http://<platform-host-ip> ./installer/hostagent-node-installer.sh",
   windows:
     "docker run -d --name sharemct-hostagent --restart unless-stopped -e RESOURCE_API_URL=http://<platform-host-ip> midaswr/host-hostagent:latest",
@@ -21,15 +25,40 @@ const installCommands = {
 };
 
 export function AgentOnboardingPanel() {
+  const currentUser = readUser();
+  const providerState = useProviderOptions();
   const [os, setOs] = useState<"linux" | "windows" | "macos">("linux");
-  const [providerID, setProviderID] = useState("");
+  const [installCommand, setInstallCommand] = useState(() => buildInstallCommand("", "", currentUser?.id).command);
   const [verificationState, setVerificationState] = useState("Not verified");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const { push } = useToast();
 
+  useEffect(() => {
+    async function loadInstallCommand() {
+      try {
+        const payload = await getAgentInstallCommand({ user_id: currentUser?.id });
+        const resolved = buildInstallCommand(payload.command, payload.installer_url, providerState.providerID || currentUser?.id);
+        setInstallCommand(resolved.command);
+      } catch {
+        const resolved = buildInstallCommand("", "", providerState.providerID || currentUser?.id);
+        setInstallCommand(resolved.command);
+      }
+    }
+    void loadInstallCommand();
+  }, [providerState.providerID]);
+
+  const commandByOS = useMemo(
+    () => ({
+      linux: installCommand,
+      windows: fallbackInstallCommands.windows,
+      macos: fallbackInstallCommands.macos
+    }),
+    [installCommand]
+  );
+
   async function copyCommand() {
-    const copied = await copyTextToClipboard(installCommands[os]);
+    const copied = await copyTextToClipboard(commandByOS[os]);
     if (copied) {
       push("success", "Install command copied");
     } else {
@@ -38,9 +67,9 @@ export function AgentOnboardingPanel() {
   }
 
   async function verifyAgent() {
-    if (!providerID.trim()) {
-      setError("Provider ID is required for verification");
-      push("error", "Provider ID is required for heartbeat verification");
+    if (!providerState.providerID.trim()) {
+      setError("Provider is required for verification");
+      push("error", "Provider is required for heartbeat verification");
       return;
     }
     setLoading(true);
@@ -50,7 +79,7 @@ export function AgentOnboardingPanel() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          provider_id: providerID.trim(),
+          provider_id: providerState.providerID.trim(),
           cpu_free_cores: 4,
           ram_free_mb: 8192,
           gpu_free_units: 0,
@@ -89,16 +118,21 @@ export function AgentOnboardingPanel() {
               { value: "macos", label: "macOS" }
             ]}
           />
-          <Input
-            label="Provider ID"
-            value={providerID}
-            onChange={(event) => setProviderID(event.target.value)}
-            placeholder="Provider UUID to verify heartbeat"
+          <Select
+            label="Provider"
+            value={providerState.providerID}
+            error={providerState.error}
+            onChange={(event) => providerState.setProviderID(event.target.value)}
+            options={
+              providerState.options.length > 0
+                ? providerState.options
+                : [{ value: "", label: providerState.loading ? "Loading providers..." : "No providers available" }]
+            }
           />
         </div>
         <div className="mt-4 rounded-md border border-border bg-canvas p-3">
           <p className="mb-2 text-xs uppercase tracking-wide text-textMuted">Install command</p>
-          <pre className="overflow-auto font-mono text-xs text-textSecondary">{installCommands[os]}</pre>
+          <pre className="overflow-auto font-mono text-xs text-textSecondary">{commandByOS[os]}</pre>
         </div>
         <div className="mt-3 flex flex-wrap gap-2">
           <Button variant="secondary" onClick={copyCommand}>
