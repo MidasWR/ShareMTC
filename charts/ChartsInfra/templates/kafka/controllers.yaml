@@ -1,12 +1,14 @@
-apiVersion: kafka.strimzi.io/v1beta2
+apiVersion: kafka.strimzi.io/v1
 kind: Kafka
 metadata:
   name: {{ .Values.kafka.clusterName }}
   namespace: {{ .Values.global.namespace }}
+  annotations:
+    strimzi.io/kraft: enabled
+    strimzi.io/node-pools: enabled
 spec:
   kafka:
     version: {{ .Values.kafka.version | quote }}
-    replicas: {{ .Values.kafka.replicas }}
     listeners:
       - name: plain
         port: 9092
@@ -18,12 +20,6 @@ spec:
       transaction.state.log.min.isr: 1
       default.replication.factor: 1
       min.insync.replicas: 1
-    storage:
-      type: ephemeral
-  zookeeper:
-    replicas: {{ .Values.kafka.replicas }}
-    storage:
-      type: ephemeral
   entityOperator:
     topicOperator: {}
     userOperator: {}

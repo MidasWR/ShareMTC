@@ -80,15 +80,59 @@ wait_for_service() {
 
 wait_for_kafka_readiness() {
   local max_wait="${1:-10m}"
-  echo "Waiting for Kafka cluster ${KAFKA_CLUSTER_NAME} in namespace ${NAMESPACE}..."
-  if ! kubectl -n "${NAMESPACE}" wait kafka/"${KAFKA_CLUSTER_NAME}" --for=condition=Ready=True --timeout="${max_wait}"; then
+  local deadline
+  local now
+  local ready
+  local conditions
+  local sleep_sec=10
+
+  deadline="$(date -d "+${max_wait}" +%s 2>/dev/null || true)"
+  if [[ -z "${deadline}" ]]; then
+    deadline="$(( $(date +%s) + 600 ))"
+  fi
+
+  echo "Waiting for Kafka cluster ${KAFKA_CLUSTER_NAME} in namespace ${NAMESPACE} (timeout ${max_wait})..."
+  while true; do
+    now="$(date +%s)"
+    if [[ "${now}" -ge "${deadline}" ]]; then
+      break
+    fi
+
+    ready="$(kubectl -n "${NAMESPACE}" get kafka "${KAFKA_CLUSTER_NAME}" -o jsonpath='{range .status.conditions[?(@.type=="Ready")]}{.status}{end}' 2>/dev/null || true)"
+    if [[ "${ready}" == "True" ]]; then
+      echo "Kafka cluster ${KAFKA_CLUSTER_NAME} reported Ready=True."
+      wait_for_service "${NAMESPACE}" "${KAFKA_BOOTSTRAP_SERVICE}" 120
+      return 0
+    fi
+
+    echo "Kafka is not Ready yet. Current conditions:"
+    conditions="$(kubectl -n "${NAMESPACE}" get kafka "${KAFKA_CLUSTER_NAME}" -o jsonpath='{range .status.conditions[*]}{.type}={.status}:{.reason}{" - "}{.message}{"\n"}{end}' 2>/dev/null || true)"
+    if [[ -n "${conditions}" ]]; then
+      echo "${conditions}"
+    else
+      echo "No status conditions yet (resource may still be reconciling)."
+    fi
+
+    echo "Kafka-related pods:"
+    kubectl -n "${NAMESPACE}" get pods -l "strimzi.io/cluster=${KAFKA_CLUSTER_NAME}" --no-headers 2>/dev/null || true
+    sleep "${sleep_sec}"
+  done
+
+  if ! kubectl -n "${NAMESPACE}" wait kafka/"${KAFKA_CLUSTER_NAME}" --for=condition=Ready=True --timeout=1s >/dev/null 2>&1; then
     echo "Kafka cluster ${KAFKA_CLUSTER_NAME} is not Ready."
     kubectl -n "${NAMESPACE}" get kafka "${KAFKA_CLUSTER_NAME}" -o yaml || true
     kubectl -n "${NAMESPACE}" describe kafka "${KAFKA_CLUSTER_NAME}" || true
     kubectl -n "${NAMESPACE}" get pods -o wide | grep -E "${KAFKA_CLUSTER_NAME}|zookeeper|entity-operator" || true
+    kubectl -n "${STRIMZI_NAMESPACE}" get pods -o wide || true
+    kubectl -n "${STRIMZI_NAMESPACE}" logs deployment/strimzi-cluster-operator --tail=200 || true
     return 1
   fi
-  wait_for_service "${NAMESPACE}" "${KAFKA_BOOTSTRAP_SERVICE}" 120
+}
+
+wait_for_strimzi_operator_readiness() {
+  local max_wait="${1:-10m}"
+  echo "Waiting for Strimzi operator rollout in namespace ${STRIMZI_NAMESPACE}..."
+  kubectl -n "${STRIMZI_NAMESPACE}" rollout status deployment/strimzi-cluster-operator --timeout="${max_wait}"
 }
 
 resolve_envoy_gateway_class() {
@@ -172,6 +216,7 @@ install_prerequisites() {
   adopt_strimzi_cluster_resources "${STRIMZI_NAMESPACE}"
   helm upgrade --install strimzi-kafka-operator strimzi/strimzi-kafka-operator -n "${STRIMZI_NAMESPACE}" --create-namespace \
     --set watchAnyNamespace=true
+  wait_for_strimzi_operator_readiness "${HELM_TIMEOUT}"
   helm upgrade --install kyverno kyverno/kyverno -n kyverno --create-namespace
   helm upgrade --install postgres-operator postgres-operator-charts/postgres-operator -n postgres-operator --create-namespace
   helm upgrade --install vpa fairwinds-stable/vpa -n vpa --create-namespace
