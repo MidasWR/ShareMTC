@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/MidasWR/ShareMTC/services/hostagent/config"
@@ -68,6 +69,16 @@ func main() {
 			if err := producer.PublishMetric(context.Background(), cfg.KafkaTopic, metric); err != nil {
 				logger.Error().Err(err).Msg("publish metric failed")
 			}
+			for _, evt := range metricEvents(metric) {
+				if err := producer.PublishEvent(context.Background(), cfg.KafkaTopic, evt); err != nil {
+					logger.Error().Err(err).Str("event_type", evt.EventType).Msg("publish telemetry event failed")
+				}
+			}
+			for _, evt := range healthLogEvents(metric) {
+				if err := producer.PublishEvent(context.Background(), cfg.KafkaTopic, evt); err != nil {
+					logger.Error().Err(err).Str("event_type", evt.EventType).Msg("publish log event failed")
+				}
+			}
 		}
 		if cfg.ResourceAPIURL != "" {
 			if err := httpclient.SendHeartbeat(context.Background(), cfg.ResourceAPIURL, cfg.AgentToken, metric); err != nil {
@@ -88,13 +99,19 @@ func main() {
 		}
 		logger.Info().
 			Str("provider_id", metric.ProviderID).
+			Int("cpu_total_cores", metric.CPUTotalCores).
 			Int("cpu_free_cores", metric.CPUFreeCores).
+			Int("ram_total_mb", metric.RAMTotalMB).
 			Int("ram_free_mb", metric.RAMFreeMB).
 			Int("gpu_free_units", metric.GPUFreeUnits).
 			Int("gpu_total_units", metric.GPUTotalUnits).
 			Int("gpu_memory_total_mb", metric.GPUMemoryTotalMB).
 			Int("gpu_memory_used_mb", metric.GPUMemoryUsedMB).
+			Int("disk_total_mb", metric.DiskTotalMB).
+			Int("disk_free_mb", metric.DiskFreeMB).
 			Int("network_mbps", metric.NetworkMbps).
+			Float64("load_avg_1m", metric.LoadAvg1m).
+			Int64("uptime_seconds", metric.UptimeSeconds).
 			Msg("metric sent")
 	}
 }
@@ -107,4 +124,83 @@ func serviceLog(providerID string, level string, message string) models.AgentLog
 		Source:     "hostagent",
 		CreatedAt:  time.Now().UTC(),
 	}
+}
+
+func metricEvents(metric models.HostMetric) []kafka.Event {
+	now := metric.HeartbeatAt
+	if now.IsZero() {
+		now = time.Now().UTC()
+	}
+	makeMetric := func(metricType string, value float64) kafka.Event {
+		return kafka.Event{
+			EventType:  "metric",
+			ProviderID: metric.ProviderID,
+			ResourceID: metric.ProviderID,
+			OccurredAt: now,
+			Payload: map[string]interface{}{
+				"resource_type": "host",
+				"metric_type":   metricType,
+				"value":         value,
+			},
+		}
+	}
+	return []kafka.Event{
+		makeMetric("host_cpu_total_cores", float64(metric.CPUTotalCores)),
+		makeMetric("host_cpu_free_cores", float64(metric.CPUFreeCores)),
+		makeMetric("host_ram_total_mb", float64(metric.RAMTotalMB)),
+		makeMetric("host_ram_free_mb", float64(metric.RAMFreeMB)),
+		makeMetric("host_gpu_total_units", float64(metric.GPUTotalUnits)),
+		makeMetric("host_gpu_free_units", float64(metric.GPUFreeUnits)),
+		makeMetric("host_gpu_memory_total_mb", float64(metric.GPUMemoryTotalMB)),
+		makeMetric("host_gpu_memory_used_mb", float64(metric.GPUMemoryUsedMB)),
+		makeMetric("host_disk_total_mb", float64(metric.DiskTotalMB)),
+		makeMetric("host_disk_free_mb", float64(metric.DiskFreeMB)),
+		makeMetric("host_network_mbps", float64(metric.NetworkMbps)),
+		makeMetric("host_load_avg_1m", metric.LoadAvg1m),
+		makeMetric("host_uptime_seconds", float64(metric.UptimeSeconds)),
+	}
+}
+
+func healthLogEvents(metric models.HostMetric) []kafka.Event {
+	events := make([]kafka.Event, 0, 2)
+	now := metric.HeartbeatAt
+	if now.IsZero() {
+		now = time.Now().UTC()
+	}
+	diskFreeRatio := ratio(metric.DiskFreeMB, metric.DiskTotalMB)
+	ramFreeRatio := ratio(metric.RAMFreeMB, metric.RAMTotalMB)
+	if diskFreeRatio < 0.1 {
+		events = append(events, kafka.Event{
+			EventType:  "agent_log",
+			ProviderID: metric.ProviderID,
+			ResourceID: metric.ProviderID,
+			OccurredAt: now,
+			Payload: map[string]interface{}{
+				"level":   "warning",
+				"source":  "hostagent",
+				"message": fmt.Sprintf("low disk headroom: %.2f%% free", diskFreeRatio*100),
+			},
+		})
+	}
+	if ramFreeRatio < 0.1 {
+		events = append(events, kafka.Event{
+			EventType:  "agent_log",
+			ProviderID: metric.ProviderID,
+			ResourceID: metric.ProviderID,
+			OccurredAt: now,
+			Payload: map[string]interface{}{
+				"level":   "warning",
+				"source":  "hostagent",
+				"message": fmt.Sprintf("low RAM headroom: %.2f%% free", ramFreeRatio*100),
+			},
+		})
+	}
+	return events
+}
+
+func ratio(part int, total int) float64 {
+	if total <= 0 || part <= 0 {
+		return 0
+	}
+	return float64(part) / float64(total)
 }

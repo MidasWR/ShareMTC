@@ -11,6 +11,7 @@ import (
 	"github.com/MidasWR/ShareMTC/services/resourceservice/internal/adapter/provisioning"
 	"github.com/MidasWR/ShareMTC/services/resourceservice/internal/models"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/rs/zerolog/log"
 )
 
@@ -77,16 +78,16 @@ type CGroupApplier interface {
 }
 
 type ResourceService struct {
-	repo            Repository
-	cgroups         CGroupApplier
-	orchestrator    orchestrator.Runtime
-	provisioning    ProvisioningClient
-	heartbeatMaxAge time.Duration
-	createRateLimitRPM int
-	vmTTL time.Duration
-	vmDaemonDownloadURL string
+	repo                 Repository
+	cgroups              CGroupApplier
+	orchestrator         orchestrator.Runtime
+	provisioning         ProvisioningClient
+	heartbeatMaxAge      time.Duration
+	createRateLimitRPM   int
+	vmTTL                time.Duration
+	vmDaemonDownloadURL  string
 	vmDaemonKafkaBrokers string
-	vmDaemonKafkaTopic string
+	vmDaemonKafkaTopic   string
 }
 
 type ProvisioningClient interface {
@@ -138,6 +139,9 @@ func (s *ResourceService) Allocate(ctx context.Context, alloc models.Allocation)
 	host, err := s.repo.GetHostResource(ctx, alloc.ProviderID)
 	if err != nil {
 		log.Error().Err(err).Str("provider_id", alloc.ProviderID).Msg("allocation failed on heartbeat lookup")
+		if errors.Is(err, pgx.ErrNoRows) {
+			return models.Allocation{}, errors.New("host heartbeat not found")
+		}
 		return models.Allocation{}, err
 	}
 	if host.ProviderID == "" {

@@ -11,6 +11,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"syscall"
 )
 
 const gpuBusyThreshold = 0.85
@@ -122,6 +123,76 @@ func memFreeMB() (int, error) {
 		return 0, err
 	}
 	return 0, errors.New("memavailable not found")
+}
+
+func memTotalMB() (int, error) {
+	file, err := os.Open("/proc/meminfo")
+	if err != nil {
+		return 0, err
+	}
+	defer file.Close()
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.HasPrefix(line, "MemTotal:") {
+			fields := strings.Fields(line)
+			if len(fields) < 2 {
+				return 0, errors.New("unexpected meminfo format")
+			}
+			kb, err := strconv.Atoi(fields[1])
+			if err != nil {
+				return 0, err
+			}
+			return kb / 1024, nil
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return 0, err
+	}
+	return 0, errors.New("memtotal not found")
+}
+
+func cpuTotalCores() int {
+	total := runtime.NumCPU()
+	if total < 0 {
+		return 0
+	}
+	return total
+}
+
+func diskUsageMB(path string) (int, int, error) {
+	var stat syscall.Statfs_t
+	if err := syscall.Statfs(path, &stat); err != nil {
+		return 0, 0, err
+	}
+	total := int((stat.Blocks * uint64(stat.Bsize)) / (1024 * 1024))
+	free := int((stat.Bavail * uint64(stat.Bsize)) / (1024 * 1024))
+	if total < 0 {
+		total = 0
+	}
+	if free < 0 {
+		free = 0
+	}
+	return total, free, nil
+}
+
+func uptimeSeconds() (int64, error) {
+	data, err := os.ReadFile("/proc/uptime")
+	if err != nil {
+		return 0, err
+	}
+	fields := strings.Fields(string(data))
+	if len(fields) < 1 {
+		return 0, errors.New("unexpected /proc/uptime format")
+	}
+	seconds, err := strconv.ParseFloat(fields[0], 64)
+	if err != nil {
+		return 0, err
+	}
+	if seconds < 0 {
+		return 0, nil
+	}
+	return int64(seconds), nil
 }
 
 func networkBytes() (int64, error) {

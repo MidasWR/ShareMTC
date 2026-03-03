@@ -3,6 +3,7 @@ package kafka
 import (
 	"context"
 	"encoding/json"
+	"time"
 
 	"github.com/IBM/sarama"
 	"github.com/MidasWR/ShareMTC/services/hostagent/internal/models"
@@ -10,6 +11,14 @@ import (
 
 type Producer struct {
 	sync sarama.SyncProducer
+}
+
+type Event struct {
+	EventType  string                 `json:"event_type"`
+	ProviderID string                 `json:"provider_id"`
+	ResourceID string                 `json:"resource_id,omitempty"`
+	OccurredAt time.Time              `json:"occurred_at"`
+	Payload    map[string]interface{} `json:"payload,omitempty"`
 }
 
 func New(brokers []string) (*Producer, error) {
@@ -37,6 +46,21 @@ func (p *Producer) PublishMetric(ctx context.Context, topic string, metric model
 	msg := &sarama.ProducerMessage{
 		Topic: topic,
 		Key:   sarama.StringEncoder(metric.ProviderID),
+		Value: sarama.ByteEncoder(payload),
+	}
+	_, _, err = p.sync.SendMessage(msg)
+	return err
+}
+
+func (p *Producer) PublishEvent(ctx context.Context, topic string, event Event) error {
+	_ = ctx
+	payload, err := json.Marshal(event)
+	if err != nil {
+		return err
+	}
+	msg := &sarama.ProducerMessage{
+		Topic: topic,
+		Key:   sarama.StringEncoder(event.ProviderID),
 		Value: sarama.ByteEncoder(payload),
 	}
 	_, _, err = p.sync.SendMessage(msg)

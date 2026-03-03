@@ -217,9 +217,17 @@ func handleHealthCheckEvent(ctx context.Context, svc *service.ResourceService, e
 }
 
 func handleMetricEvent(ctx context.Context, svc *service.ResourceService, event kafkaadapter.Event) error {
+	resourceType := getString(event.Payload, "resource_type", "vm")
+	resourceID := event.ResourceID
+	if resourceID == "" {
+		resourceID = getString(event.Payload, "resource_id", "")
+	}
+	if resourceID == "" {
+		resourceID = event.ProviderID
+	}
 	item := models.MetricPoint{
-		ResourceType: "vm",
-		ResourceID:   event.ResourceID,
+		ResourceType: resourceType,
+		ResourceID:   resourceID,
 		MetricType:   getString(event.Payload, "metric_type", "unknown"),
 		Value:        getFloat(event.Payload, "value", 0),
 		CapturedAt:   event.OccurredAt,

@@ -14,6 +14,26 @@ func memFreeMB() (int, error) {
 	return 0, errUnsupportedPlatform
 }
 
+func memTotalMB() (int, error) {
+	return 0, errUnsupportedPlatform
+}
+
+func cpuTotalCores() int {
+	return 0
+}
+
+func diskUsageMB(_ string) (int, int, error) {
+	return 0, 0, errUnsupportedPlatform
+}
+
+func loadAvg1m() (float64, error) {
+	return 0, errUnsupportedPlatform
+}
+
+func uptimeSeconds() (int64, error) {
+	return 0, errUnsupportedPlatform
+}
+
 func networkBytes() (int64, error) {
 	return 0, errUnsupportedPlatform
 }
