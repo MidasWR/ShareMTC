@@ -12,6 +12,14 @@ spec:
       allowedRoutes:
         namespaces:
           from: Same
+{{- if .Values.envoy.kafka.enabled }}
+    - name: kafka
+      protocol: TCP
+      port: {{ .Values.envoy.kafka.externalPort }}
+      allowedRoutes:
+        namespaces:
+          from: Same
+{{- end }}
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
@@ -88,3 +96,20 @@ spec:
         - name: {{ .Values.services.frontend.name }}
           namespace: {{ .Values.services.namespace }}
           port: {{ .Values.services.frontend.port }}
+{{- if .Values.envoy.kafka.enabled }}
+---
+apiVersion: gateway.networking.k8s.io/v1alpha2
+kind: TCPRoute
+metadata:
+  name: kafka-route
+  namespace: {{ .Values.global.namespace }}
+spec:
+  parentRefs:
+    - name: {{ .Values.envoy.dns }}
+      sectionName: kafka
+  rules:
+    - backendRefs:
+        - name: {{ .Values.kafka.clusterName }}-kafka-bootstrap
+          namespace: {{ .Values.global.namespace }}
+          port: {{ .Values.envoy.kafka.upstreamPort }}
+{{- end }}

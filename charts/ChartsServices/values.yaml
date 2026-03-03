@@ -25,6 +25,8 @@ admin:
   agentInstaller:
     resourceApiURL: ""
     kafkaBrokers: ""
+    publicHost: ""
+    kafkaPort: 9092
     imageRepo: midaswr/host-hostagent
 
 resource:

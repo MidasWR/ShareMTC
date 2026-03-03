@@ -15,6 +15,11 @@ if ! command -v docker >/dev/null 2>&1; then
   echo "Docker is required but not installed."
   exit 1
 fi
+DOCKER_BIN="$(command -v docker)"
+if [[ -z "${DOCKER_BIN}" || ! -x "${DOCKER_BIN}" ]]; then
+  echo "Docker executable path is invalid: ${DOCKER_BIN}"
+  exit 1
+fi
 
 IMAGE_REPO="${IMAGE_REPO:-midaswr/host-hostagent}"
 IMAGE_TAG="${IMAGE_TAG:-latest}"
@@ -50,9 +55,9 @@ Wants=network-online.target
 Restart=always
 RestartSec=5
 EnvironmentFile=/etc/sharemct/hostagent.env
-ExecStartPre=/usr/bin/docker pull ${IMAGE_REPO}:${IMAGE_TAG}
-ExecStart=/usr/bin/docker run --rm --name sharemct-hostagent --privileged --network host --env-file /etc/sharemct/hostagent.env ${IMAGE_REPO}:${IMAGE_TAG}
-ExecStop=/usr/bin/docker stop sharemct-hostagent
+ExecStartPre=${DOCKER_BIN} pull ${IMAGE_REPO}:${IMAGE_TAG}
+ExecStart=${DOCKER_BIN} run --rm --name sharemct-hostagent --privileged --network host --env-file /etc/sharemct/hostagent.env ${IMAGE_REPO}:${IMAGE_TAG}
+ExecStop=${DOCKER_BIN} stop sharemct-hostagent
 
 [Install]
 WantedBy=multi-user.target

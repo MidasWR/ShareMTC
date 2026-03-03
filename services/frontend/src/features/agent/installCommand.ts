@@ -1,4 +1,5 @@
 const DEFAULT_INSTALLER_URL = "https://github.com/MidasWR/ShareMTC/releases/latest/download/hostagent-node-installer.sh";
+const DEFAULT_KAFKA_PORT = 9092;
 
 function shellQuote(value: string): string {
   return `'${value.replace(/'/g, `'\\''`)}'`;
@@ -22,7 +23,9 @@ export function buildInstallCommand(rawCommand: string, rawInstallerURL: string,
   const safeProviderID = providerID?.trim() || "";
   let command = rawCommand.trim();
   if (!command) {
-    command = `curl -fsSL ${shellQuote(installerURL)} | sudo RESOURCE_API_URL='http://resourceservice' PROVIDER_ID='${safeProviderID || "provider-id"}' bash`;
+    const host = typeof window !== "undefined" ? window.location.hostname : "127.0.0.1";
+    const kafkaBrokers = `${host}:${DEFAULT_KAFKA_PORT}`;
+    command = `curl -fsSL ${shellQuote(installerURL)} | sudo KAFKA_BROKERS=${shellQuote(kafkaBrokers)} PROVIDER_ID='${safeProviderID || "provider-id"}' bash`;
     return { command, installerURL };
   }
 

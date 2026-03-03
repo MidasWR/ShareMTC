@@ -36,6 +36,7 @@ func main() {
 		Int("create_rate_limit_rpm", cfg.CreateRateLimitRPM).
 		Int("vm_ttl_minutes", cfg.VMTTLMinutes).
 		Str("vmdaemon_topic", cfg.VMDaemonKafkaTopic).
+		Str("hostagent_topic", cfg.HostAgentKafkaTopic).
 		Strs("kafka_brokers", cfg.KafkaBrokers).
 		Msg("resourceservice configuration loaded")
 	pool, err := db.Connect(context.Background(), cfg.PostgresDSN)
@@ -73,6 +74,13 @@ func main() {
 			logger.Info().Strs("brokers", cfg.KafkaBrokers).Str("topic", cfg.VMDaemonKafkaTopic).Str("group", cfg.VMDaemonKafkaGroup).Msg("vmdaemon kafka consumer started")
 			if err := consumer.Run(context.Background()); err != nil {
 				logger.Error().Err(err).Msg("vmdaemon kafka consumer stopped")
+			}
+		}()
+		hostMetricConsumer := kafkaadapter.NewConsumer(cfg.KafkaBrokers, cfg.HostAgentKafkaTopic, cfg.HostAgentKafkaGroup, kafkaIngestHandler(svc))
+		go func() {
+			logger.Info().Strs("brokers", cfg.KafkaBrokers).Str("topic", cfg.HostAgentKafkaTopic).Str("group", cfg.HostAgentKafkaGroup).Msg("hostagent kafka consumer started")
+			if err := hostMetricConsumer.Run(context.Background()); err != nil {
+				logger.Error().Err(err).Msg("hostagent kafka consumer stopped")
 			}
 		}()
 	}
@@ -164,10 +172,35 @@ func kafkaIngestHandler(svc *service.ResourceService) func(context.Context, kafk
 			return handleAgentLogEvent(ctx, svc, event)
 		case "root_input_log":
 			return handleRootInputLogEvent(ctx, svc, event)
+		case "host_metric":
+			return handleHostMetricEvent(ctx, svc, event)
 		default:
+			// hostagent publishes plain HostMetric JSON (without event_type).
+			// Detect this shape and ingest as heartbeat telemetry.
+			if event.ProviderID != "" && !event.HeartbeatAt.IsZero() {
+				return handleHostMetricEvent(ctx, svc, event)
+			}
 			return nil
 		}
 	}
+}
+
+func handleHostMetricEvent(ctx context.Context, svc *service.ResourceService, event kafkaadapter.Event) error {
+	item := models.HostResource{
+		ProviderID:       event.ProviderID,
+		CPUFreeCores:     event.CPUFreeCores,
+		RAMFreeMB:        event.RAMFreeMB,
+		GPUFreeUnits:     event.GPUFreeUnits,
+		GPUTotalUnits:    event.GPUTotalUnits,
+		GPUMemoryTotalMB: event.GPUMemoryTotalMB,
+		GPUMemoryUsedMB:  event.GPUMemoryUsedMB,
+		NetworkMbps:      event.NetworkMbps,
+		HeartbeatAt:      event.HeartbeatAt,
+	}
+	if item.HeartbeatAt.IsZero() {
+		item.HeartbeatAt = time.Now().UTC()
+	}
+	return svc.UpdateHeartbeat(ctx, item)
 }
 
 func handleHealthCheckEvent(ctx context.Context, svc *service.ResourceService, event kafkaadapter.Event) error {

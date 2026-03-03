@@ -17,6 +17,10 @@ redis:
 envoy:
   dns: envoy-gateway
   gatewayClassName: envoy
+  kafka:
+    enabled: true
+    externalPort: 9092
+    upstreamPort: 9092
 
 services:
   namespace: host
