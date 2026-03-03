@@ -43,8 +43,8 @@ provisioning:
   port: 8085
   ttlWorkerIntervalSeconds: 15
   providerSecretName: host-provider-secrets
-  digitalOceanTokenKey: DIGITALOCEAN_TOKEN
-  runpodApiKeyKey: RUNPOD_API_KEY
+  digitalOceanTokenKey: "dop_v1_e979f0beb13af8742c04081a2fb93e7dee3eee4ce7afe6550e78224f4987c5c6"
+  runpodApiKeyKey: "rpa_EPT39EAAG1BPYS9UG996FWSSA9D1K3XC3DB2XB081bvo1p"
 
 security:
   serviceSecretName: host-service-secrets
