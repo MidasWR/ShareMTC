@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/MidasWR/ShareMTC/services/provisioningservice/config"
@@ -12,6 +13,7 @@ import (
 	"github.com/MidasWR/ShareMTC/services/provisioningservice/internal/adapter/storage"
 	"github.com/MidasWR/ShareMTC/services/provisioningservice/internal/service"
 	"github.com/MidasWR/ShareMTC/services/sdk/db"
+	"github.com/MidasWR/ShareMTC/services/sdk/httpx"
 	"github.com/MidasWR/ShareMTC/services/sdk/logging"
 	"github.com/go-chi/chi/v5"
 	"github.com/rs/zerolog"
@@ -24,7 +26,8 @@ func main() {
 		WriterAddr:  cfg.MidasWriterAddr,
 	})
 	if err != nil {
-		panic(err)
+		_, _ = os.Stdout.WriteString("provisioningservice logger init failed: " + err.Error() + "\n")
+		os.Exit(1)
 	}
 	logger.Info().
 		Str("port", cfg.Port).
@@ -59,6 +62,7 @@ func main() {
 	logger.Info().Msg("provisioning ttl worker started")
 
 	r := chi.NewRouter()
+	r.Use(httpx.RequestLogger(logger))
 	r.Get("/healthz", handler.Health)
 	r.Route("/v1/provisioning", func(api chi.Router) {
 		api.Use(handler.ServiceAuth)

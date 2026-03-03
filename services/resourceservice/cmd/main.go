@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/MidasWR/ShareMTC/services/resourceservice/config"
@@ -16,6 +17,7 @@ import (
 	"github.com/MidasWR/ShareMTC/services/resourceservice/internal/service"
 	sdkauth "github.com/MidasWR/ShareMTC/services/sdk/auth"
 	"github.com/MidasWR/ShareMTC/services/sdk/db"
+	"github.com/MidasWR/ShareMTC/services/sdk/httpx"
 	"github.com/MidasWR/ShareMTC/services/sdk/logging"
 	"github.com/go-chi/chi/v5"
 	"github.com/rs/zerolog"
@@ -28,7 +30,8 @@ func main() {
 		WriterAddr:  cfg.MidasWriterAddr,
 	})
 	if err != nil {
-		panic(err)
+		_, _ = os.Stdout.WriteString("resourceservice logger init failed: " + err.Error() + "\n")
+		os.Exit(1)
 	}
 	logger.Info().
 		Str("port", cfg.Port).
@@ -84,6 +87,7 @@ func main() {
 	logger.Info().Msg("resource http handler initialized")
 
 	r := chi.NewRouter()
+	r.Use(httpx.RequestLogger(logger))
 	r.Get("/healthz", handler.Health)
 	r.Route("/v1/resources", func(api chi.Router) {
 		api.Use(sdkauth.RequireAuth(cfg.JWTSecret))

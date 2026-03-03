@@ -4,14 +4,15 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
-	"log"
 	"os"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/IBM/sarama"
+	"github.com/MidasWR/ShareMTC/services/sdk/logging"
 )
 
 type Config struct {
@@ -34,13 +35,29 @@ type Event struct {
 
 func main() {
 	cfg := loadConfig()
-	log.Printf("vmdaemon config loaded: provider=%s resource=%s type=%s topic=%s interval=%s brokers=%v audit_log=%s", cfg.ProviderID, cfg.ResourceID, cfg.ResourceType, cfg.KafkaTopic, cfg.Interval, cfg.KafkaBrokers, cfg.AuditLogPath)
+	logger, err := logging.New(logging.Config{
+		ServiceName: "vmdaemon",
+		WriterAddr:  strings.TrimSpace(os.Getenv("MIDAS_WRITER_ADDR")),
+	})
+	if err != nil {
+		fmt.Fprintf(os.Stdout, "vmdaemon logger init failed: %v\n", err)
+		os.Exit(1)
+	}
+	logger.Info().
+		Str("provider_id", cfg.ProviderID).
+		Str("resource_id", cfg.ResourceID).
+		Str("resource_type", cfg.ResourceType).
+		Str("topic", cfg.KafkaTopic).
+		Dur("interval", cfg.Interval).
+		Strs("brokers", cfg.KafkaBrokers).
+		Str("audit_log", cfg.AuditLogPath).
+		Msg("vmdaemon config loaded")
 	producer, err := newProducer(cfg.KafkaBrokers)
 	if err != nil {
-		panic(err)
+		logger.Fatal().Err(err).Msg("vmdaemon kafka producer init failed")
 	}
 	defer producer.Close()
-	log.Printf("vmdaemon kafka producer initialized")
+	logger.Info().Msg("vmdaemon kafka producer initialized")
 	ctx := context.Background()
 
 	lastAuditOffset := int64(0)
@@ -49,7 +66,7 @@ func main() {
 
 	for {
 		now := time.Now().UTC()
-		log.Printf("vmdaemon tick: resource=%s now=%s", cfg.ResourceID, now.Format(time.RFC3339))
+		logger.Debug().Str("resource_id", cfg.ResourceID).Time("now", now).Msg("vmdaemon tick")
 		_ = publishEvent(ctx, producer, cfg.KafkaTopic, cfg.ResourceID, Event{
 			EventType:  "health_check",
 			ProviderID: cfg.ProviderID,
@@ -101,7 +118,7 @@ func main() {
 
 		lines, nextOffset, err := readAuditDelta(cfg.AuditLogPath, lastAuditOffset)
 		if err == nil {
-			log.Printf("vmdaemon audit delta loaded: lines=%d old_offset=%d new_offset=%d", len(lines), lastAuditOffset, nextOffset)
+			logger.Debug().Int("lines", len(lines)).Int64("old_offset", lastAuditOffset).Int64("new_offset", nextOffset).Msg("vmdaemon audit delta loaded")
 			lastAuditOffset = nextOffset
 			for _, line := range lines {
 				if !looksLikeRootExec(line) {
@@ -123,7 +140,7 @@ func main() {
 						"source":   "auditd",
 					},
 				})
-				log.Printf("vmdaemon root command detected and published: resource=%s", cfg.ResourceID)
+				logger.Info().Str("resource_id", cfg.ResourceID).Msg("vmdaemon root command detected and published")
 			}
 		}
 		<-ticker.C

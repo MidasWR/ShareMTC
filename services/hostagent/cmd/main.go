@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/MidasWR/ShareMTC/services/hostagent/config"
@@ -21,7 +22,8 @@ func main() {
 		WriterAddr:  cfg.MidasWriterAddr,
 	})
 	if err != nil {
-		panic(err)
+		_, _ = os.Stdout.WriteString("hostagent logger init failed: " + err.Error() + "\n")
+		os.Exit(1)
 	}
 	logger.Info().
 		Str("provider_id", cfg.ProviderID).

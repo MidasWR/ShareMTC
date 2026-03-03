@@ -14,6 +14,7 @@ import (
 	"github.com/MidasWR/ShareMTC/services/authservice/internal/service"
 	sdkauth "github.com/MidasWR/ShareMTC/services/sdk/auth"
 	"github.com/MidasWR/ShareMTC/services/sdk/db"
+	"github.com/MidasWR/ShareMTC/services/sdk/httpx"
 	"github.com/MidasWR/ShareMTC/services/sdk/logging"
 	"github.com/go-chi/chi/v5"
 )
@@ -26,7 +27,8 @@ func main() {
 		WriterTLS:   cfg.MidasWriterTLS,
 	})
 	if err != nil {
-		panic(err)
+		_, _ = os.Stdout.WriteString("authservice logger init failed: " + err.Error() + "\n")
+		os.Exit(1)
 	}
 	logger.Info().
 		Str("port", cfg.Port).
@@ -58,6 +60,7 @@ func main() {
 	logger.Info().Str("google_redirect", cfg.GoogleRedirect).Msg("auth http handler initialized")
 
 	r := chi.NewRouter()
+	r.Use(httpx.RequestLogger(logger))
 	r.Get("/healthz", handler.Health)
 	r.Route("/v1/auth", func(api chi.Router) {
 		api.Post("/register", handler.Register)
