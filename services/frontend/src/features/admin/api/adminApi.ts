@@ -3,7 +3,7 @@ import { apiClient } from "../../../lib/http";
 import { AdminStats, PodCatalogItem, PodTemplate, Provider, ProviderMetrics } from "../../../types/api";
 
 export function listProviders() {
-  return apiClient.get<Provider[]>(`${API_BASE.admin}/v1/admin/providers/`);
+  return apiClient.get<Provider[]>(`${API_BASE.admin}/v1/admin/providers/`, { preserveSessionOnAuthError: true });
 }
 
 export function createProvider(payload: {
