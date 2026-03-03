@@ -1,6 +1,7 @@
 type JwtPayload = {
   exp?: number;
   role?: string;
+  user_id?: string;
 };
 
 export type AuthUser = {
@@ -47,6 +48,14 @@ export function getRole(): string {
   const token = readToken();
   if (!token) return "guest";
   return parsePayload(token)?.role ?? "user";
+}
+
+export function getUserID(): string | null {
+  const user = readUser();
+  if (user?.id) return user.id;
+  const token = readToken();
+  if (!token) return null;
+  return parsePayload(token)?.user_id ?? null;
 }
 
 export function isTokenValid(): boolean {
