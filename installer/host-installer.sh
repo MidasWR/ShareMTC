@@ -13,6 +13,8 @@ HELM_TIMEOUT="${HELM_TIMEOUT:-15m}"
 STRIMZI_NAMESPACE="${STRIMZI_NAMESPACE:-strimzi-system}"
 ENVOY_NAMESPACE="${ENVOY_NAMESPACE:-envoy-gateway-system}"
 ENVOY_GATEWAY_CLASS="${ENVOY_GATEWAY_CLASS:-}"
+KAFKA_CLUSTER_NAME="${KAFKA_CLUSTER_NAME:-host-kafka}"
+KAFKA_BOOTSTRAP_SERVICE="${KAFKA_BOOTSTRAP_SERVICE:-${KAFKA_CLUSTER_NAME}-kafka-bootstrap}"
 SPARK_ENABLED="${SPARK_ENABLED:-0}"
 SPARK_IMAGE="${SPARK_IMAGE:-apache/spark}"
 SPARK_TAG="${SPARK_TAG:-3.5.8-scala2.12-java17-python3-ubuntu}"
@@ -59,6 +61,34 @@ wait_for_gatewayclass() {
     fi
     sleep 2
   done
+}
+
+wait_for_service() {
+  local ns="$1"
+  local svc="$2"
+  local max_attempts="${3:-120}"
+  local i=0
+  until kubectl -n "${ns}" get svc "${svc}" >/dev/null 2>&1; do
+    i=$((i + 1))
+    if [[ "${i}" -ge "${max_attempts}" ]]; then
+      echo "Timed out waiting for Service ${svc} in namespace ${ns}"
+      return 1
+    fi
+    sleep 2
+  done
+}
+
+wait_for_kafka_readiness() {
+  local max_wait="${1:-10m}"
+  echo "Waiting for Kafka cluster ${KAFKA_CLUSTER_NAME} in namespace ${NAMESPACE}..."
+  if ! kubectl -n "${NAMESPACE}" wait kafka/"${KAFKA_CLUSTER_NAME}" --for=condition=Ready=True --timeout="${max_wait}"; then
+    echo "Kafka cluster ${KAFKA_CLUSTER_NAME} is not Ready."
+    kubectl -n "${NAMESPACE}" get kafka "${KAFKA_CLUSTER_NAME}" -o yaml || true
+    kubectl -n "${NAMESPACE}" describe kafka "${KAFKA_CLUSTER_NAME}" || true
+    kubectl -n "${NAMESPACE}" get pods -o wide | grep -E "${KAFKA_CLUSTER_NAME}|zookeeper|entity-operator" || true
+    return 1
+  fi
+  wait_for_service "${NAMESPACE}" "${KAFKA_BOOTSTRAP_SERVICE}" 120
 }
 
 resolve_envoy_gateway_class() {
@@ -327,6 +357,7 @@ fi
 if ! is_skipped "infra"; then
   helm upgrade host-infra "${INFRA_CHART_PATH}" "${HELM_UPGRADE_FLAGS[@]}" \
     --set global.namespace="${NAMESPACE}" \
+    --set kafka.clusterName="${KAFKA_CLUSTER_NAME}" \
     --set envoy.gatewayClassName="${ENVOY_GATEWAY_CLASS}" \
     --set falco.enabled="${FALCO_ENABLED}" \
     --set spark.enabled="${SPARK_ENABLED}" \
@@ -337,11 +368,20 @@ fi
 if ! is_skipped "services"; then
   helm upgrade host-services "${SERVICES_CHART_PATH}" "${HELM_UPGRADE_FLAGS[@]}" \
     --set global.namespace="${NAMESPACE}" \
-    --set global.tag="${TAG}"
+    --set global.tag="${TAG}" \
+    --set kafka.bootstrapService="${KAFKA_BOOTSTRAP_SERVICE}" \
+    --set kafka.brokers="${KAFKA_BOOTSTRAP_SERVICE}.${NAMESPACE}.svc.cluster.local:9092"
 fi
 
 apply_runtime_spark_guard
 apply_runtime_falco_guard
+
+if ! is_skipped "infra"; then
+  wait_for_kafka_readiness "${HELM_TIMEOUT}" || {
+    echo "Kafka bootstrap failed. Installer stopped because platform would be deployed in broken state."
+    exit 1
+  }
+fi
 
 LB_IP="$(kubectl get svc -n ${NAMESPACE} -o jsonpath='{.items[0].status.loadBalancer.ingress[0].ip}' 2>/dev/null || true)"
 if [[ -z "${LB_IP}" ]]; then
