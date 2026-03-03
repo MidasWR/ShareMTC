@@ -32,6 +32,8 @@ func main() {
 	}
 	logger.Info().
 		Str("port", cfg.Port).
+		Str("cgroup_root", cfg.CGroupRoot).
+		Bool("cgroup_soft_fail", cfg.CGroupSoftFail).
 		Dur("heartbeat_max_age", cfg.HeartbeatMaxAge).
 		Int("create_rate_limit_rpm", cfg.CreateRateLimitRPM).
 		Int("vm_ttl_minutes", cfg.VMTTLMinutes).
@@ -55,7 +57,7 @@ func main() {
 	logger.Info().Str("provisioning_url", cfg.ProvisioningURL).Dur("provisioning_timeout", cfg.ProvisioningHTTPTimeout).Msg("provisioning client initialized")
 	svc := service.NewResourceService(
 		repo,
-		cgroups.NewV2Applier(""),
+		cgroups.NewV2Applier(cfg.CGroupRoot, cfg.CGroupSoftFail),
 		orchestrator.NewInternalRuntime(),
 		provisioningClient,
 		cfg.HeartbeatMaxAge,

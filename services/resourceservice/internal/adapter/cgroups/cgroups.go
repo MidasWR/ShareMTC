@@ -1,39 +1,60 @@
 package cgroups
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 )
 
 type V2Applier struct {
-	root string
+	root            string
+	allowSoftErrors bool
 }
 
 // NewV2Applier enforces coarse CPU/RAM limits for allocations.
 // It is an accounting guardrail for the control plane, not a sandbox boundary.
-func NewV2Applier(root string) *V2Applier {
+func NewV2Applier(root string, allowSoftErrors bool) *V2Applier {
 	if root == "" {
-		root = "/sys/fs/cgroup/host"
+		root = "/sys/fs/cgroup"
 	}
-	return &V2Applier{root: root}
+	return &V2Applier{root: root, allowSoftErrors: allowSoftErrors}
 }
 
 func (a *V2Applier) Apply(providerID string, cpuCores int, ramMB int, gpuUnits int) error {
 	_ = gpuUnits
 	dir := filepath.Join(a.root, providerID)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
+		if isNonFatalCgroupError(err) {
+			if a.allowSoftErrors {
+				return nil
+			}
+			return fmt.Errorf("cgroup enforcement unavailable (mkdir): %w", err)
+		}
 		return err
 	}
 
 	quota := cpuCores * 100000
 	if err := os.WriteFile(filepath.Join(dir, "cpu.max"), []byte(fmt.Sprintf("%d %d", quota, 100000)), 0o644); err != nil {
+		if isNonFatalCgroupError(err) {
+			if a.allowSoftErrors {
+				return nil
+			}
+			return fmt.Errorf("cgroup enforcement unavailable (cpu.max): %w", err)
+		}
 		return err
 	}
 	memory := ramMB * 1024 * 1024
 	if err := os.WriteFile(filepath.Join(dir, "memory.max"), []byte(strconv.Itoa(memory)), 0o644); err != nil {
+		if isNonFatalCgroupError(err) {
+			if a.allowSoftErrors {
+				return nil
+			}
+			return fmt.Errorf("cgroup enforcement unavailable (memory.max): %w", err)
+		}
 		return err
 	}
 	return nil
@@ -45,5 +66,23 @@ func (a *V2Applier) Release(allocationID string) error {
 		return nil
 	}
 	dir := filepath.Join(a.root, parts[0])
-	return os.RemoveAll(dir)
+	err := os.RemoveAll(dir)
+	if isNonFatalCgroupError(err) || os.IsNotExist(err) {
+		return nil
+	}
+	return err
+}
+
+func isNonFatalCgroupError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if os.IsPermission(err) {
+		return true
+	}
+	return errors.Is(err, syscall.EPERM) ||
+		errors.Is(err, syscall.EACCES) ||
+		errors.Is(err, syscall.EROFS) ||
+		errors.Is(err, syscall.ENOENT) ||
+		errors.Is(err, syscall.ENOSYS)
 }

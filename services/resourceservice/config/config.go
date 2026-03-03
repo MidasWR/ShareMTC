@@ -14,6 +14,8 @@ type Config struct {
 	PostgresDSN              string
 	MidasWriterAddr          string
 	JWTSecret                string
+	CGroupRoot               string
+	CGroupSoftFail           bool
 	HeartbeatMaxAge          time.Duration
 	ProvisioningURL          string
 	ProvisioningServiceToken string
@@ -34,6 +36,8 @@ func Load() Config {
 		PostgresDSN:              postgresDSN(),
 		MidasWriterAddr:          os.Getenv("MIDAS_WRITER_ADDR"),
 		JWTSecret:                env("JWT_SECRET", "change-me-in-production"),
+		CGroupRoot:               env("CGROUP_ROOT", "/sys/fs/cgroup"),
+		CGroupSoftFail:           envBool("CGROUP_SOFT_FAIL", false),
 		HeartbeatMaxAge:          time.Duration(envInt("HEARTBEAT_MAX_AGE_SECONDS", 30)) * time.Second,
 		ProvisioningURL:          env("PROVISIONING_BASE_URL", "http://provisioningservice:8085"),
 		ProvisioningServiceToken: env("PROVISIONING_SERVICE_TOKEN", "change-me-in-production"),
@@ -67,6 +71,21 @@ func envInt(name string, fallback int) int {
 		return fallback
 	}
 	return parsed
+}
+
+func envBool(name string, fallback bool) bool {
+	value := strings.TrimSpace(strings.ToLower(os.Getenv(name)))
+	if value == "" {
+		return fallback
+	}
+	switch value {
+	case "1", "true", "yes", "on":
+		return true
+	case "0", "false", "no", "off":
+		return false
+	default:
+		return fallback
+	}
 }
 
 func postgresDSN() string {
