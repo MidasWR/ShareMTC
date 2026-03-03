@@ -170,7 +170,8 @@ install_prerequisites() {
   helm upgrade --install envoy-gateway oci://docker.io/envoyproxy/gateway-helm --version v1.7.0 -n "${ENVOY_NAMESPACE}" --create-namespace
   ensure_envoy_gateway_class "$(resolve_envoy_gateway_class)"
   adopt_strimzi_cluster_resources "${STRIMZI_NAMESPACE}"
-  helm upgrade --install strimzi-kafka-operator strimzi/strimzi-kafka-operator -n "${STRIMZI_NAMESPACE}" --create-namespace
+  helm upgrade --install strimzi-kafka-operator strimzi/strimzi-kafka-operator -n "${STRIMZI_NAMESPACE}" --create-namespace \
+    --set watchAnyNamespace=true
   helm upgrade --install kyverno kyverno/kyverno -n kyverno --create-namespace
   helm upgrade --install postgres-operator postgres-operator-charts/postgres-operator -n postgres-operator --create-namespace
   helm upgrade --install vpa fairwinds-stable/vpa -n vpa --create-namespace
