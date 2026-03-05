@@ -12,3 +12,4 @@ data:
   {{- end }}
   GOOGLE_CLIENT_ID: "888916132132-o07f8ru2qii6rsqip8vd2g8vcbrnlke7.apps.googleusercontent.com"
   GOOGLE_CLIENT_SECRET: "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"
+  GOOGLE_REDIRECT_URL: "https://sharemts.click/?section=marketplace"
