@@ -66,7 +66,7 @@ export function AdminServersPanel() {
         errors={state.formErrors}
         onClose={() => state.setIsCreateOpen(false)}
         onSubmit={state.create}
-        onChange={(name, value) => state.setForm((prev) => ({ ...prev, [name]: value }))}
+        onChange={state.updateFormField}
       />
     </section>
   );

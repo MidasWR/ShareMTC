@@ -33,12 +33,21 @@ describe("fetchJSON auth session behavior", () => {
     expect(localStorage.getItem("host_user")).toBeTruthy();
   });
 
-  it("clears session on 403 for protected api", async () => {
+  it("clears session on 401 for protected api", async () => {
+    setSession(makeToken({ exp: Math.floor(Date.now() / 1000) + 120, role: "user" }), { id: "u1", role: "user" });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(mockJsonResponse(401, { error: "unauthorized" })));
+
+    await expect(fetchJSON("/v1/admin/providers/")).rejects.toThrow("unauthorized");
+    expect(localStorage.getItem("host_token")).toBeNull();
+    expect(localStorage.getItem("host_user")).toBeNull();
+  });
+
+  it("keeps session on 403 for protected api", async () => {
     setSession(makeToken({ exp: Math.floor(Date.now() / 1000) + 120, role: "user" }), { id: "u1", role: "user" });
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(mockJsonResponse(403, { error: "forbidden" })));
 
     await expect(fetchJSON("/v1/admin/providers/")).rejects.toThrow("forbidden");
-    expect(localStorage.getItem("host_token")).toBeNull();
-    expect(localStorage.getItem("host_user")).toBeNull();
+    expect(localStorage.getItem("host_token")).toBeTruthy();
+    expect(localStorage.getItem("host_user")).toBeTruthy();
   });
 });

@@ -7,6 +7,7 @@ import { AppShell } from "../app/shell/AppShell";
 import { AuthPanel } from "./AuthPanel";
 import { KeyboardShortcutsPanel } from "./KeyboardShortcutsPanel";
 import { AdminAccessPanel } from "../features/admin/access/AdminAccessPanel";
+import { consumeOAuthCallback } from "../app/auth/oauthCallback";
 
 const BillingPanel = lazy(() => import("./BillingPanel").then((module) => ({ default: module.BillingPanel })));
 const SettingsPanel = lazy(() => import("../features/settings/SettingsPanel").then((module) => ({ default: module.SettingsPanel })));
@@ -47,6 +48,14 @@ export function App() {
       navigateToTab("admin", false);
     }
   }, [navigateToTab]);
+
+  useEffect(() => {
+    const targetTab = consumeOAuthCallback();
+    if (targetTab) {
+      navigateToTab(targetTab, false);
+      refreshSession();
+    }
+  }, [navigateToTab, refreshSession]);
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {

@@ -50,7 +50,9 @@ export function useServers() {
     const nextErrors: Partial<Record<"display_name" | "machine_id" | "network_mbps", string>> = {};
     if (!form.display_name.trim()) nextErrors.display_name = "Display name is required";
     if (!form.machine_id.trim()) nextErrors.machine_id = "Machine ID is required";
-    if ((Number(form.network_mbps) || 0) <= 0) nextErrors.network_mbps = "Network Mbps must be greater than 0";
+    if (!/^\d+$/.test(form.network_mbps.trim()) || Number(form.network_mbps) <= 0) {
+      nextErrors.network_mbps = "Network Mbps must be a positive integer";
+    }
     setFormErrors(nextErrors);
     const firstError = Object.values(nextErrors)[0];
     if (firstError) {
@@ -63,7 +65,7 @@ export function useServers() {
         display_name: form.display_name.trim(),
         machine_id: form.machine_id.trim(),
         provider_type: form.provider_type,
-        network_mbps: Number(form.network_mbps) || 0
+        network_mbps: Number(form.network_mbps)
       });
       push("success", formatOperationMessage({ action: "Create", entityType: "Server", entityName: form.display_name.trim(), result: "success" }), "Admin servers");
       setIsCreateOpen(false);
@@ -71,9 +73,27 @@ export function useServers() {
       setFormErrors({});
       await refresh();
     } catch (requestError) {
-      push("error", requestError instanceof Error ? requestError.message : "Create server failed", "Admin servers");
+      const message = requestError instanceof Error ? requestError.message : "Create server failed";
+      if (message.toLowerCase().includes("machine_id")) {
+        setFormErrors((prev) => ({ ...prev, machine_id: message }));
+      }
+      push("error", message, "Admin servers");
     } finally {
       setCreating(false);
+    }
+  }
+
+  function updateFormField(name: keyof NewServerForm, value: string) {
+    setForm((prev) => ({ ...prev, [name]: value }));
+    if (name === "display_name" || name === "machine_id" || name === "network_mbps") {
+      setFormErrors((prev) => {
+        if (!prev[name]) {
+          return prev;
+        }
+        const next = { ...prev };
+        delete next[name];
+        return next;
+      });
     }
   }
 
@@ -122,6 +142,7 @@ export function useServers() {
     form,
     formErrors,
     setForm,
+    updateFormField,
     onlineCount,
     filteredProviders,
     refresh,

@@ -8,15 +8,16 @@ import (
 )
 
 type Config struct {
-	Port             string
-	PostgresDSN      string
-	JWTSecret        string
-	GoogleClientID   string
-	GoogleSecret     string
-	GoogleRedirect   string
-	MidasWriterAddr  string
-	MidasWriterTLS   bool
-	TokenTTLMinutes  int
+	Port            string
+	PostgresDSN     string
+	JWTSecret       string
+	GoogleClientID  string
+	GoogleSecret    string
+	GoogleRedirect  string
+	FrontendBaseURL string
+	MidasWriterAddr string
+	MidasWriterTLS  bool
+	TokenTTLMinutes int
 }
 
 func Load() Config {
@@ -27,6 +28,7 @@ func Load() Config {
 		GoogleClientID:  os.Getenv("GOOGLE_CLIENT_ID"),
 		GoogleSecret:    os.Getenv("GOOGLE_CLIENT_SECRET"),
 		GoogleRedirect:  env("GOOGLE_REDIRECT_URL", "http://localhost:8081/v1/auth/google/callback"),
+		FrontendBaseURL: env("FRONTEND_BASE_URL", "http://localhost:5173"),
 		MidasWriterAddr: os.Getenv("MIDAS_WRITER_ADDR"),
 		MidasWriterTLS:  envBool("MIDAS_WRITER_TLS", false),
 		TokenTTLMinutes: envInt("TOKEN_TTL_MINUTES", 1440),

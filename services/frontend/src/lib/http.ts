@@ -39,7 +39,7 @@ export async function fetchJSON<T>(url: string, init?: RequestOptions): Promise<
   }
 
   if (!response.ok) {
-    if (response.status === 401 || response.status === 403) {
+    if (response.status === 401) {
       const preserveSession = preserveSessionOnAuthError || shouldPreserveSessionForRequest(url);
       if (!preserveSession) {
         clearSession();

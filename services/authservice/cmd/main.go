@@ -34,6 +34,7 @@ func main() {
 		Str("port", cfg.Port).
 		Int("token_ttl_minutes", cfg.TokenTTLMinutes).
 		Bool("writer_tls", cfg.MidasWriterTLS).
+		Str("frontend_base_url", cfg.FrontendBaseURL).
 		Msg("authservice configuration loaded")
 
 	ctx := context.Background()
@@ -56,7 +57,7 @@ func main() {
 
 	svc := service.New(repo, cfg.JWTSecret, time.Duration(cfg.TokenTTLMinutes)*time.Minute)
 	logger.Info().Msg("auth service initialized")
-	handler := httpadapter.NewHandler(svc, logger, cfg.GoogleClientID, cfg.GoogleSecret, cfg.GoogleRedirect)
+	handler := httpadapter.NewHandler(svc, logger, cfg.GoogleClientID, cfg.GoogleSecret, cfg.GoogleRedirect, cfg.FrontendBaseURL, cfg.JWTSecret)
 	logger.Info().Str("google_redirect", cfg.GoogleRedirect).Msg("auth http handler initialized")
 
 	r := chi.NewRouter()

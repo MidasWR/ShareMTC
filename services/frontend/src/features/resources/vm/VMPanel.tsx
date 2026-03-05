@@ -47,6 +47,17 @@ export function VMPanel() {
   const selectedTemplate = templates.find((item) => item.code === template);
   const configSource = manualOverride ? "Manual override" : "From Template/Offer";
 
+  function clearError(key: string) {
+    setErrors((prev) => {
+      if (!prev[key]) {
+        return prev;
+      }
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+  }
+
   async function refresh() {
     setLoading(true);
     try {
@@ -92,6 +103,9 @@ export function VMPanel() {
     if (ramGB <= 0) nextErrors.ram_gb = "RAM must be greater than 0";
     if (gpuUnits < 0) nextErrors.gpu_units = "GPU cannot be negative";
     if (networkMbps <= 0) nextErrors.network_mbps = "Network must be greater than 0";
+    if (manualOverride && systemRamGB <= 0) nextErrors.system_ram_gb = "System RAM must be greater than 0";
+    if (manualOverride && vramGB < 0) nextErrors.vram_gb = "VRAM cannot be negative";
+    if (manualOverride && maxInstances <= 0) nextErrors.max_instances = "Max instances must be greater than 0";
     setErrors(nextErrors);
     const firstError = Object.values(nextErrors)[0];
     if (firstError) {
@@ -164,14 +178,25 @@ export function VMPanel() {
             label="Provider"
             value={providerState.providerID}
             error={errors.provider_id || providerState.error}
-            onChange={(event) => providerState.setProviderID(event.target.value)}
+            onChange={(event) => {
+              providerState.setProviderID(event.target.value);
+              clearError("provider_id");
+            }}
             options={
               providerState.options.length > 0
                 ? providerState.options
                 : [{ value: "", label: providerState.loading ? "Loading providers..." : "No providers available" }]
             }
           />
-          <Input label="VM Name" value={name} error={errors.name} onChange={(event) => setName(event.target.value)} />
+          <Input
+            label="VM Name"
+            value={name}
+            error={errors.name}
+            onChange={(event) => {
+              setName(event.target.value);
+              clearError("name");
+            }}
+          />
           <Select
             label="Template"
             value={template}
@@ -179,6 +204,7 @@ export function VMPanel() {
             onChange={(event) => {
               const nextTemplate = event.target.value;
               setTemplate(nextTemplate);
+              clearError("template");
               const selected = templates.find((item) => item.code === nextTemplate);
               if (selected && !manualOverride) {
                 setOsName(selected.os_name || osName);
@@ -192,11 +218,63 @@ export function VMPanel() {
               ? templates.map((item) => ({ value: item.code, label: `${item.name} (${item.code})` }))
               : [{ value: template, label: template }]}
           />
-          <Input label="OS Name" value={osName} error={errors.os_name} onChange={(event) => setOsName(event.target.value)} />
-          <Input type="number" min={1} step={1} label="CPU Cores" error={errors.cpu_cores} value={`${cpuCores}`} onChange={(event) => setCpuCores(Number(event.target.value) || 0)} />
-          <Input type="number" min={1} step={1} label="RAM (GB)" error={errors.ram_gb} value={`${ramGB}`} onChange={(event) => setRamGB(Number(event.target.value) || 0)} />
-          <Input type="number" min={0} step={1} label="GPU Units" error={errors.gpu_units} value={`${gpuUnits}`} onChange={(event) => setGpuUnits(Number(event.target.value) || 0)} />
-          <Input type="number" min={1} step={100} label="Network (Mbps)" error={errors.network_mbps} value={`${networkMbps}`} onChange={(event) => setNetworkMbps(Number(event.target.value) || 0)} />
+          <Input
+            label="OS Name"
+            value={osName}
+            error={errors.os_name}
+            onChange={(event) => {
+              setOsName(event.target.value);
+              clearError("os_name");
+            }}
+          />
+          <Input
+            type="number"
+            min={1}
+            step={1}
+            label="CPU Cores"
+            error={errors.cpu_cores}
+            value={`${cpuCores}`}
+            onChange={(event) => {
+              setCpuCores(Number(event.target.value) || 0);
+              clearError("cpu_cores");
+            }}
+          />
+          <Input
+            type="number"
+            min={1}
+            step={1}
+            label="RAM (GB)"
+            error={errors.ram_gb}
+            value={`${ramGB}`}
+            onChange={(event) => {
+              setRamGB(Number(event.target.value) || 0);
+              clearError("ram_gb");
+            }}
+          />
+          <Input
+            type="number"
+            min={0}
+            step={1}
+            label="GPU Units"
+            error={errors.gpu_units}
+            value={`${gpuUnits}`}
+            onChange={(event) => {
+              setGpuUnits(Number(event.target.value) || 0);
+              clearError("gpu_units");
+            }}
+          />
+          <Input
+            type="number"
+            min={1}
+            step={100}
+            label="Network (Mbps)"
+            error={errors.network_mbps}
+            value={`${networkMbps}`}
+            onChange={(event) => {
+              setNetworkMbps(Number(event.target.value) || 0);
+              clearError("network_mbps");
+            }}
+          />
           <details className="xl:col-span-4 rounded-md border border-border bg-canvas p-3 text-sm text-textSecondary">
             <summary className="details-summary-focus cursor-pointer text-textPrimary">Advanced configuration</summary>
             <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -236,8 +314,12 @@ export function VMPanel() {
                 min={1}
                 step={1}
                 label="System RAM (GB)"
+                error={errors.system_ram_gb}
                 value={`${systemRamGB}`}
-                onChange={(event) => setSystemRamGB(Number(event.target.value) || 0)}
+                onChange={(event) => {
+                  setSystemRamGB(Number(event.target.value) || 0);
+                  clearError("system_ram_gb");
+                }}
                 disabled={!manualOverride}
               />
               <Input
@@ -245,8 +327,12 @@ export function VMPanel() {
                 min={0}
                 step={1}
                 label="VRAM (GB)"
+                error={errors.vram_gb}
                 value={`${vramGB}`}
-                onChange={(event) => setVramGB(Number(event.target.value) || 0)}
+                onChange={(event) => {
+                  setVramGB(Number(event.target.value) || 0);
+                  clearError("vram_gb");
+                }}
                 disabled={!manualOverride}
               />
               <Input
@@ -254,8 +340,12 @@ export function VMPanel() {
                 min={1}
                 step={1}
                 label="Max instances"
+                error={errors.max_instances}
                 value={`${maxInstances}`}
-                onChange={(event) => setMaxInstances(Number(event.target.value) || 1)}
+                onChange={(event) => {
+                  setMaxInstances(Number(event.target.value) || 1);
+                  clearError("max_instances");
+                }}
                 disabled={!manualOverride}
               />
               <label className="flex items-center gap-2 text-xs text-textSecondary">

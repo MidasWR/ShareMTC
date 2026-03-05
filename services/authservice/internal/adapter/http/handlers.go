@@ -2,8 +2,15 @@ package httpadapter
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"net/http"
+	"net/url"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/MidasWR/ShareMTC/services/authservice/internal/models"
@@ -19,15 +26,19 @@ import (
 )
 
 type Handler struct {
-	auth  *service.AuthService
-	log   zerolog.Logger
-	oauth *oauth2.Config
+	auth             *service.AuthService
+	log              zerolog.Logger
+	oauth            *oauth2.Config
+	frontendBaseURL  string
+	oauthStateSecret string
 }
 
-func NewHandler(auth *service.AuthService, logger zerolog.Logger, googleClientID string, googleSecret string, redirectURL string) *Handler {
+func NewHandler(auth *service.AuthService, logger zerolog.Logger, googleClientID string, googleSecret string, redirectURL string, frontendBaseURL string, oauthStateSecret string) *Handler {
 	return &Handler{
-		auth: auth,
-		log:  logger,
+		auth:             auth,
+		log:              logger,
+		frontendBaseURL:  strings.TrimRight(frontendBaseURL, "/"),
+		oauthStateSecret: oauthStateSecret,
 		oauth: &oauth2.Config{
 			ClientID:     googleClientID,
 			ClientSecret: googleSecret,
@@ -77,19 +88,33 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) GoogleStart(w http.ResponseWriter, r *http.Request) {
-	state := time.Now().Format("20060102150405")
+	state, err := h.buildOAuthState()
+	if err != nil {
+		h.log.Error().Err(err).Msg("failed to generate oauth state")
+		httpx.Error(w, http.StatusInternalServerError, "failed to start oauth")
+		return
+	}
 	http.Redirect(w, r, h.oauth.AuthCodeURL(state), http.StatusTemporaryRedirect)
 }
 
 func (h *Handler) GoogleCallback(w http.ResponseWriter, r *http.Request) {
+	if oauthErr := r.URL.Query().Get("error"); oauthErr != "" {
+		http.Redirect(w, r, h.buildFrontendRedirect("", "", "myCompute", "OAuth access was denied"), http.StatusTemporaryRedirect)
+		return
+	}
+	state := r.URL.Query().Get("state")
+	if !h.validateOAuthState(state) {
+		http.Redirect(w, r, h.buildFrontendRedirect("", "", "myCompute", "Invalid OAuth state"), http.StatusTemporaryRedirect)
+		return
+	}
 	code := r.URL.Query().Get("code")
 	if code == "" {
-		httpx.Error(w, http.StatusBadRequest, "missing code")
+		http.Redirect(w, r, h.buildFrontendRedirect("", "", "myCompute", "Missing OAuth code"), http.StatusTemporaryRedirect)
 		return
 	}
 	token, err := h.oauth.Exchange(r.Context(), code)
 	if err != nil {
-		httpx.Error(w, http.StatusBadRequest, "oauth exchange failed")
+		http.Redirect(w, r, h.buildFrontendRedirect("", "", "myCompute", "OAuth exchange failed"), http.StatusTemporaryRedirect)
 		return
 	}
 
@@ -97,21 +122,100 @@ func (h *Handler) GoogleCallback(w http.ResponseWriter, r *http.Request) {
 	client := h.oauth.Client(ctx, token)
 	api, err := googleoauth.NewService(ctx, option.WithHTTPClient(client))
 	if err != nil {
-		httpx.Error(w, http.StatusInternalServerError, "oauth service init failed")
+		http.Redirect(w, r, h.buildFrontendRedirect("", "", "myCompute", "OAuth service init failed"), http.StatusTemporaryRedirect)
 		return
 	}
 	profile, err := api.Userinfo.Get().Do()
 	if err != nil {
-		httpx.Error(w, http.StatusInternalServerError, "unable to fetch google profile")
+		http.Redirect(w, r, h.buildFrontendRedirect("", "", "myCompute", "Unable to fetch Google profile"), http.StatusTemporaryRedirect)
 		return
 	}
 
 	user, jwtToken, err := h.auth.LoginGoogle(r.Context(), profile.Email, profile.Id)
 	if err != nil {
-		httpx.Error(w, http.StatusInternalServerError, err.Error())
+		http.Redirect(w, r, h.buildFrontendRedirect("", "", "myCompute", err.Error()), http.StatusTemporaryRedirect)
 		return
 	}
-	httpx.JSON(w, http.StatusOK, map[string]any{"user": user, "token": jwtToken})
+	encodedUser, err := json.Marshal(user)
+	if err != nil {
+		http.Redirect(w, r, h.buildFrontendRedirect("", "", "myCompute", "Failed to encode user payload"), http.StatusTemporaryRedirect)
+		return
+	}
+	userPayload := base64.RawURLEncoding.EncodeToString(encodedUser)
+	section := "myCompute"
+	if strings.EqualFold(user.Role, "admin") || strings.EqualFold(user.Role, "super-admin") || strings.EqualFold(user.Role, "ops-admin") {
+		section = "admin"
+	}
+	http.Redirect(w, r, h.buildFrontendRedirect(jwtToken, userPayload, section, ""), http.StatusTemporaryRedirect)
+}
+
+func (h *Handler) buildOAuthState() (string, error) {
+	nonce := make([]byte, 16)
+	if _, err := rand.Read(nonce); err != nil {
+		return "", err
+	}
+	noncePart := base64.RawURLEncoding.EncodeToString(nonce)
+	timestamp := strconv.FormatInt(time.Now().Unix(), 10)
+	payload := timestamp + "." + noncePart
+	mac := hmac.New(sha256.New, []byte(h.oauthStateSecret))
+	if _, err := mac.Write([]byte(payload)); err != nil {
+		return "", err
+	}
+	signature := base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
+	return payload + "." + signature, nil
+}
+
+func (h *Handler) validateOAuthState(state string) bool {
+	parts := strings.Split(state, ".")
+	if len(parts) != 3 {
+		return false
+	}
+	payload := parts[0] + "." + parts[1]
+	mac := hmac.New(sha256.New, []byte(h.oauthStateSecret))
+	if _, err := mac.Write([]byte(payload)); err != nil {
+		return false
+	}
+	expected := base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
+	if !hmac.Equal([]byte(expected), []byte(parts[2])) {
+		return false
+	}
+	ts, err := strconv.ParseInt(parts[0], 10, 64)
+	if err != nil {
+		return false
+	}
+	issuedAt := time.Unix(ts, 0)
+	age := time.Since(issuedAt)
+	return age >= 0 && age <= 10*time.Minute
+}
+
+func (h *Handler) buildFrontendRedirect(token string, user string, section string, authError string) string {
+	baseURL := h.frontendBaseURL
+	if baseURL == "" {
+		baseURL = "/"
+	}
+	redirectURL, err := url.Parse(baseURL)
+	if err != nil {
+		redirectURL = &url.URL{Path: "/"}
+	}
+	query := redirectURL.Query()
+	if section == "" {
+		section = "myCompute"
+	}
+	query.Set("section", section)
+	redirectURL.RawQuery = query.Encode()
+
+	fragment := url.Values{}
+	if token != "" {
+		fragment.Set("token", token)
+	}
+	if user != "" {
+		fragment.Set("user", user)
+	}
+	if authError != "" {
+		fragment.Set("auth_error", authError)
+	}
+	redirectURL.Fragment = fragment.Encode()
+	return redirectURL.String()
 }
 
 func (h *Handler) Health(w http.ResponseWriter, _ *http.Request) {

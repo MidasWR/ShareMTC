@@ -12,8 +12,10 @@ import { useToast } from "../../design/components/Toast";
 import { Badge } from "../../design/primitives/Badge";
 import { listVMTemplates } from "../resources/api/resourcesApi";
 import { resolvePodLogoURL, resolveTemplateLogoURL } from "../../lib/logoResolver";
+import { useSectionRouting } from "../../app/routing/useSectionRouting";
 
 export function PodsCatalogPanel() {
+  const { navigateToTab } = useSectionRouting(true);
   const [pods, setPods] = useState<PodCatalogItem[]>([]);
   const [templates, setTemplates] = useState<PodTemplate[]>([]);
   const [vmTemplates, setVmTemplates] = useState<Array<{
@@ -47,10 +49,11 @@ export function PodsCatalogPanel() {
   const { push } = useToast();
 
   function openMarketplace() {
-    const url = new URL(window.location.href);
-    url.searchParams.set("section", "marketplace");
-    window.history.pushState({}, "", url);
-    window.dispatchEvent(new PopStateEvent("popstate"));
+    const current = new URLSearchParams(window.location.search).get("section");
+    if (current === "marketplace") {
+      return;
+    }
+    navigateToTab("marketplace");
   }
 
   async function loadCatalog() {

@@ -21,6 +21,8 @@ export function K8sClustersPanel() {
   const [name, setName] = useState("core-k8s");
   const [loading, setLoading] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<KubernetesCluster | null>(null);
+  const [deleteError, setDeleteError] = useState("");
+  const [deleting, setDeleting] = useState(false);
   const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
   const { push } = useToast();
   const providerState = useProviderOptions();
@@ -83,15 +85,19 @@ export function K8sClustersPanel() {
   }
 
   async function remove(clusterID: string) {
-    setLoading(true);
+    setDeleting(true);
     try {
       await deleteK8sCluster(clusterID);
       await refresh();
       push("info", formatOperationMessage({ action: "Delete", entityType: "Cluster", entityId: clusterID, result: "success" }), "Kubernetes");
+      setDeleteTarget(null);
+      setDeleteError("");
     } catch (error) {
-      push("error", error instanceof Error ? error.message : "Failed to delete cluster", "Kubernetes");
+      const message = error instanceof Error ? error.message : "Failed to delete cluster";
+      setDeleteError(message);
+      push("error", message, "Kubernetes");
     } finally {
-      setLoading(false);
+      setDeleting(false);
     }
   }
 
@@ -154,7 +160,7 @@ export function K8sClustersPanel() {
                 render: (row) => (
                   <ActionDropdown
                     label="Actions"
-                    disabled={!row.id || loading}
+                    disabled={!row.id || loading || deleting}
                     options={[
                       { value: "refresh", label: "Refresh" },
                       { value: "delete", label: "Delete" }
@@ -177,16 +183,24 @@ export function K8sClustersPanel() {
         description={deleteTarget ? `Cluster ${deleteTarget.name} will be permanently deleted.` : undefined}
         confirmLabel="Delete"
         confirmVariant="destructive"
-        onClose={() => setDeleteTarget(null)}
-        onConfirm={() => {
+        onClose={() => {
+          if (deleting) {
+            return;
+          }
+          setDeleteError("");
+          setDeleteTarget(null);
+        }}
+        onConfirm={async () => {
           if (!deleteTarget?.id) {
             setDeleteTarget(null);
             return;
           }
-          void remove(deleteTarget.id);
-          setDeleteTarget(null);
+          await remove(deleteTarget.id);
         }}
-      />
+      >
+        {deleteError ? <p className="mb-2 text-sm text-danger">{deleteError}</p> : null}
+        {deleting ? <p className="text-xs text-textSecondary">Deleting cluster...</p> : null}
+      </Modal>
     </section>
   );
 }

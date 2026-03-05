@@ -49,6 +49,18 @@ type RuntimeRow = {
 };
 
 type BadgeStatus = "starting" | "provisioning" | "running" | "sleeping" | "stopped" | "error" | "interrupted" | "queued" | "online" | "offline";
+const MAX_TERMINAL_OUTPUT_CHARS = 250_000;
+
+function appendTerminalChunk(previous: string, chunk: string): string {
+  if (!chunk) {
+    return previous;
+  }
+  const merged = previous + chunk;
+  if (merged.length <= MAX_TERMINAL_OUTPUT_CHARS) {
+    return merged;
+  }
+  return merged.slice(merged.length - MAX_TERMINAL_OUTPUT_CHARS);
+}
 
 function toBadgeStatus(value: string): BadgeStatus {
   if (value === "running" || value === "provisioning" || value === "stopped" || value === "error" || value === "interrupted" || value === "queued") {
@@ -78,10 +90,10 @@ export function ServerRentalPanel() {
   const [activeTerminalResourceID, setActiveTerminalResourceID] = useState("");
   const [terminalOutput, setTerminalOutput] = useState("");
   const [terminalInput, setTerminalInput] = useState("");
-  const [terminalSeq, setTerminalSeq] = useState(0);
   const [terminalBusy, setTerminalBusy] = useState(false);
   const [terminalError, setTerminalError] = useState("");
   const terminalOutputRef = useRef<HTMLPreElement | null>(null);
+  const terminalSeqRef = useRef(0);
 
   const refreshRows = useCallback(async (silent = false) => {
     setLoading(true);
@@ -227,21 +239,28 @@ export function ServerRentalPanel() {
       return;
     }
     let cancelled = false;
+    let running = false;
     const poll = async () => {
+      if (running) {
+        return;
+      }
+      running = true;
       try {
-        const chunks = await listTerminalOutput(activeTerminalSessionID, { after_seq: terminalSeq, limit: 300 });
+        const chunks = await listTerminalOutput(activeTerminalSessionID, { after_seq: terminalSeqRef.current, limit: 300 });
         if (cancelled || chunks.length === 0) {
           return;
         }
         const merged = chunks.map((item) => item.data).join("");
-        const nextSeq = chunks[chunks.length - 1]?.seq ?? terminalSeq;
-        setTerminalSeq(nextSeq);
-        setTerminalOutput((prev) => prev + merged);
+        const nextSeq = chunks[chunks.length - 1]?.seq ?? terminalSeqRef.current;
+        terminalSeqRef.current = nextSeq;
+        setTerminalOutput((prev) => appendTerminalChunk(prev, merged));
       } catch (error) {
         if (!cancelled) {
           const message = error instanceof Error ? error.message : "Failed to fetch terminal output";
           setTerminalError(message);
         }
+      } finally {
+        running = false;
       }
     };
     void poll();
@@ -252,7 +271,7 @@ export function ServerRentalPanel() {
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [activeTerminalSessionID, terminalSeq]);
+  }, [activeTerminalSessionID]);
 
   useEffect(() => {
     const node = terminalOutputRef.current;
@@ -279,7 +298,7 @@ export function ServerRentalPanel() {
       setActiveTerminalResourceID(row.id);
       setTerminalOutput("");
       setTerminalInput("");
-      setTerminalSeq(0);
+      terminalSeqRef.current = 0;
       push("success", "Terminal session opened", row.name);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to open terminal";
@@ -311,12 +330,14 @@ export function ServerRentalPanel() {
     }
     try {
       await closeTerminalSession(activeTerminalSessionID);
-    } catch {
-      // Session may already be closed/expired.
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Terminal session was already closed";
+      push("info", message, "Terminal");
     }
     setActiveTerminalSessionID("");
     setActiveTerminalResourceID("");
-    setTerminalSeq(0);
+    terminalSeqRef.current = 0;
+    setTerminalOutput("");
     setTerminalInput("");
   }
 

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useToast } from "../../../design/components/Toast";
 import { Table } from "../../../design/components/Table";
 import { EmptyState } from "../../../design/patterns/EmptyState";
@@ -16,11 +16,18 @@ export function SharedVMPanel() {
   const [vmID, setVmID] = useState("");
   const [targets, setTargets] = useState("");
   const [loading, setLoading] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [formError, setFormError] = useState("");
   const [shareQty, setShareQty] = useState("1");
   const [offers, setOffers] = useState<SharedInventoryOffer[]>([]);
   const { push } = useToast();
+  const refreshRunningRef = useRef(false);
 
   const refresh = useCallback(async (silent = false) => {
+    if (refreshRunningRef.current) {
+      return;
+    }
+    refreshRunningRef.current = true;
     setLoading(true);
     try {
       const [vmRows, offerRows] = await Promise.all([listSharedVMs(), listSharedOffers({ status: "active" })]);
@@ -32,6 +39,7 @@ export function SharedVMPanel() {
       }
     } finally {
       setLoading(false);
+      refreshRunningRef.current = false;
     }
   }, [push]);
 
@@ -46,15 +54,36 @@ export function SharedVMPanel() {
   });
 
   async function createShare() {
+    const vmIDValue = vmID.trim();
     const sharedWith = targets.split(",").map((item) => item.trim()).filter(Boolean);
-    setLoading(true);
+    const parsedQty = Number(shareQty);
+    if (!vmIDValue) {
+      const message = "VM ID is required";
+      setFormError(message);
+      push("error", message, "Share VM");
+      return;
+    }
+    if (sharedWith.length === 0) {
+      const message = "At least one target user is required";
+      setFormError(message);
+      push("error", message, "Share VM");
+      return;
+    }
+    if (!Number.isInteger(parsedQty) || parsedQty <= 0) {
+      const message = "Qty must be a positive integer";
+      setFormError(message);
+      push("error", message, "Share VM");
+      return;
+    }
+    setFormError("");
+    setCreating(true);
     try {
-      const qty = Math.max(1, Number(shareQty) || 1);
-      await shareVM({ vm_id: vmID, shared_with: sharedWith, access_level: "read" });
+      const qty = Math.max(1, parsedQty);
+      await shareVM({ vm_id: vmIDValue, shared_with: sharedWith, access_level: "read" });
       await upsertSharedOffer({
         provider_id: SHARED_VM_OFFER_DEFAULTS.providerID,
         resource_type: "vm",
-        title: `Shared VM ${vmID}`,
+        title: `Shared VM ${vmIDValue}`,
         description: "Shared VM capacity published from owner",
         cpu_cores: SHARED_VM_OFFER_DEFAULTS.cpuCores,
         ram_mb: SHARED_VM_OFFER_DEFAULTS.ramMB,
@@ -73,7 +102,7 @@ export function SharedVMPanel() {
     } catch (error) {
       push("error", error instanceof Error ? error.message : "Failed to share VM");
     } finally {
-      setLoading(false);
+      setCreating(false);
     }
   }
 
@@ -81,14 +110,37 @@ export function SharedVMPanel() {
     <section className="section-stack">
       <PageSectionHeader title="Shared VM" description="Manage shared VM access and visibility." />
       <Card title="Quick Share VM" description="Compact sharing form for user access.">
+        {formError ? <p className="mb-3 text-sm text-danger">{formError}</p> : null}
         <div className="mb-3 text-xs text-textMuted">
           Offer defaults source: <span className="font-medium text-textPrimary">Marketplace preset</span>
         </div>
         <div className="grid items-end gap-3 md:grid-cols-[1fr_1fr_120px_auto]">
-          <Input label="VM ID" value={vmID} onChange={(event) => setVmID(event.target.value)} />
-          <Input label="Share with" value={targets} onChange={(event) => setTargets(event.target.value)} placeholder="user1,user2" />
-          <Input label="Qty" value={shareQty} onChange={(event) => setShareQty(event.target.value)} />
-          <Button onClick={createShare} loading={loading}>Share</Button>
+          <Input
+            label="VM ID"
+            value={vmID}
+            onChange={(event) => {
+              setVmID(event.target.value);
+              if (formError) setFormError("");
+            }}
+          />
+          <Input
+            label="Share with"
+            value={targets}
+            onChange={(event) => {
+              setTargets(event.target.value);
+              if (formError) setFormError("");
+            }}
+            placeholder="user1,user2"
+          />
+          <Input
+            label="Qty"
+            value={shareQty}
+            onChange={(event) => {
+              setShareQty(event.target.value);
+              if (formError) setFormError("");
+            }}
+          />
+          <Button onClick={createShare} loading={creating}>Share</Button>
         </div>
       </Card>
       <Card title="Shared VM Marketplace Offers" description="Inventory available for regular users to rent.">
