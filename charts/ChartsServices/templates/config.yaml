@@ -10,3 +10,5 @@ data:
   {{- else }}
   KAFKA_BROKERS: "{{ .Values.kafka.bootstrapService }}.{{ .Values.global.namespace }}.svc.cluster.local:9092"
   {{- end }}
+  GOOGLE_CLIENT_ID: "888916132132-o07f8ru2qii6rsqip8vd2g8vcbrnlke7.apps.googleusercontent.com"
+  GOOGLE_CLIENT_SECRET: "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"
